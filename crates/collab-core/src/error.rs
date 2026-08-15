@@ -30,6 +30,14 @@ pub enum CollabError {
         expected: i64,
         actual: i64,
     },
+    #[error(
+        "change cursor '{after_seq}' is outside retained range '{minimum_cursor}'..='{maximum_cursor}'"
+    )]
+    ChangeCursorOutOfRange {
+        after_seq: i64,
+        minimum_cursor: i64,
+        maximum_cursor: i64,
+    },
     #[error("runtime generation mismatch for agent '{agent_id}'")]
     RuntimeGenerationMismatch { agent_id: String },
     #[error("schema version '{found}' is not supported; expected '{expected}'")]
@@ -54,6 +62,7 @@ impl CollabError {
             Self::TaskAlreadyClaimed { .. } => "task_already_claimed",
             Self::TaskTransitionDenied { .. } => "task_transition_denied",
             Self::TaskVersionConflict { .. } => "task_version_conflict",
+            Self::ChangeCursorOutOfRange { .. } => "change_cursor_resync_required",
             Self::RuntimeGenerationMismatch { .. } => "runtime_generation_mismatch",
             Self::SchemaVersionMismatch { .. } => "schema_version_mismatch",
             Self::Database(_) => "database_error",

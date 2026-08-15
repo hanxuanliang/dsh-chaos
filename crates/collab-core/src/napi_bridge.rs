@@ -424,6 +424,16 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn prune_changes_before(&self, before_ms: f64) -> Result<String> {
+        let before_ms = parse_millis("before_ms", before_ms)?;
+        self.core
+            .prune_changes_before(before_ms)
+            .await
+            .map(|floor| floor.to_string())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn create_task(&self, message_id: String, actor_id: String) -> Result<JsTask> {
         self.core
             .create_task(&message_id, &actor_id)
@@ -637,6 +647,17 @@ fn parse_i64(name: &str, value: &str) -> Result<i64> {
             format!("[invalid_argument] {name} must be a signed 64-bit decimal string"),
         )
     })
+}
+
+fn parse_millis(name: &str, value: f64) -> Result<i64> {
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+    if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > MAX_SAFE_INTEGER {
+        return Err(Error::new(
+            Status::InvalidArg,
+            format!("[invalid_argument] {name} must be a non-negative integer millisecond value"),
+        ));
+    }
+    Ok(value as i64)
 }
 
 fn to_napi_error(error: CollabError) -> Error {

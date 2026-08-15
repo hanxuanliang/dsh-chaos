@@ -136,6 +136,7 @@ export interface NativeCollabHandle {
   listActors(actorId: string): Promise<NativeActor[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
+  pruneChangesBefore(beforeMs: number): Promise<string>
   createTask(messageId: string, actorId: string): Promise<NativeTask>
   claimTask(messageId: string, actorId: string): Promise<NativeTask>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>

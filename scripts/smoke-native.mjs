@@ -109,6 +109,12 @@ try {
   const changes = await core.listChanges(owner.id, '0', 500)
   assert(changes.some(change => change.kind === 'message_created'))
   assert(changes.some(change => change.kind === 'task_updated'))
+  const retentionFloor = await core.pruneChangesBefore(Date.now() + 1)
+  assert.equal((await core.snapshot(owner.id)).cursor, retentionFloor)
+  await assert.rejects(
+    core.listChanges(owner.id, '0', 500),
+    /change_cursor_resync_required/,
+  )
   await core.close()
 } finally {
   await rm(root, { recursive: true, force: true })

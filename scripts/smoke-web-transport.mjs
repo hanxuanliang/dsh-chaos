@@ -83,6 +83,17 @@ try {
   assert(wire.includes(`"entityId":"${created.body.result.value.value.id}"`))
   abort.abort()
   await reader.cancel().catch(() => {})
+
+  const retentionFloor = await ctx.collab.pruneChangesBefore(Date.now() + 1)
+  const resync = await fetch(`${base}/dsh-chaos/events?cursor=0`, {
+    headers: { 'last-event-id': '0' },
+  })
+  assert.equal(resync.status, 200)
+  const resyncWire = await resync.text()
+  assert.match(resyncWire, /event: resync_required/)
+  assert.match(resyncWire, /"code":"change_cursor_resync_required"/)
+  const recovered = await call('snapshot', {})
+  assert.equal(recovered.body.result.value.value.cursor, retentionFloor)
 } finally {
   for (const fiber of fibers.reverse()) await fiber.dispose()
   for (const dispose of dependencies.reverse()) dispose()

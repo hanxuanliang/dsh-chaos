@@ -188,6 +188,16 @@ snapshotGate = undefined
 gate.resolve()
 await until(() => snapshotCalls >= 3 && activeSnapshots === 0, 'coalesced refresh to drain')
 
+const beforeResyncSources = sources.length
+directSource.emit('resync_required')
+await until(() => sources.length === beforeResyncSources + 1, 'full snapshot resync')
+const recoveredSource = source
+assert.equal(directSource.closed, true)
+assert.equal(
+  recoveredSource.url,
+  `/dsh-chaos/events?cursor=${controller.getSnapshot().cursor}`,
+)
+
 await controller.createChannel('Implementation')
 assert.equal(controller.getSnapshot().selectedTargetId, secondTarget.id)
 currentTargets = []
@@ -196,7 +206,7 @@ assert.equal(controller.getSnapshot().selectedTargetId, undefined)
 assert.deepEqual(controller.getSnapshot().messages, [])
 assert.deepEqual(controller.getSnapshot().tasks, [])
 controller.dispose()
-assert.equal(directSource.closed, true)
+assert.equal(recoveredSource.closed, true)
 
 const pendingGate = deferred()
 let pendingSnapshotStarted = false

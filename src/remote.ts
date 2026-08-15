@@ -359,10 +359,14 @@ export async function serveCollabEvents(
         changes = await api.listChanges(actorId, cursor, 500)
       } catch (error) {
         waiter.cancel()
+        const detail = errorResult(error).error
+        const event = detail.code === 'change_cursor_resync_required'
+          ? 'resync_required'
+          : 'error'
         await writeSse(
           response,
           controller.signal,
-          `event: error\ndata: ${JSON.stringify(errorResult(error).error)}\n\n`,
+          `event: ${event}\ndata: ${JSON.stringify(detail)}\n\n`,
         )
         return
       }

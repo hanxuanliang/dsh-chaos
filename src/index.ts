@@ -47,6 +47,9 @@ export type {
 
 export const name = 'dsh-chaos'
 
+const CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000
+const CHANGE_PRUNE_INTERVAL_MS = 60 * 60 * 1_000
+
 export interface Config {
   path?: string
   deliveryPollMs?: number
@@ -96,8 +99,14 @@ export class CollabService extends Service {
     const path = this.config.path ?? DEFAULT_DATABASE_PATH
     const handle = await loadNativeModule().openCollab(path)
     this.handle = handle
+    let retentionStopped = false
+    let retentionTimer: ReturnType<typeof setInterval> | undefined
+    let retentionRun = Promise.resolve()
     this.ctx.effect(() => async () => {
       const errors: unknown[] = []
+      retentionStopped = true
+      if (retentionTimer !== undefined) clearInterval(retentionTimer)
+      await retentionRun
       const delivery = this.delivery
       this.delivery = undefined
       try {
@@ -128,6 +137,17 @@ export class CollabService extends Service {
         if (error !== undefined) this.ctx.logger.warn(error)
       },
     }
+    await handle.pruneChangesBefore(Date.now() - CHANGE_RETENTION_MS)
+    const pruneExpiredChanges = (): void => {
+      retentionRun = retentionRun.then(async () => {
+        if (retentionStopped) return
+        await handle.pruneChangesBefore(Date.now() - CHANGE_RETENTION_MS)
+      }).catch((error: unknown) => {
+        warnings.warn('dsh-chaos change retention pruning failed', error)
+      })
+    }
+    retentionTimer = setInterval(pruneExpiredChanges, CHANGE_PRUNE_INTERVAL_MS)
+    retentionTimer.unref()
     const runtimes = new RuntimeManager(this.ctx.agents, this, warnings)
     this.runtimes = runtimes
 
@@ -279,6 +299,10 @@ export class CollabService extends Service {
 
   listChanges(actorId: string, afterSeq = '0', limit = 100) {
     return this.requireHandle().listChanges(actorId, afterSeq, limit)
+  }
+
+  pruneChangesBefore(beforeMs: number) {
+    return this.requireHandle().pruneChangesBefore(beforeMs)
   }
 
   createRuntime(input: CreateRuntimeInput) {

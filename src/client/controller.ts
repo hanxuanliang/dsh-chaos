@@ -75,7 +75,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   async refresh(): Promise<void> {
     if (this.disposed) return
     try {
-      await this.reloadProjection()
+      const snapshot = await this.reloadProjection()
+      if (this.started && this.source === undefined) this.connectEvents(snapshot.cursor)
     } catch (error) {
       this.publish({ ...this.state, status: 'error', error: messageOf(error) })
     }
@@ -240,6 +241,29 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     source.addEventListener('change', () => {
       if (this.source === source) void this.refresh()
     })
+    source.addEventListener('resync_required', () => {
+      if (this.source === source) void this.resyncEvents(source)
+    })
+  }
+
+  private async resyncEvents(source: EventSource): Promise<void> {
+    if (this.source !== source || this.disposed) return
+    source.close()
+    this.source = undefined
+    this.publish({ ...this.state, stream: 'connecting', error: undefined })
+    try {
+      const snapshot = await this.reloadProjection()
+      if (!this.disposed && this.source === undefined) this.connectEvents(snapshot.cursor)
+    } catch (error) {
+      if (!this.disposed && this.source === undefined) {
+        this.publish({
+          ...this.state,
+          status: 'error',
+          stream: 'idle',
+          error: messageOf(error),
+        })
+      }
+    }
   }
 
   private async call<T>(endpoint: string, payload: unknown): Promise<T> {

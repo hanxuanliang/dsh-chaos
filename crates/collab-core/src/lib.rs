@@ -29,6 +29,8 @@ use uuid::Uuid;
 
 use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_VERSION};
 
+const CHANGE_RETENTION_FLOOR_KEY: &str = "change_retention_floor";
+
 /// One process-local handle over the authoritative local Turso database.
 pub struct CollabCore {
     connection: Mutex<Connection>,
@@ -567,6 +569,15 @@ impl CollabCore {
         }
         let connection = self.connection.lock().await;
         require_actor(&connection, actor_id).await?;
+        let minimum_cursor = change_retention_floor(&connection).await?;
+        let maximum_cursor = latest_change_seq(&connection).await?;
+        if after_seq < minimum_cursor || after_seq > maximum_cursor {
+            return Err(CollabError::ChangeCursorOutOfRange {
+                after_seq,
+                minimum_cursor,
+                maximum_cursor,
+            });
+        }
         let mut rows = connection
             .query(
                 "SELECT change.seq, change.kind, change.target_id,
@@ -584,6 +595,64 @@ impl CollabCore {
             changes.push(change_from_row(&row)?);
         }
         Ok(changes)
+    }
+
+    /// Delete the oldest contiguous prefix of change events older than one
+    /// wall-clock cutoff and persist the newest cursor that remains safe for
+    /// incremental replay. A non-monotonic clock may retain extra old rows,
+    /// but can never create a replay hole.
+    pub async fn prune_changes_before(&self, before_ms: i64) -> Result<i64> {
+        self.assert_open()?;
+        if before_ms < 0 {
+            return Err(CollabError::InvalidArgument(
+                "before_ms must not be negative".into(),
+            ));
+        }
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let current_floor = change_retention_floor(&transaction).await?;
+        let mut rows = transaction
+            .query(
+                "SELECT MIN(seq) FROM change_events WHERE created_at_ms >= ?1",
+                [before_ms],
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(CollabError::Database(
+                "change retention query returned no row".into(),
+            ));
+        };
+        let first_retained_seq = row.get::<Option<i64>>(0)?;
+        drop(rows);
+        let prune_through = match first_retained_seq {
+            Some(first_retained_seq) => first_retained_seq - 1,
+            None => latest_change_seq(&transaction).await?,
+        };
+        if prune_through <= current_floor {
+            transaction.commit().await?;
+            return Ok(current_floor);
+        }
+
+        transaction
+            .execute(
+                "DELETE FROM change_recipients WHERE change_seq <= ?1",
+                [prune_through],
+            )
+            .await?;
+        transaction
+            .execute("DELETE FROM change_events WHERE seq <= ?1", [prune_through])
+            .await?;
+        transaction
+            .execute(
+                "INSERT INTO collab_meta (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (CHANGE_RETENTION_FLOOR_KEY, prune_through.to_string()),
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(prune_through)
     }
 
     /// List Task metadata visible to one actor, optionally narrowed to an
@@ -2207,7 +2276,33 @@ async fn latest_change_seq(connection: &Connection) -> Result<i64> {
             "change sequence query returned no row".into(),
         ));
     };
-    Ok(row.get(0)?)
+    let latest = row.get::<i64>(0)?;
+    drop(rows);
+    Ok(latest.max(change_retention_floor(connection).await?))
+}
+
+async fn change_retention_floor(connection: &Connection) -> Result<i64> {
+    let mut rows = connection
+        .query(
+            "SELECT value FROM collab_meta WHERE key = ?1",
+            [CHANGE_RETENTION_FLOOR_KEY],
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Ok(0);
+    };
+    let value = row.get::<String>(0)?;
+    let floor = value.parse::<i64>().map_err(|_| {
+        CollabError::Database(format!(
+            "change retention floor '{value}' is not a signed 64-bit integer"
+        ))
+    })?;
+    if floor < 0 {
+        return Err(CollabError::Database(format!(
+            "change retention floor '{floor}' is negative"
+        )));
+    }
+    Ok(floor)
 }
 
 fn change_from_row(row: &Row) -> Result<ChangeEvent> {
@@ -3233,6 +3328,42 @@ mod tests {
                 .await?
                 .is_empty()
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn change_retention_requires_snapshot_resync_outside_retained_range() -> Result<()> {
+        let (core, user, _alpha, _beta, channel) = fixture().await?;
+        let cursor = core.snapshot(&user.id).await?.cursor;
+        assert!(cursor > 0);
+
+        let floor = core.prune_changes_before(now_ms()? + 1).await?;
+        assert_eq!(floor, cursor);
+        assert_eq!(core.snapshot(&user.id).await?.cursor, floor);
+        assert!(core.list_changes(&user.id, floor, 10).await?.is_empty());
+        for after_seq in [floor - 1, floor + 1] {
+            assert!(matches!(
+                core.list_changes(&user.id, after_seq, 10).await,
+                Err(CollabError::ChangeCursorOutOfRange {
+                    minimum_cursor,
+                    maximum_cursor,
+                    ..
+                }) if minimum_cursor == floor && maximum_cursor == floor
+            ));
+        }
+
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id,
+                author_id: user.id.clone(),
+                client_request_id: "after-retention".into(),
+                text: "new retained change".into(),
+            })
+            .await?;
+        let changes = core.list_changes(&user.id, floor, 10).await?;
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].entity_id, sent.message.id);
+        assert_eq!(core.prune_changes_before(0).await?, floor);
         Ok(())
     }
 

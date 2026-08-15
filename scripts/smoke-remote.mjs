@@ -141,6 +141,23 @@ try {
   await stream
   assert.equal(response.statusCode, 200)
 
+  const retentionFloor = await ctx.collab.pruneChangesBefore(Date.now() + 1)
+  const resync = new MockResponse()
+  await sseRoute.handler({
+    method: 'GET',
+    url: '/dsh-chaos/events?cursor=0',
+    headers: {
+      host: '127.0.0.1:3080',
+      origin: 'http://127.0.0.1:3080',
+      'sec-fetch-site': 'same-origin',
+      'last-event-id': '0',
+    },
+  }, resync)
+  const resyncWire = resync.chunks.join('')
+  assert.match(resyncWire, /event: resync_required/)
+  assert.match(resyncWire, /"code":"change_cursor_resync_required"/)
+  assert.equal((await call('snapshot', {})).value.cursor, retentionFloor)
+
   const forbidden = new MockResponse()
   await sseRoute.handler({
     method: 'GET',
