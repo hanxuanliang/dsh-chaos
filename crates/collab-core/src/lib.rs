@@ -11,8 +11,8 @@ pub use napi_bridge::*;
 
 pub use error::{CollabError, Result};
 pub use model::{
-    Actor, ActorKind, InboxBatch, InboxMessage, Message, RuntimeBinding, SendMessageRequest,
-    SendMessageResult, Target, TargetKind, Task, TaskStatus,
+    Actor, ActorKind, InboxBatch, InboxMessage, Message, PendingWake, RuntimeBinding,
+    SendMessageRequest, SendMessageResult, Target, TargetKind, Task, TaskStatus,
 };
 
 use std::path::Path;
@@ -21,11 +21,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use turso::Connection;
 use turso::transaction::TransactionBehavior;
+use turso::{Connection, Row};
 use uuid::Uuid;
 
-use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_VERSION};
+use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_VERSION};
 
 /// One process-local handle over the authoritative local Turso database.
 pub struct CollabCore {
@@ -136,7 +136,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_actor(&transaction, actor_id).await?;
+        let actor_kind = require_actor(&transaction, actor_id).await?;
         require_target(&transaction, target_id).await?;
         require_owner(&transaction, target_id, added_by).await?;
         transaction
@@ -149,6 +149,16 @@ impl CollabCore {
                 (target_id, actor_id, now),
             )
             .await?;
+        if actor_kind == ActorKind::Agent {
+            transaction
+                .execute(
+                    "UPDATE agent_wake_state
+                     SET notified_generation = 0
+                     WHERE agent_id = ?1",
+                    [actor_id],
+                )
+                .await?;
+        }
         transaction.commit().await?;
         Ok(())
     }
@@ -214,6 +224,213 @@ impl CollabCore {
             preset: preset.to_owned(),
             bound_at_ms: now,
         })
+    }
+
+    /// Return the current runtime binding for one stable Agent.
+    pub async fn runtime_binding(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
+        self.assert_open()?;
+        require_non_empty("agent_id", agent_id)?;
+        let connection = self.connection.lock().await;
+        find_runtime_binding(&connection, "agent_id", agent_id).await
+    }
+
+    /// Resolve the stable Agent identity that owns one live DSH Session id.
+    pub async fn runtime_binding_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<RuntimeBinding>> {
+        self.assert_open()?;
+        require_non_empty("session_id", session_id)?;
+        let connection = self.connection.lock().await;
+        find_runtime_binding(&connection, "session_id", session_id).await
+    }
+
+    /// List every durable current runtime binding for process recovery.
+    pub async fn list_runtime_bindings(&self) -> Result<Vec<RuntimeBinding>> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        let mut rows = connection
+            .query(
+                "SELECT agent_id, session_id, generation, provider, model, preset, bound_at_ms
+                 FROM runtime_bindings ORDER BY agent_id",
+                (),
+            )
+            .await?;
+        let mut bindings = Vec::new();
+        while let Some(row) = rows.next().await? {
+            bindings.push(RuntimeBinding {
+                agent_id: row.get(0)?,
+                session_id: row.get(1)?,
+                generation: row.get(2)?,
+                provider: row.get(3)?,
+                model: row.get(4)?,
+                preset: row.get(5)?,
+                bound_at_ms: row.get(6)?,
+            });
+        }
+        Ok(bindings)
+    }
+
+    /// Scan the level-triggered wake ledger. Only authorized deliveries that
+    /// have not reached a model request contribute to the returned watermark.
+    pub async fn list_pending_wakes(&self, limit: u32) -> Result<Vec<PendingWake>> {
+        self.assert_open()?;
+        if limit == 0 || limit > 1000 {
+            return Err(CollabError::InvalidArgument(
+                "limit must be between 1 and 1000".into(),
+            ));
+        }
+        let connection = self.connection.lock().await;
+        let mut rows = connection
+            .query(
+                "SELECT rb.agent_id, rb.session_id, rb.generation,
+                        rb.provider, rb.model, rb.preset, rb.bound_at_ms,
+                        pending.pending_seq
+                 FROM runtime_bindings rb
+                 JOIN agent_wake_state wake ON wake.agent_id = rb.agent_id
+                 JOIN (
+                   SELECT d.recipient_id AS agent_id, MAX(d.message_seq) AS pending_seq
+                   FROM deliveries d
+                   JOIN memberships mem
+                     ON mem.target_id = d.target_id
+                    AND mem.actor_id = d.recipient_id
+                    AND mem.left_at_ms IS NULL
+                   WHERE d.model_seen_at_ms IS NULL
+                   GROUP BY d.recipient_id
+                 ) pending ON pending.agent_id = rb.agent_id
+                 WHERE pending.pending_seq > wake.notified_seq
+                    OR wake.notified_generation <> rb.generation
+                    OR EXISTS (
+                      SELECT 1 FROM deliveries d
+                      JOIN memberships mem
+                        ON mem.target_id = d.target_id
+                       AND mem.actor_id = d.recipient_id
+                       AND mem.left_at_ms IS NULL
+                      WHERE d.recipient_id = rb.agent_id
+                        AND d.model_seen_at_ms IS NULL
+                        AND (d.notified_at_ms IS NULL
+                          OR d.notified_generation <> rb.generation)
+                    )
+                 ORDER BY pending.pending_seq, rb.agent_id
+                 LIMIT ?1",
+                [i64::from(limit)],
+            )
+            .await?;
+        let mut wakes = Vec::new();
+        while let Some(row) = rows.next().await? {
+            wakes.push(PendingWake {
+                binding: RuntimeBinding {
+                    agent_id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    generation: row.get(2)?,
+                    provider: row.get(3)?,
+                    model: row.get(4)?,
+                    preset: row.get(5)?,
+                    bound_at_ms: row.get(6)?,
+                },
+                pending_seq: row.get(7)?,
+            });
+        }
+        Ok(wakes)
+    }
+
+    /// Record that the exact current Session generation accepted a content-free
+    /// wake through `pending_seq`. A concurrently committed newer Message stays
+    /// above this watermark and will be returned by the next scan.
+    pub async fn mark_notified(
+        &self,
+        agent_id: &str,
+        generation: i64,
+        session_id: &str,
+        pending_seq: i64,
+    ) -> Result<()> {
+        self.assert_open()?;
+        if pending_seq <= 0 {
+            return Err(CollabError::InvalidArgument(
+                "pending_seq must be positive".into(),
+            ));
+        }
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_current_binding(&transaction, agent_id, generation, session_id).await?;
+
+        let mut rows = transaction
+            .query(
+                "SELECT pending_seq FROM agent_wake_state WHERE agent_id = ?1",
+                [agent_id],
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(not_found("wake state", agent_id));
+        };
+        let durable_pending = row.get::<i64>(0)?;
+        drop(rows);
+        if pending_seq > durable_pending {
+            return Err(CollabError::InvalidArgument(format!(
+                "pending_seq {pending_seq} exceeds durable watermark {durable_pending}"
+            )));
+        }
+
+        transaction
+            .execute(
+                "UPDATE agent_wake_state
+                 SET notified_seq = MAX(notified_seq, ?2),
+                     notified_generation = ?3,
+                     attempt_count = 0,
+                     next_retry_at_ms = NULL,
+                     last_error = NULL
+                 WHERE agent_id = ?1",
+                (agent_id, pending_seq, generation),
+            )
+            .await?;
+        transaction
+            .execute(
+                "UPDATE deliveries
+                 SET notified_at_ms = ?3, notified_generation = ?4
+                 WHERE recipient_id = ?1
+                   AND message_seq <= ?2
+                   AND model_seen_at_ms IS NULL
+                   AND EXISTS (
+                     SELECT 1 FROM memberships mem
+                     WHERE mem.target_id = deliveries.target_id
+                       AND mem.actor_id = deliveries.recipient_id
+                       AND mem.left_at_ms IS NULL
+                   )",
+                (agent_id, pending_seq, now, generation),
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Re-arm model-unseen work when the same persisted Session is resumed into
+    /// a fresh process-local Agent inbox. This does not create a new Session
+    /// generation; the current binding still fences the operation.
+    pub async fn rearm_runtime_wake(
+        &self,
+        agent_id: &str,
+        generation: i64,
+        session_id: &str,
+    ) -> Result<()> {
+        self.assert_open()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_current_binding(&transaction, agent_id, generation, session_id).await?;
+        transaction
+            .execute(
+                "UPDATE agent_wake_state
+                 SET notified_generation = 0
+                 WHERE agent_id = ?1",
+                [agent_id],
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(())
     }
 
     /// Return the authorized, not-yet-model-seen deliveries for the current
@@ -385,6 +602,70 @@ impl CollabCore {
             .await?;
         transaction.commit().await?;
         Ok(())
+    }
+
+    /// Read one exact Message only while the actor remains an active member of
+    /// that exact target.
+    pub async fn read_message(
+        &self,
+        actor_id: &str,
+        target_id: &str,
+        message_id: &str,
+    ) -> Result<Message> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        require_target(&connection, target_id).await?;
+        require_active_member(&connection, target_id, actor_id, "read").await?;
+        let mut rows = connection
+            .query(
+                "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
+                 FROM messages WHERE id = ?1 AND target_id = ?2",
+                (message_id, target_id),
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(not_found("message in exact target", message_id));
+        };
+        message_from_row(&row)
+    }
+
+    /// Read an ascending page from one exact target after a global sequence.
+    pub async fn read_messages(
+        &self,
+        actor_id: &str,
+        target_id: &str,
+        after_seq: i64,
+        limit: u32,
+    ) -> Result<Vec<Message>> {
+        self.assert_open()?;
+        if after_seq < 0 {
+            return Err(CollabError::InvalidArgument(
+                "after_seq must not be negative".into(),
+            ));
+        }
+        if limit == 0 || limit > 100 {
+            return Err(CollabError::InvalidArgument(
+                "limit must be between 1 and 100".into(),
+            ));
+        }
+        let connection = self.connection.lock().await;
+        require_target(&connection, target_id).await?;
+        require_active_member(&connection, target_id, actor_id, "read").await?;
+        let mut rows = connection
+            .query(
+                "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
+                 FROM messages
+                 WHERE target_id = ?1 AND seq > ?2
+                 ORDER BY seq
+                 LIMIT ?3",
+                (target_id, after_seq, i64::from(limit)),
+            )
+            .await?;
+        let mut messages = Vec::new();
+        while let Some(row) = rows.next().await? {
+            messages.push(message_from_row(&row)?);
+        }
+        Ok(messages)
     }
 
     /// Convert a committed top-level Message to a Task with a target-local
@@ -772,28 +1053,98 @@ async fn migrate(connection: &mut Connection) -> Result<()> {
         None => None,
     };
     drop(rows);
-    if let Some(found) = stored {
-        if found != SCHEMA_VERSION.to_string() {
-            return Err(CollabError::SchemaVersionMismatch {
+    let mut version = match stored {
+        Some(found) => found
+            .parse::<u32>()
+            .map_err(|_| CollabError::SchemaVersionMismatch {
                 found,
                 expected: SCHEMA_VERSION,
-            });
-        }
-        return Ok(());
+            })?,
+        None => 0,
+    };
+    if version > SCHEMA_VERSION {
+        return Err(CollabError::SchemaVersionMismatch {
+            found: version.to_string(),
+            expected: SCHEMA_VERSION,
+        });
     }
 
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .await?;
-    transaction.execute_batch(SCHEMA_V1).await?;
-    transaction
-        .execute(
-            "INSERT INTO collab_meta (key, value) VALUES ('schema_version', ?1)",
-            [SCHEMA_VERSION.to_string()],
-        )
-        .await?;
-    transaction.commit().await?;
+    while version < SCHEMA_VERSION {
+        let next = version + 1;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        match next {
+            1 => transaction.execute_batch(SCHEMA_V1).await?,
+            2 => transaction.execute_batch(SCHEMA_V2).await?,
+            _ => {
+                return Err(CollabError::SchemaVersionMismatch {
+                    found: version.to_string(),
+                    expected: SCHEMA_VERSION,
+                });
+            }
+        }
+        transaction
+            .execute(
+                "INSERT INTO collab_meta (key, value) VALUES ('schema_version', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [next.to_string()],
+            )
+            .await?;
+        transaction.commit().await?;
+        version = next;
+    }
     Ok(())
+}
+
+async fn find_runtime_binding(
+    connection: &Connection,
+    key: &'static str,
+    value: &str,
+) -> Result<Option<RuntimeBinding>> {
+    let statement = match key {
+        "agent_id" => {
+            "SELECT agent_id, session_id, generation, provider, model, preset, bound_at_ms
+             FROM runtime_bindings WHERE agent_id = ?1"
+        }
+        "session_id" => {
+            "SELECT agent_id, session_id, generation, provider, model, preset, bound_at_ms
+             FROM runtime_bindings WHERE session_id = ?1"
+        }
+        _ => {
+            return Err(CollabError::Database(
+                "unsupported runtime binding lookup key".into(),
+            ));
+        }
+    };
+    let mut rows = connection.query(statement, [value]).await?;
+    let Some(row) = rows.next().await? else {
+        return Ok(None);
+    };
+    Ok(Some(RuntimeBinding {
+        agent_id: row.get(0)?,
+        session_id: row.get(1)?,
+        generation: row.get(2)?,
+        provider: row.get(3)?,
+        model: row.get(4)?,
+        preset: row.get(5)?,
+        bound_at_ms: row.get(6)?,
+    }))
+}
+
+fn message_from_row(row: &Row) -> Result<Message> {
+    let body_json = row.get::<String>(5)?;
+    let body: StoredTextBody = serde_json::from_str(&body_json)
+        .map_err(|error| CollabError::Database(format!("message body is malformed: {error}")))?;
+    Ok(Message {
+        seq: row.get(0)?,
+        id: row.get(1)?,
+        target_id: row.get(2)?,
+        author_id: row.get(3)?,
+        client_request_id: row.get(4)?,
+        text: body.text,
+        created_at_ms: row.get(6)?,
+    })
 }
 
 async fn require_actor(connection: &Connection, actor_id: &str) -> Result<ActorKind> {
@@ -1269,6 +1620,170 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn runtime_lookup_keeps_session_ownership_unique() -> Result<()> {
+        let (core, _user, alpha, beta, _channel) = fixture().await?;
+        let binding = core
+            .bind_runtime(&alpha.id, "session-owned", "openai", "codex", "default")
+            .await?;
+
+        assert_eq!(
+            core.runtime_binding(&alpha.id).await?,
+            Some(binding.clone())
+        );
+        assert_eq!(
+            core.runtime_binding_for_session("session-owned").await?,
+            Some(binding)
+        );
+        assert!(
+            core.bind_runtime(&beta.id, "session-owned", "openai", "codex", "default")
+                .await
+                .is_err()
+        );
+        assert_eq!(core.list_runtime_bindings().await?.len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn wake_watermark_is_level_triggered_and_generation_fenced() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        let first = core
+            .bind_runtime(&alpha.id, "wake-session-1", "openai", "codex", "default")
+            .await?;
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "wake-message".into(),
+                text: "ring once".into(),
+            })
+            .await?;
+
+        let wakes = core.list_pending_wakes(10).await?;
+        assert_eq!(wakes.len(), 1);
+        assert_eq!(wakes[0].binding, first);
+        assert_eq!(wakes[0].pending_seq, sent.message.seq);
+        core.mark_notified(
+            &alpha.id,
+            first.generation,
+            &first.session_id,
+            sent.message.seq,
+        )
+        .await?;
+        assert!(core.list_pending_wakes(10).await?.is_empty());
+
+        core.rearm_runtime_wake(&alpha.id, first.generation, &first.session_id)
+            .await?;
+        assert_eq!(core.list_pending_wakes(10).await?.len(), 1);
+        core.mark_notified(
+            &alpha.id,
+            first.generation,
+            &first.session_id,
+            sent.message.seq,
+        )
+        .await?;
+        assert!(core.list_pending_wakes(10).await?.is_empty());
+
+        {
+            let connection = core.connection.lock().await;
+            connection
+                .execute(
+                    "UPDATE memberships SET left_at_ms = 1
+                     WHERE target_id = ?1 AND actor_id = ?2",
+                    (channel.id.as_str(), alpha.id.as_str()),
+                )
+                .await?;
+        }
+        assert!(core.list_pending_wakes(10).await?.is_empty());
+        core.add_member(&channel.id, &alpha.id, &user.id).await?;
+        assert_eq!(core.list_pending_wakes(10).await?.len(), 1);
+        core.mark_notified(
+            &alpha.id,
+            first.generation,
+            &first.session_id,
+            sent.message.seq,
+        )
+        .await?;
+        assert!(core.list_pending_wakes(10).await?.is_empty());
+
+        let second = core
+            .bind_runtime(&alpha.id, "wake-session-2", "openai", "codex", "default")
+            .await?;
+        let rebound = core.list_pending_wakes(10).await?;
+        assert_eq!(rebound.len(), 1);
+        assert_eq!(rebound[0].binding, second);
+        assert!(matches!(
+            core.mark_notified(
+                &alpha.id,
+                first.generation,
+                &first.session_id,
+                sent.message.seq,
+            )
+            .await,
+            Err(CollabError::RuntimeGenerationMismatch { .. })
+        ));
+        core.mark_notified(
+            &alpha.id,
+            second.generation,
+            &second.session_id,
+            sent.message.seq,
+        )
+        .await?;
+
+        let batch = core
+            .check_inbox(&alpha.id, second.generation, &second.session_id, 10)
+            .await?;
+        core.mark_model_seen(
+            batch.id.as_deref().expect("one-message batch"),
+            &alpha.id,
+            second.generation,
+            &second.session_id,
+        )
+        .await?;
+        core.bind_runtime(&alpha.id, "wake-session-3", "openai", "codex", "default")
+            .await?;
+        assert!(core.list_pending_wakes(10).await?.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn exact_target_reads_recheck_current_membership() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        let outsider = core.create_user("outsider", "Outsider").await?;
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "history-message".into(),
+                text: "history".into(),
+            })
+            .await?;
+
+        assert_eq!(
+            core.read_message(&alpha.id, &channel.id, &sent.message.id)
+                .await?,
+            sent.message
+        );
+        assert_eq!(
+            core.read_messages(&alpha.id, &channel.id, 0, 10).await?,
+            vec![sent.message.clone()]
+        );
+        assert!(matches!(
+            core.read_message(&outsider.id, &channel.id, &sent.message.id)
+                .await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+
+        let other = core.create_channel("other", &user.id).await?;
+        core.add_member(&other.id, &alpha.id, &user.id).await?;
+        assert!(matches!(
+            core.read_message(&alpha.id, &other.id, &sent.message.id)
+                .await,
+            Err(CollabError::NotFound { .. })
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn only_one_concurrent_task_claim_wins() -> Result<()> {
         let (core, user, alpha, beta, channel) = fixture().await?;
         let sent = core
@@ -1294,6 +1809,58 @@ mod tests {
         ));
         assert_eq!(successes, 1);
         assert_eq!(conflicts, 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn schema_v1_file_upgrades_to_unique_session_bindings() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("v1.db");
+        {
+            let database =
+                turso::Builder::new_local(path.to_str().ok_or_else(|| {
+                    CollabError::Filesystem("temporary path is not UTF-8".into())
+                })?)
+                .build()
+                .await?;
+            let mut connection = database.connect()?;
+            connection.execute_batch(META_SCHEMA).await?;
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .await?;
+            transaction.execute_batch(SCHEMA_V1).await?;
+            transaction
+                .execute(
+                    "INSERT INTO collab_meta (key, value) VALUES ('schema_version', '1')",
+                    (),
+                )
+                .await?;
+            transaction.commit().await?;
+        }
+
+        let core = CollabCore::open(&path).await?;
+        let alpha = core
+            .create_agent("v1-alpha", "Alpha", "/tmp/v1-alpha")
+            .await?;
+        let beta = core.create_agent("v1-beta", "Beta", "/tmp/v1-beta").await?;
+        core.bind_runtime(&alpha.id, "unique-session", "openai", "codex", "default")
+            .await?;
+        assert!(
+            core.bind_runtime(&beta.id, "unique-session", "openai", "codex", "default")
+                .await
+                .is_err()
+        );
+        let connection = core.connection.lock().await;
+        let mut rows = connection
+            .query(
+                "SELECT value FROM collab_meta WHERE key = 'schema_version'",
+                (),
+            )
+            .await?;
+        assert_eq!(
+            rows.next().await?.expect("schema row").get::<String>(0)?,
+            "2"
+        );
         Ok(())
     }
 

@@ -101,6 +101,15 @@ pub struct RuntimeBinding {
     pub bound_at_ms: i64,
 }
 
+/// One current runtime whose durable inbox still needs a level-triggered
+/// notification. The watermark is the newest authorized, not-yet-model-seen
+/// delivery at the time of the scan.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct PendingWake {
+    pub binding: RuntimeBinding,
+    pub pending_seq: i64,
+}
+
 /// One message returned by an inbox check.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct InboxMessage {

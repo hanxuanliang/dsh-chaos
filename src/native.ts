@@ -45,6 +45,11 @@ export interface NativeRuntimeBinding {
   boundAtMs: number
 }
 
+export interface NativePendingWake {
+  binding: NativeRuntimeBinding
+  pendingSeq: string
+}
+
 export interface NativeInboxBatch {
   id?: string
   agentId: string
@@ -84,8 +89,21 @@ export interface NativeCollabHandle {
     model: string,
     preset: string,
   ): Promise<NativeRuntimeBinding>
+  runtimeBinding(agentId: string): Promise<NativeRuntimeBinding | undefined>
+  runtimeBindingForSession(sessionId: string): Promise<NativeRuntimeBinding | undefined>
+  listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
+  listPendingWakes(limit: number): Promise<NativePendingWake[]>
+  markNotified(
+    agentId: string,
+    generation: string,
+    sessionId: string,
+    pendingSeq: string,
+  ): Promise<void>
+  rearmRuntimeWake(agentId: string, generation: string, sessionId: string): Promise<void>
   checkInbox(agentId: string, generation: string, sessionId: string, limit: number): Promise<NativeInboxBatch>
   markModelSeen(batchId: string, agentId: string, generation: string, sessionId: string): Promise<void>
+  readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
+  readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   createTask(messageId: string, actorId: string): Promise<NativeTask>
   claimTask(messageId: string, actorId: string): Promise<NativeTask>
 }

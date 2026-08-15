@@ -1,4 +1,4 @@
-pub(crate) const SCHEMA_VERSION: u32 = 1;
+pub(crate) const SCHEMA_VERSION: u32 = 2;
 
 pub(crate) const META_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS collab_meta (
@@ -151,4 +151,9 @@ CREATE TABLE read_cursors (
   updated_at_ms INTEGER NOT NULL,
   PRIMARY KEY (actor_id, target_id)
 );
+"#;
+
+pub(crate) const SCHEMA_V2: &str = r#"
+CREATE UNIQUE INDEX runtime_bindings_session_id
+  ON runtime_bindings (session_id);
 "#;

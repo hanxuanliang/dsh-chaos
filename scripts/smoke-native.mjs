@@ -27,6 +27,23 @@ try {
   assert.equal(sent.wakeAgentIds.length, 2)
 
   const binding = await core.bindRuntime(alpha.id, 'alpha-session-1', 'openai', 'codex', 'default')
+  assert.deepEqual(await core.runtimeBinding(alpha.id), binding)
+  assert.deepEqual(await core.runtimeBindingForSession(binding.sessionId), binding)
+  assert.equal((await core.listRuntimeBindings()).length, 1)
+  const wakes = await core.listPendingWakes(20)
+  assert.equal(wakes.length, 1)
+  assert.equal(wakes[0].pendingSeq, sent.message.seq)
+  await core.markNotified(alpha.id, binding.generation, binding.sessionId, wakes[0].pendingSeq)
+  assert.equal((await core.listPendingWakes(20)).length, 0)
+  await core.rearmRuntimeWake(alpha.id, binding.generation, binding.sessionId)
+  assert.equal((await core.listPendingWakes(20)).length, 1)
+  await core.markNotified(alpha.id, binding.generation, binding.sessionId, wakes[0].pendingSeq)
+
+  assert.deepEqual(
+    await core.readMessage(alpha.id, channel.id, sent.message.id),
+    sent.message,
+  )
+  assert.equal((await core.readMessages(alpha.id, channel.id, '0', 20)).length, 1)
   const inbox = await core.checkInbox(alpha.id, binding.generation, binding.sessionId, 20)
   assert.equal(inbox.messages.length, 1)
   await core.markModelSeen(inbox.id, alpha.id, binding.generation, binding.sessionId)

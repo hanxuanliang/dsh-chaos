@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use crate::{
-    Actor, CollabCore, CollabError, InboxBatch, Message, RuntimeBinding, SendMessageRequest,
-    SendMessageResult, Target, Task, TaskStatus,
+    Actor, CollabCore, CollabError, InboxBatch, Message, PendingWake, RuntimeBinding,
+    SendMessageRequest, SendMessageResult, Target, Task, TaskStatus,
 };
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -68,6 +68,12 @@ pub struct JsRuntimeBinding {
     pub model: String,
     pub preset: String,
     pub bound_at_ms: f64,
+}
+
+#[napi(object)]
+pub struct JsPendingWake {
+    pub binding: JsRuntimeBinding,
+    pub pending_seq: String,
 }
 
 #[napi(object)]
@@ -189,6 +195,75 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn runtime_binding(&self, agent_id: String) -> Result<Option<JsRuntimeBinding>> {
+        self.core
+            .runtime_binding(&agent_id)
+            .await
+            .map(|binding| binding.map(JsRuntimeBinding::from))
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn runtime_binding_for_session(
+        &self,
+        session_id: String,
+    ) -> Result<Option<JsRuntimeBinding>> {
+        self.core
+            .runtime_binding_for_session(&session_id)
+            .await
+            .map(|binding| binding.map(JsRuntimeBinding::from))
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn list_runtime_bindings(&self) -> Result<Vec<JsRuntimeBinding>> {
+        self.core
+            .list_runtime_bindings()
+            .await
+            .map(|bindings| bindings.into_iter().map(JsRuntimeBinding::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn list_pending_wakes(&self, limit: u32) -> Result<Vec<JsPendingWake>> {
+        self.core
+            .list_pending_wakes(limit)
+            .await
+            .map(|wakes| wakes.into_iter().map(JsPendingWake::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn mark_notified(
+        &self,
+        agent_id: String,
+        generation: String,
+        session_id: String,
+        pending_seq: String,
+    ) -> Result<()> {
+        let generation = parse_i64("generation", &generation)?;
+        let pending_seq = parse_i64("pending_seq", &pending_seq)?;
+        self.core
+            .mark_notified(&agent_id, generation, &session_id, pending_seq)
+            .await
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn rearm_runtime_wake(
+        &self,
+        agent_id: String,
+        generation: String,
+        session_id: String,
+    ) -> Result<()> {
+        let generation = parse_i64("generation", &generation)?;
+        self.core
+            .rearm_runtime_wake(&agent_id, generation, &session_id)
+            .await
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn check_inbox(
         &self,
         agent_id: String,
@@ -216,6 +291,36 @@ impl CollabHandle {
         self.core
             .mark_model_seen(&batch_id, &agent_id, generation, &session_id)
             .await
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn read_message(
+        &self,
+        actor_id: String,
+        target_id: String,
+        message_id: String,
+    ) -> Result<JsMessage> {
+        self.core
+            .read_message(&actor_id, &target_id, &message_id)
+            .await
+            .map(JsMessage::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn read_messages(
+        &self,
+        actor_id: String,
+        target_id: String,
+        after_seq: String,
+        limit: u32,
+    ) -> Result<Vec<JsMessage>> {
+        let after_seq = parse_i64("after_seq", &after_seq)?;
+        self.core
+            .read_messages(&actor_id, &target_id, after_seq, limit)
+            .await
+            .map(|messages| messages.into_iter().map(JsMessage::from).collect())
             .map_err(to_napi_error)
     }
 
@@ -297,6 +402,15 @@ impl From<RuntimeBinding> for JsRuntimeBinding {
             model: binding.model,
             preset: binding.preset,
             bound_at_ms: binding.bound_at_ms as f64,
+        }
+    }
+}
+
+impl From<PendingWake> for JsPendingWake {
+    fn from(wake: PendingWake) -> Self {
+        Self {
+            binding: wake.binding.into(),
+            pending_seq: wake.pending_seq.to_string(),
         }
     }
 }
