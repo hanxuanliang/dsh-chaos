@@ -11,12 +11,16 @@
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./client": {
+      "types": "./lib/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
-    "native",
+    "native/dsh_chaos_core.node",
     "cordis.patch.yml",
     "README.md"
   ],
@@ -26,17 +30,29 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
     }
   },
   "scripts": {
-    "build": "pnpm build:native && pnpm build:ts",
+    "build": "pnpm build:native && pnpm build:ts && pnpm build:client",
+    "build:client": "tsdown --config tsdown.client.config.ts",
     "build:native": "cargo build -p dsh-chaos-core --features napi --release && node scripts/stage-native.mjs release",
     "build:native:debug": "cargo build -p dsh-chaos-core --features napi && node scripts/stage-native.mjs debug",
     "build:ts": "tsc -p tsconfig.json",
     "check:rust": "cargo check --workspace",
     "smoke:native": "node scripts/smoke-native.mjs",
+    "smoke:client": "node scripts/smoke-client.mjs",
+    "smoke:remote": "node scripts/smoke-remote.mjs",
     "smoke:service": "node scripts/smoke-service.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
+    "smoke:transport": "node scripts/smoke-web-transport.mjs",
     "test:rust": "cargo test --workspace",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -44,18 +60,32 @@
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-agent": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-agent-loop": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-session": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
-    "@deepseek-ai/schemastery": "^3.18.1"
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "react": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@deepseek-ai/dsh-agent": "0.1.0-rc.6",
     "@deepseek-ai/dsh-agent-loop": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-layout": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.6",
     "@deepseek-ai/dsh-llm": "0.1.0-rc.6",
     "@deepseek-ai/dsh-session": "0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
+    "@types/react": "^18.3.1",
+    "react": "18.3.1",
+    "tsdown": "^0.22.14",
     "typescript": "^6.0.3"
   }
 }

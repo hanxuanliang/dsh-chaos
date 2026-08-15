@@ -41,6 +41,14 @@ export interface CollabRuntimeApi {
   ): Promise<void>
   createTask(messageId: string, actorId: string): Promise<NativeTask>
   claimTask(messageId: string, actorId: string): Promise<NativeTask>
+  listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
+  unclaimTask(messageId: string, actorId: string, expectedVersion: string): Promise<NativeTask>
+  updateTaskStatus(
+    messageId: string,
+    actorId: string,
+    status: NativeTask['status'],
+    expectedVersion: string,
+  ): Promise<NativeTask>
   sendMessage(input: {
     targetId: string
     authorId: string

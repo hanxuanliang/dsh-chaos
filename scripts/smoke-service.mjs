@@ -77,6 +77,18 @@ try {
   }, execution)
   assert.equal(task.status, 'todo')
   assert.equal(claimed.assigneeId, alpha.id)
+  const reviewed = await scopedTools.get('task_update').execute({
+    messageId: sent.message.id,
+    status: 'in_review',
+    expectedVersion: claimed.version,
+  }, execution)
+  const listed = await scopedTools.get('task_list').execute({ targetId: channel.id }, execution)
+  assert.equal(listed.tasks[0].status, 'in_review')
+  const unclaimed = await scopedTools.get('task_unclaim').execute({
+    messageId: sent.message.id,
+    expectedVersion: reviewed.version,
+  }, execution)
+  assert.equal(unclaimed.assigneeId, undefined)
 
   const request = {
     provider: 'openai',

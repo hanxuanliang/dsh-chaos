@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use crate::{
-    Actor, CollabCore, CollabError, InboxBatch, Message, PendingWake, RuntimeBinding,
-    SendMessageRequest, SendMessageResult, Target, Task, TaskStatus,
+    Actor, ChangeEvent, CollabCore, CollabError, CollabSnapshot, InboxBatch, Message, PendingWake,
+    RuntimeBinding, SendMessageRequest, SendMessageResult, Target, Task, TaskStatus,
 };
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -106,6 +106,23 @@ pub struct JsTask {
     pub updated_at_ms: f64,
 }
 
+#[napi(object)]
+pub struct JsChangeEvent {
+    pub seq: String,
+    pub kind: String,
+    pub target_id: Option<String>,
+    pub entity_id: String,
+    pub created_at_ms: f64,
+}
+
+#[napi(object)]
+pub struct JsCollabSnapshot {
+    pub actor: JsActor,
+    pub cursor: String,
+    pub targets: Vec<JsTarget>,
+    pub tasks: Vec<JsTask>,
+}
+
 #[napi]
 pub async fn open_collab(path: String) -> Result<CollabHandle> {
     let core = CollabCore::open(path).await.map_err(to_napi_error)?;
@@ -125,6 +142,15 @@ impl CollabHandle {
     pub async fn create_user(&self, handle: String, display_name: String) -> Result<JsActor> {
         self.core
             .create_user(&handle, &display_name)
+            .await
+            .map(JsActor::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn ensure_user(&self, handle: String, display_name: String) -> Result<JsActor> {
+        self.core
+            .ensure_user(&handle, &display_name)
             .await
             .map(JsActor::from)
             .map_err(to_napi_error)
@@ -365,6 +391,39 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn list_actors(&self, actor_id: String) -> Result<Vec<JsActor>> {
+        self.core
+            .list_actors(&actor_id)
+            .await
+            .map(|actors| actors.into_iter().map(JsActor::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn snapshot(&self, actor_id: String) -> Result<JsCollabSnapshot> {
+        self.core
+            .snapshot(&actor_id)
+            .await
+            .map(JsCollabSnapshot::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn list_changes(
+        &self,
+        actor_id: String,
+        after_seq: String,
+        limit: u32,
+    ) -> Result<Vec<JsChangeEvent>> {
+        let after_seq = parse_i64("after_seq", &after_seq)?;
+        self.core
+            .list_changes(&actor_id, after_seq, limit)
+            .await
+            .map(|changes| changes.into_iter().map(JsChangeEvent::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn create_task(&self, message_id: String, actor_id: String) -> Result<JsTask> {
         self.core
             .create_task(&message_id, &actor_id)
@@ -377,6 +436,56 @@ impl CollabHandle {
     pub async fn claim_task(&self, message_id: String, actor_id: String) -> Result<JsTask> {
         self.core
             .claim_task(&message_id, &actor_id)
+            .await
+            .map(JsTask::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn list_tasks(
+        &self,
+        actor_id: String,
+        target_id: Option<String>,
+    ) -> Result<Vec<JsTask>> {
+        self.core
+            .list_tasks(&actor_id, target_id.as_deref())
+            .await
+            .map(|tasks| tasks.into_iter().map(JsTask::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn unclaim_task(
+        &self,
+        message_id: String,
+        actor_id: String,
+        expected_version: String,
+    ) -> Result<JsTask> {
+        let expected_version = parse_i64("expected_version", &expected_version)?;
+        self.core
+            .unclaim_task(&message_id, &actor_id, expected_version)
+            .await
+            .map(JsTask::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn update_task_status(
+        &self,
+        message_id: String,
+        actor_id: String,
+        status: String,
+        expected_version: String,
+    ) -> Result<JsTask> {
+        let expected_version = parse_i64("expected_version", &expected_version)?;
+        let status = TaskStatus::parse(&status).ok_or_else(|| {
+            Error::new(
+                Status::InvalidArg,
+                "[invalid_argument] status must be todo, in_progress, in_review, or done",
+            )
+        })?;
+        self.core
+            .update_task_status(&message_id, &actor_id, status, expected_version)
             .await
             .map(JsTask::from)
             .map_err(to_napi_error)
@@ -494,6 +603,29 @@ impl From<Task> for JsTask {
             version: task.version.to_string(),
             created_at_ms: task.created_at_ms as f64,
             updated_at_ms: task.updated_at_ms as f64,
+        }
+    }
+}
+
+impl From<ChangeEvent> for JsChangeEvent {
+    fn from(change: ChangeEvent) -> Self {
+        Self {
+            seq: change.seq.to_string(),
+            kind: change.kind.as_str().into(),
+            target_id: change.target_id,
+            entity_id: change.entity_id,
+            created_at_ms: change.created_at_ms as f64,
+        }
+    }
+}
+
+impl From<CollabSnapshot> for JsCollabSnapshot {
+    fn from(snapshot: CollabSnapshot) -> Self {
+        Self {
+            actor: snapshot.actor.into(),
+            cursor: snapshot.cursor.to_string(),
+            targets: snapshot.targets.into_iter().map(JsTarget::from).collect(),
+            tasks: snapshot.tasks.into_iter().map(JsTask::from).collect(),
         }
     }
 }

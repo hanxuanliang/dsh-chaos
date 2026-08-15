@@ -58,6 +58,57 @@ pub struct Target {
     pub created_at_ms: i64,
 }
 
+/// A durable UI invalidation kind. Change rows carry identifiers rather than
+/// mutable domain payloads; consumers re-read the authoritative projection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangeKind {
+    ActorCreated,
+    TargetCreated,
+    MembershipChanged,
+    ThreadFollowChanged,
+    MessageCreated,
+    TaskCreated,
+    TaskUpdated,
+}
+
+impl ChangeKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::ActorCreated => "actor_created",
+            Self::TargetCreated => "target_created",
+            Self::MembershipChanged => "membership_changed",
+            Self::ThreadFollowChanged => "thread_follow_changed",
+            Self::MessageCreated => "message_created",
+            Self::TaskCreated => "task_created",
+            Self::TaskUpdated => "task_updated",
+        }
+    }
+
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "actor_created" => Some(Self::ActorCreated),
+            "target_created" => Some(Self::TargetCreated),
+            "membership_changed" => Some(Self::MembershipChanged),
+            "thread_follow_changed" => Some(Self::ThreadFollowChanged),
+            "message_created" => Some(Self::MessageCreated),
+            "task_created" => Some(Self::TaskCreated),
+            "task_updated" => Some(Self::TaskUpdated),
+            _ => None,
+        }
+    }
+}
+
+/// One monotonically ordered, recipient-snapshotted collaboration change.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ChangeEvent {
+    pub seq: i64,
+    pub kind: ChangeKind,
+    pub target_id: Option<String>,
+    pub entity_id: String,
+    pub created_at_ms: i64,
+}
+
 /// A committed immutable text message.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Message {
@@ -171,4 +222,13 @@ pub struct Task {
     pub version: i64,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
+}
+
+/// One authorization-filtered bootstrap projection and its durable cursor.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CollabSnapshot {
+    pub actor: Actor,
+    pub cursor: i64,
+    pub targets: Vec<Target>,
+    pub tasks: Vec<Task>,
 }

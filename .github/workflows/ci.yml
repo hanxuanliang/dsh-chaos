@@ -26,6 +26,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build:native:debug
       - run: pnpm build:ts
+      - run: pnpm build:client
       - run: pnpm smoke:native
       - run: pnpm smoke:service
       - run: pnpm smoke:runtime
+      - run: pnpm smoke:remote
+      - run: pnpm smoke:transport
+      - run: pnpm smoke:client

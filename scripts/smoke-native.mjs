@@ -11,6 +11,7 @@ const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-'))
 try {
   const core = await native.openCollab(join(root, 'state.db'))
   const owner = await core.createUser('owner', 'Owner')
+  assert.deepEqual(await core.ensureUser('owner', 'Ignored'), owner)
   const alpha = await core.createAgent('alpha', 'Alpha', join(root, 'alpha'))
   const beta = await core.createAgent('beta', 'Beta', join(root, 'beta'))
   const channel = await core.createChannel('design', owner.id)
@@ -90,6 +91,24 @@ try {
   const claimed = await core.claimTask(task.messageId, alpha.id)
   assert.equal(claimed.status, 'in_progress')
   await assert.rejects(core.claimTask(task.messageId, beta.id), /task_already_claimed/)
+  const review = await core.updateTaskStatus(
+    task.messageId,
+    alpha.id,
+    'in_review',
+    claimed.version,
+  )
+  const unclaimed = await core.unclaimTask(task.messageId, alpha.id, review.version)
+  assert.equal(unclaimed.status, 'in_review')
+  assert.equal(unclaimed.assigneeId, undefined)
+  assert.equal((await core.listTasks(owner.id, channel.id)).length, 1)
+  assert.equal((await core.listActors(owner.id)).length, 3)
+  const snapshot = await core.snapshot(owner.id)
+  assert.equal(snapshot.actor.id, owner.id)
+  assert(snapshot.targets.some(target => target.id === channel.id))
+  assert(snapshot.tasks.some(current => current.messageId === task.messageId))
+  const changes = await core.listChanges(owner.id, '0', 500)
+  assert(changes.some(change => change.kind === 'message_created'))
+  assert(changes.some(change => change.kind === 'task_updated'))
   await core.close()
 } finally {
   await rm(root, { recursive: true, force: true })

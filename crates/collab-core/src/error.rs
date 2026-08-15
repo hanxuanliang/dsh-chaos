@@ -22,6 +22,14 @@ pub enum CollabError {
     },
     #[error("task '{message_id}' cannot transition from '{status}'")]
     TaskTransitionDenied { message_id: String, status: String },
+    #[error(
+        "task '{message_id}' version conflict: expected '{expected}', current version is '{actual}'"
+    )]
+    TaskVersionConflict {
+        message_id: String,
+        expected: i64,
+        actual: i64,
+    },
     #[error("runtime generation mismatch for agent '{agent_id}'")]
     RuntimeGenerationMismatch { agent_id: String },
     #[error("schema version '{found}' is not supported; expected '{expected}'")]
@@ -45,6 +53,7 @@ impl CollabError {
             Self::PermissionDenied { .. } => "permission_denied",
             Self::TaskAlreadyClaimed { .. } => "task_already_claimed",
             Self::TaskTransitionDenied { .. } => "task_transition_denied",
+            Self::TaskVersionConflict { .. } => "task_version_conflict",
             Self::RuntimeGenerationMismatch { .. } => "runtime_generation_mismatch",
             Self::SchemaVersionMismatch { .. } => "schema_version_mismatch",
             Self::Database(_) => "database_error",

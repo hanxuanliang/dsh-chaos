@@ -72,9 +72,32 @@ export interface NativeTask {
   updatedAtMs: number
 }
 
+export interface NativeChangeEvent {
+  seq: string
+  kind:
+    | 'actor_created'
+    | 'target_created'
+    | 'membership_changed'
+    | 'thread_follow_changed'
+    | 'message_created'
+    | 'task_created'
+    | 'task_updated'
+  targetId?: string
+  entityId: string
+  createdAtMs: number
+}
+
+export interface NativeCollabSnapshot {
+  actor: NativeActor
+  cursor: string
+  targets: NativeTarget[]
+  tasks: NativeTask[]
+}
+
 export interface NativeCollabHandle {
   close(): Promise<void>
   createUser(handle: string, displayName: string): Promise<NativeActor>
+  ensureUser(handle: string, displayName: string): Promise<NativeActor>
   createAgent(handle: string, displayName: string, workspacePath: string): Promise<NativeActor>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
@@ -110,8 +133,19 @@ export interface NativeCollabHandle {
   markModelSeen(batchId: string, agentId: string, generation: string, sessionId: string): Promise<void>
   readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
+  listActors(actorId: string): Promise<NativeActor[]>
+  snapshot(actorId: string): Promise<NativeCollabSnapshot>
+  listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   createTask(messageId: string, actorId: string): Promise<NativeTask>
   claimTask(messageId: string, actorId: string): Promise<NativeTask>
+  listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
+  unclaimTask(messageId: string, actorId: string, expectedVersion: string): Promise<NativeTask>
+  updateTaskStatus(
+    messageId: string,
+    actorId: string,
+    status: NativeTask['status'],
+    expectedVersion: string,
+  ): Promise<NativeTask>
 }
 
 interface NativeModule {

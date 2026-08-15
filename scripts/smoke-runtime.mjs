@@ -125,6 +125,38 @@ class FakeCollab {
       updatedAtMs: 5,
     }
   }
+  async listTasks(actorId, targetId) {
+    this.taskActors.push(actorId)
+    assert.equal(targetId, 'target-1')
+    return [await this.claimTask('message-2', actorId)]
+  }
+  async updateTaskStatus(messageId, actorId, status, expectedVersion) {
+    this.taskActors.push(actorId)
+    assert.equal(expectedVersion, '2')
+    return {
+      messageId,
+      targetId: 'target-1',
+      number: '1',
+      status,
+      assigneeId: actorId,
+      version: '3',
+      createdAtMs: 4,
+      updatedAtMs: 6,
+    }
+  }
+  async unclaimTask(messageId, actorId, expectedVersion) {
+    this.taskActors.push(actorId)
+    assert.equal(expectedVersion, '3')
+    return {
+      messageId,
+      targetId: 'target-1',
+      number: '1',
+      status: 'in_review',
+      version: '4',
+      createdAtMs: 4,
+      updatedAtMs: 7,
+    }
+  }
 }
 
 const tools = new Map()
@@ -168,6 +200,9 @@ assert.deepEqual([...tools.keys()].sort(), [
   'message_send',
   'task_claim',
   'task_create',
+  'task_list',
+  'task_unclaim',
+  'task_update',
 ])
 
 collab.pending = [{ binding, pendingSeq: '9' }]
@@ -216,7 +251,27 @@ const claimedTask = await tools.get('task_claim').execute({
   actorId: 'forged-agent',
 }, execution)
 assert.equal(claimedTask.assigneeId, 'agent-1')
-assert.deepEqual(collab.taskActors, ['agent-1', 'agent-1'])
+const listedTasks = await tools.get('task_list').execute({ targetId: 'target-1' }, execution)
+assert.equal(listedTasks.tasks[0].assigneeId, 'agent-1')
+const reviewedTask = await tools.get('task_update').execute({
+  messageId: 'message-2',
+  status: 'in_review',
+  expectedVersion: '2',
+}, execution)
+assert.equal(reviewedTask.version, '3')
+const unclaimedTask = await tools.get('task_unclaim').execute({
+  messageId: 'message-2',
+  expectedVersion: '3',
+}, execution)
+assert.equal(unclaimedTask.assigneeId, undefined)
+assert.deepEqual(collab.taskActors, [
+  'agent-1',
+  'agent-1',
+  'agent-1',
+  'agent-1',
+  'agent-1',
+  'agent-1',
+])
 
 fakeAgent.status = 'running'
 collab.pending = [{ binding, pendingSeq: '10' }]

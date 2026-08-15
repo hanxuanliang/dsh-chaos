@@ -42,6 +42,13 @@ const requireAgent = (agent: Agent | undefined): Agent => {
   return agent
 }
 
+const requireVersion = (value: string): string => {
+  if (!/^[1-9][0-9]*$/.test(value)) {
+    throw new Error('expectedVersion must be a positive decimal integer string')
+  }
+  return value
+}
+
 /** Register collab tools inside one unpublished Agent scope. */
 export function installCollabTools(
   agentCtx: Context,
@@ -212,6 +219,86 @@ export function installCollabTools(
       exec.signal.throwIfAborted()
       const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
       return collab.claimTask(args.messageId, binding.agentId)
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
+    name: 'task_list',
+    description: 'List Tasks visible to the calling Agent, optionally within one exact collaboration target.',
+    parameters: {
+      targetId: { type: 'string', description: 'Optional exact Channel or Direct target id.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          tasks: { type: 'array', required: true, items: TASK_SCHEMA },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      return { tasks: await collab.listTasks(binding.agentId, args.targetId) }
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
+    name: 'task_unclaim',
+    description: 'Release a Task claimed by the calling Agent. Status is preserved and expectedVersion fences stale writes.',
+    parameters: {
+      messageId: { type: 'string', required: true, description: 'Source Message id of the Task.' },
+      expectedVersion: { type: 'string', required: true, description: 'Current positive decimal Task version.' },
+    },
+    output: {
+      schema: TASK_SCHEMA,
+      render: (_args, value) => [{
+        type: 'text',
+        text: `task ${value.number} is unclaimed at version ${value.version}`,
+      }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      return collab.unclaimTask(
+        args.messageId,
+        binding.agentId,
+        requireVersion(args.expectedVersion),
+      )
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
+    name: 'task_update',
+    description: 'Move one visible Task to a valid lifecycle status. Assignment is unchanged and expectedVersion fences stale writes.',
+    parameters: {
+      messageId: { type: 'string', required: true, description: 'Source Message id of the Task.' },
+      status: {
+        type: 'string',
+        required: true,
+        enum: ['todo', 'in_progress', 'in_review', 'done'],
+        description: 'Requested lifecycle status.',
+      },
+      expectedVersion: { type: 'string', required: true, description: 'Current positive decimal Task version.' },
+    },
+    output: {
+      schema: TASK_SCHEMA,
+      render: (_args, value) => [{
+        type: 'text',
+        text: `task ${value.number} moved to ${value.status} at version ${value.version}`,
+      }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      return collab.updateTaskStatus(
+        args.messageId,
+        binding.agentId,
+        args.status,
+        requireVersion(args.expectedVersion),
+      )
     },
   }))
 }

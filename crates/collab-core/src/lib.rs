@@ -11,10 +11,12 @@ pub use napi_bridge::*;
 
 pub use error::{CollabError, Result};
 pub use model::{
-    Actor, ActorKind, InboxBatch, InboxMessage, Message, PendingWake, RuntimeBinding,
-    SendMessageRequest, SendMessageResult, Target, TargetKind, Task, TaskStatus,
+    Actor, ActorKind, ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, Message,
+    PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target, TargetKind, Task,
+    TaskStatus,
 };
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +27,7 @@ use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
 use uuid::Uuid;
 
-use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_VERSION};
+use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_VERSION};
 
 /// One process-local handle over the authoritative local Turso database.
 pub struct CollabCore {
@@ -82,6 +84,59 @@ impl CollabCore {
             .await
     }
 
+    /// Return the stable User for one handle, creating it when absent.
+    pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
+        self.assert_open()?;
+        require_non_empty("handle", handle)?;
+        require_non_empty("display_name", display_name)?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        if let Some(actor) = find_actor_by_handle(&transaction, handle).await? {
+            if actor.kind != ActorKind::User {
+                return Err(CollabError::InvalidArgument(format!(
+                    "actor handle '{handle}' belongs to an Agent"
+                )));
+            }
+            transaction.commit().await?;
+            return Ok(actor);
+        }
+
+        let actor = Actor {
+            id: new_id(),
+            kind: ActorKind::User,
+            handle: handle.to_owned(),
+            display_name: display_name.to_owned(),
+            created_at_ms: now,
+        };
+        transaction
+            .execute(
+                "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
+                 VALUES (?1, 'user', ?2, ?3, ?4)",
+                (
+                    actor.id.as_str(),
+                    actor.handle.as_str(),
+                    actor.display_name.as_str(),
+                    now,
+                ),
+            )
+            .await?;
+        let actor_ids = all_actor_ids(&transaction).await?;
+        insert_change(
+            &transaction,
+            ChangeKind::ActorCreated,
+            None,
+            &actor.id,
+            &actor_ids,
+            now,
+        )
+        .await?;
+        transaction.commit().await?;
+        Ok(actor)
+    }
+
     /// Create a Channel and make its creator the owner/member.
     pub async fn create_channel(&self, name: &str, creator_id: &str) -> Result<Target> {
         self.assert_open()?;
@@ -126,6 +181,15 @@ impl CollabCore {
                 (target.id.as_str(), target.created_by.as_str(), now),
             )
             .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TargetCreated,
+            &target.id,
+            &target.id,
+            &[],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
         Ok(target)
     }
@@ -212,6 +276,15 @@ impl CollabCore {
                 (target.id.as_str(), actor_low_id, actor_high_id, now),
             )
             .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TargetCreated,
+            &target.id,
+            &target.id,
+            &[],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
         Ok(target)
     }
@@ -288,6 +361,16 @@ impl CollabCore {
         {
             follow_thread_in_transaction(&transaction, &target.id, &root_author_id, now).await?;
         }
+        let parent_actor_ids = active_member_ids(&transaction, &parent_target_id).await?;
+        insert_change(
+            &transaction,
+            ChangeKind::TargetCreated,
+            Some(&target.id),
+            &target.id,
+            &parent_actor_ids,
+            now,
+        )
+        .await?;
         transaction.commit().await?;
         Ok(target)
     }
@@ -314,7 +397,17 @@ impl CollabCore {
             "follow",
         )
         .await?;
-        follow_thread_in_transaction(&transaction, thread_target_id, actor_id, now).await?;
+        if follow_thread_in_transaction(&transaction, thread_target_id, actor_id, now).await? {
+            insert_target_change(
+                &transaction,
+                ChangeKind::ThreadFollowChanged,
+                thread_target_id,
+                actor_id,
+                &[actor_id],
+                now,
+            )
+            .await?;
+        }
         transaction.commit().await?;
         Ok(())
     }
@@ -341,7 +434,7 @@ impl CollabCore {
             "unfollow",
         )
         .await?;
-        transaction
+        let changed = transaction
             .execute(
                 "UPDATE thread_follows
                  SET unfollowed_at_ms = ?3
@@ -350,6 +443,17 @@ impl CollabCore {
                 (thread_target_id, actor_id, now),
             )
             .await?;
+        if changed == 1 {
+            insert_target_change(
+                &transaction,
+                ChangeKind::ThreadFollowChanged,
+                thread_target_id,
+                actor_id,
+                &[actor_id],
+                now,
+            )
+            .await?;
+        }
         transaction.commit().await?;
         Ok(())
     }
@@ -375,7 +479,12 @@ impl CollabCore {
                  (target_id, actor_id, role, joined_at_ms, left_at_ms)
                  VALUES (?1, ?2, 'member', ?3, NULL)
                  ON CONFLICT(target_id, actor_id) DO UPDATE SET
-                   role = 'member', joined_at_ms = excluded.joined_at_ms, left_at_ms = NULL",
+                   role = CASE
+                     WHEN memberships.role = 'owner' THEN 'owner'
+                     ELSE 'member'
+                   END,
+                   joined_at_ms = excluded.joined_at_ms,
+                   left_at_ms = NULL",
                 (target_id, actor_id, now),
             )
             .await?;
@@ -389,8 +498,104 @@ impl CollabCore {
                 )
                 .await?;
         }
+        insert_target_change(
+            &transaction,
+            ChangeKind::MembershipChanged,
+            target_id,
+            actor_id,
+            &[actor_id],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
         Ok(())
+    }
+
+    /// List the local actor directory after authenticating the caller.
+    pub async fn list_actors(&self, actor_id: &str) -> Result<Vec<Actor>> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+        let mut rows = connection
+            .query(
+                "SELECT id, kind, handle, display_name, created_at_ms
+                 FROM actors ORDER BY handle, id",
+                (),
+            )
+            .await?;
+        let mut actors = Vec::new();
+        while let Some(row) = rows.next().await? {
+            actors.push(actor_from_row(&row)?);
+        }
+        Ok(actors)
+    }
+
+    /// Return one authorization-filtered bootstrap projection and the global
+    /// durable change cursor observed in the same connection critical section.
+    pub async fn snapshot(&self, actor_id: &str) -> Result<CollabSnapshot> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        let actor = find_actor(&connection, actor_id).await?;
+        let cursor = latest_change_seq(&connection).await?;
+        let targets = targets_for_actor(&connection, actor_id).await?;
+        let tasks = tasks_for_actor(&connection, actor_id, None).await?;
+        Ok(CollabSnapshot {
+            actor,
+            cursor,
+            targets,
+            tasks,
+        })
+    }
+
+    /// Return durable changes addressed to one actor after a global cursor.
+    pub async fn list_changes(
+        &self,
+        actor_id: &str,
+        after_seq: i64,
+        limit: u32,
+    ) -> Result<Vec<ChangeEvent>> {
+        self.assert_open()?;
+        if after_seq < 0 {
+            return Err(CollabError::InvalidArgument(
+                "after_seq must not be negative".into(),
+            ));
+        }
+        if limit == 0 || limit > 500 {
+            return Err(CollabError::InvalidArgument(
+                "limit must be between 1 and 500".into(),
+            ));
+        }
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+        let mut rows = connection
+            .query(
+                "SELECT change.seq, change.kind, change.target_id,
+                        change.entity_id, change.created_at_ms
+                 FROM change_recipients recipient
+                 JOIN change_events change ON change.seq = recipient.change_seq
+                 WHERE recipient.actor_id = ?1 AND change.seq > ?2
+                 ORDER BY change.seq
+                 LIMIT ?3",
+                (actor_id, after_seq, i64::from(limit)),
+            )
+            .await?;
+        let mut changes = Vec::new();
+        while let Some(row) = rows.next().await? {
+            changes.push(change_from_row(&row)?);
+        }
+        Ok(changes)
+    }
+
+    /// List Task metadata visible to one actor, optionally narrowed to an
+    /// exact target.
+    pub async fn list_tasks(&self, actor_id: &str, target_id: Option<&str>) -> Result<Vec<Task>> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+        if let Some(target_id) = target_id {
+            require_target_access(&connection, target_id, actor_id, "list tasks in").await?;
+        }
+        tasks_for_actor(&connection, actor_id, target_id).await
     }
 
     /// Atomically commit one immutable Message, its recipient snapshot, and
@@ -986,6 +1191,15 @@ impl CollabCore {
             now,
         )
         .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TaskCreated,
+            &target_id,
+            message_id,
+            &[],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
 
         Ok(Task {
@@ -1058,6 +1272,15 @@ impl CollabCore {
             now,
         )
         .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TaskUpdated,
+            &current.target_id,
+            message_id,
+            &[],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
 
         Ok(Task {
@@ -1069,6 +1292,214 @@ impl CollabCore {
             version: next_version,
             created_at_ms: current.created_at_ms,
             updated_at_ms: now,
+        })
+    }
+
+    /// Release a Task currently claimed by this actor while preserving its
+    /// independent status. The expected version fences stale UI writes.
+    pub async fn unclaim_task(
+        &self,
+        message_id: &str,
+        actor_id: &str,
+        expected_version: i64,
+    ) -> Result<Task> {
+        self.assert_open()?;
+        if expected_version < 1 {
+            return Err(CollabError::InvalidArgument(
+                "expected_version must be positive".into(),
+            ));
+        }
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        let current = find_task(&transaction, message_id)
+            .await?
+            .ok_or_else(|| not_found("task", message_id))?;
+        require_target_access(
+            &transaction,
+            &current.target_id,
+            actor_id,
+            "unclaim task in",
+        )
+        .await?;
+        if current.version != expected_version {
+            return Err(CollabError::TaskVersionConflict {
+                message_id: message_id.to_owned(),
+                expected: expected_version,
+                actual: current.version,
+            });
+        }
+        let Some(assignee_id) = current.assignee_id.as_deref() else {
+            transaction.commit().await?;
+            return Ok(current);
+        };
+        if assignee_id != actor_id {
+            return Err(CollabError::PermissionDenied {
+                actor_id: actor_id.to_owned(),
+                action: "unclaim another actor's task in",
+                target_id: current.target_id,
+            });
+        }
+        if current.status == TaskStatus::Done {
+            return Err(CollabError::TaskTransitionDenied {
+                message_id: message_id.to_owned(),
+                status: current.status.as_str().to_owned(),
+            });
+        }
+
+        let next_version = current.version + 1;
+        let changed = transaction
+            .execute(
+                "UPDATE tasks
+                 SET assignee_id = NULL, version = ?2, updated_at_ms = ?3
+                 WHERE message_id = ?1 AND assignee_id = ?4 AND version = ?5",
+                (message_id, next_version, now, actor_id, current.version),
+            )
+            .await?;
+        if changed != 1 {
+            return Err(CollabError::Database(
+                "task unclaim compare-and-set did not update one row".into(),
+            ));
+        }
+        insert_task_event(
+            &transaction,
+            message_id,
+            actor_id,
+            "unclaimed",
+            Some(current.status),
+            Some(current.status),
+            Some(actor_id),
+            None,
+            next_version,
+            now,
+        )
+        .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TaskUpdated,
+            &current.target_id,
+            message_id,
+            &[],
+            now,
+        )
+        .await?;
+        transaction.commit().await?;
+
+        Ok(Task {
+            assignee_id: None,
+            version: next_version,
+            updated_at_ms: now,
+            ..current
+        })
+    }
+
+    /// Move one Task through the explicit lifecycle with optimistic version
+    /// fencing. Assignment remains unchanged.
+    pub async fn update_task_status(
+        &self,
+        message_id: &str,
+        actor_id: &str,
+        status: TaskStatus,
+        expected_version: i64,
+    ) -> Result<Task> {
+        self.assert_open()?;
+        if expected_version < 1 {
+            return Err(CollabError::InvalidArgument(
+                "expected_version must be positive".into(),
+            ));
+        }
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        let current = find_task(&transaction, message_id)
+            .await?
+            .ok_or_else(|| not_found("task", message_id))?;
+        require_target_access(&transaction, &current.target_id, actor_id, "update task in").await?;
+        if current.version != expected_version {
+            return Err(CollabError::TaskVersionConflict {
+                message_id: message_id.to_owned(),
+                expected: expected_version,
+                actual: current.version,
+            });
+        }
+        if current
+            .assignee_id
+            .as_deref()
+            .is_some_and(|assignee_id| assignee_id != actor_id)
+            && !is_owner(&transaction, &current.target_id, actor_id).await?
+        {
+            return Err(CollabError::PermissionDenied {
+                actor_id: actor_id.to_owned(),
+                action: "update another actor's task in",
+                target_id: current.target_id,
+            });
+        }
+        if current.status == status {
+            transaction.commit().await?;
+            return Ok(current);
+        }
+        if !task_transition_allowed(current.status, status) {
+            return Err(CollabError::TaskTransitionDenied {
+                message_id: message_id.to_owned(),
+                status: current.status.as_str().to_owned(),
+            });
+        }
+
+        let next_version = current.version + 1;
+        let changed = transaction
+            .execute(
+                "UPDATE tasks
+                 SET status = ?2, version = ?3, updated_at_ms = ?4
+                 WHERE message_id = ?1 AND version = ?5",
+                (
+                    message_id,
+                    status.as_str(),
+                    next_version,
+                    now,
+                    current.version,
+                ),
+            )
+            .await?;
+        if changed != 1 {
+            return Err(CollabError::Database(
+                "task status compare-and-set did not update one row".into(),
+            ));
+        }
+        insert_task_event(
+            &transaction,
+            message_id,
+            actor_id,
+            "status_changed",
+            Some(current.status),
+            Some(status),
+            current.assignee_id.as_deref(),
+            current.assignee_id.as_deref(),
+            next_version,
+            now,
+        )
+        .await?;
+        insert_target_change(
+            &transaction,
+            ChangeKind::TaskUpdated,
+            &current.target_id,
+            message_id,
+            &[],
+            now,
+        )
+        .await?;
+        transaction.commit().await?;
+
+        Ok(Task {
+            status,
+            version: next_version,
+            updated_at_ms: now,
+            ..current
         })
     }
 
@@ -1117,6 +1548,16 @@ impl CollabCore {
                 )
                 .await?;
         }
+        let actor_ids = all_actor_ids(&transaction).await?;
+        insert_change(
+            &transaction,
+            ChangeKind::ActorCreated,
+            None,
+            &actor.id,
+            &actor_ids,
+            now,
+        )
+        .await?;
         transaction.commit().await?;
         Ok(actor)
     }
@@ -1289,6 +1730,15 @@ impl CollabCore {
             }
             recipient_ids.push(recipient_id);
         }
+        insert_target_change(
+            &transaction,
+            ChangeKind::MessageCreated,
+            &request.target_id,
+            &message_id,
+            &[request.author_id.as_str()],
+            now,
+        )
+        .await?;
         transaction.commit().await?;
 
         Ok(SendMessageResult {
@@ -1367,6 +1817,7 @@ async fn migrate(connection: &mut Connection) -> Result<()> {
             1 => transaction.execute_batch(SCHEMA_V1).await?,
             2 => transaction.execute_batch(SCHEMA_V2).await?,
             3 => transaction.execute_batch(SCHEMA_V3).await?,
+            4 => transaction.execute_batch(SCHEMA_V4).await?,
             _ => {
                 return Err(CollabError::SchemaVersionMismatch {
                     found: version.to_string(),
@@ -1437,6 +1888,56 @@ fn message_from_row(row: &Row) -> Result<Message> {
     })
 }
 
+fn parse_actor_kind(actor_id: &str, value: &str) -> Result<ActorKind> {
+    match value {
+        "user" => Ok(ActorKind::User),
+        "agent" => Ok(ActorKind::Agent),
+        other => Err(CollabError::Database(format!(
+            "actor '{actor_id}' has unknown kind '{other}'"
+        ))),
+    }
+}
+
+fn actor_from_row(row: &Row) -> Result<Actor> {
+    let id = row.get::<String>(0)?;
+    let kind_text = row.get::<String>(1)?;
+    Ok(Actor {
+        kind: parse_actor_kind(&id, &kind_text)?,
+        id,
+        handle: row.get(2)?,
+        display_name: row.get(3)?,
+        created_at_ms: row.get(4)?,
+    })
+}
+
+async fn find_actor(connection: &Connection, actor_id: &str) -> Result<Actor> {
+    let mut rows = connection
+        .query(
+            "SELECT id, kind, handle, display_name, created_at_ms
+             FROM actors WHERE id = ?1",
+            [actor_id],
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) => actor_from_row(&row),
+        None => Err(not_found("actor", actor_id)),
+    }
+}
+
+async fn find_actor_by_handle(connection: &Connection, handle: &str) -> Result<Option<Actor>> {
+    let mut rows = connection
+        .query(
+            "SELECT id, kind, handle, display_name, created_at_ms
+             FROM actors WHERE handle = ?1",
+            [handle],
+        )
+        .await?;
+    rows.next()
+        .await?
+        .map(|row| actor_from_row(&row))
+        .transpose()
+}
+
 async fn require_actor(connection: &Connection, actor_id: &str) -> Result<ActorKind> {
     let mut rows = connection
         .query("SELECT kind FROM actors WHERE id = ?1", [actor_id])
@@ -1444,13 +1945,7 @@ async fn require_actor(connection: &Connection, actor_id: &str) -> Result<ActorK
     let Some(row) = rows.next().await? else {
         return Err(not_found("actor", actor_id));
     };
-    match row.get::<String>(0)?.as_str() {
-        "user" => Ok(ActorKind::User),
-        "agent" => Ok(ActorKind::Agent),
-        other => Err(CollabError::Database(format!(
-            "actor '{actor_id}' has unknown kind '{other}'"
-        ))),
-    }
+    parse_actor_kind(actor_id, &row.get::<String>(0)?)
 }
 
 async fn require_agent(connection: &Connection, agent_id: &str) -> Result<()> {
@@ -1505,6 +2000,7 @@ async fn require_target_route(connection: &Connection, target_id: &str) -> Resul
     };
     let kind_text = row.get::<String>(0)?;
     let parent_target_id = row.get::<Option<String>>(1)?;
+    drop(rows);
     let kind = parse_target_kind(target_id, &kind_text)?;
     if kind == TargetKind::Thread && parent_target_id.is_none() {
         return Err(CollabError::Database(format!(
@@ -1515,6 +2011,25 @@ async fn require_target_route(connection: &Connection, target_id: &str) -> Resul
         return Err(CollabError::Database(format!(
             "non-Thread target '{target_id}' unexpectedly has a parent"
         )));
+    }
+    if let Some(parent_target_id) = parent_target_id.as_deref() {
+        let mut parent_rows = connection
+            .query(
+                "SELECT kind FROM targets
+                 WHERE id = ?1 AND archived_at_ms IS NULL",
+                [parent_target_id],
+            )
+            .await?;
+        let Some(parent_row) = parent_rows.next().await? else {
+            return Err(not_found("active Thread parent target", parent_target_id));
+        };
+        let parent_kind_text = parent_row.get::<String>(0)?;
+        let parent_kind = parse_target_kind(parent_target_id, &parent_kind_text)?;
+        if parent_kind == TargetKind::Thread {
+            return Err(CollabError::Database(format!(
+                "Thread target '{target_id}' has a Thread parent"
+            )));
+        }
     }
     Ok(TargetRoute {
         kind,
@@ -1544,6 +2059,17 @@ async fn require_target_access(
 }
 
 async fn require_owner(connection: &Connection, target_id: &str, actor_id: &str) -> Result<()> {
+    if is_owner(connection, target_id, actor_id).await? {
+        return Ok(());
+    }
+    Err(CollabError::PermissionDenied {
+        actor_id: actor_id.to_owned(),
+        action: "manage",
+        target_id: target_id.to_owned(),
+    })
+}
+
+async fn is_owner(connection: &Connection, target_id: &str, actor_id: &str) -> Result<bool> {
     let mut rows = connection
         .query(
             "SELECT 1 FROM memberships
@@ -1552,14 +2078,7 @@ async fn require_owner(connection: &Connection, target_id: &str, actor_id: &str)
             (target_id, actor_id),
         )
         .await?;
-    if rows.next().await?.is_none() {
-        return Err(CollabError::PermissionDenied {
-            actor_id: actor_id.to_owned(),
-            action: "manage",
-            target_id: target_id.to_owned(),
-        });
-    }
-    Ok(())
+    Ok(rows.next().await?.is_some())
 }
 
 async fn require_active_member(
@@ -1634,24 +2153,224 @@ async fn find_target(connection: &Connection, target_id: &str) -> Result<Target>
     })
 }
 
+async fn targets_for_actor(connection: &Connection, actor_id: &str) -> Result<Vec<Target>> {
+    let mut rows = connection
+        .query(
+            "SELECT DISTINCT target.id, target.kind, target.name,
+                    target.parent_target_id, target.root_message_id,
+                    target.created_by, target.created_at_ms
+             FROM targets target
+             JOIN memberships membership
+               ON membership.target_id = CASE
+                 WHEN target.kind = 'thread' THEN target.parent_target_id
+                 ELSE target.id
+               END
+              AND membership.actor_id = ?1
+              AND membership.left_at_ms IS NULL
+             WHERE target.archived_at_ms IS NULL
+               AND (
+                 target.kind <> 'thread'
+                 OR EXISTS (
+                   SELECT 1 FROM targets parent
+                   WHERE parent.id = target.parent_target_id
+                     AND parent.kind IN ('channel', 'direct')
+                     AND parent.archived_at_ms IS NULL
+                 )
+               )
+             ORDER BY target.created_at_ms, target.id",
+            [actor_id],
+        )
+        .await?;
+    let mut targets = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let id = row.get::<String>(0)?;
+        let kind_text = row.get::<String>(1)?;
+        targets.push(Target {
+            kind: parse_target_kind(&id, &kind_text)?,
+            id,
+            name: row.get(2)?,
+            parent_target_id: row.get(3)?,
+            root_message_id: row.get(4)?,
+            created_by: row.get(5)?,
+            created_at_ms: row.get(6)?,
+        });
+    }
+    Ok(targets)
+}
+
+async fn latest_change_seq(connection: &Connection) -> Result<i64> {
+    let mut rows = connection
+        .query("SELECT COALESCE(MAX(seq), 0) FROM change_events", ())
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(CollabError::Database(
+            "change sequence query returned no row".into(),
+        ));
+    };
+    Ok(row.get(0)?)
+}
+
+fn change_from_row(row: &Row) -> Result<ChangeEvent> {
+    let seq = row.get::<i64>(0)?;
+    let kind_text = row.get::<String>(1)?;
+    let Some(kind) = ChangeKind::parse(&kind_text) else {
+        return Err(CollabError::Database(format!(
+            "change '{seq}' has unknown kind '{kind_text}'"
+        )));
+    };
+    Ok(ChangeEvent {
+        seq,
+        kind,
+        target_id: row.get(2)?,
+        entity_id: row.get(3)?,
+        created_at_ms: row.get(4)?,
+    })
+}
+
 async fn follow_thread_in_transaction(
     connection: &Connection,
     thread_target_id: &str,
     actor_id: &str,
     now: i64,
-) -> Result<()> {
-    connection
+) -> Result<bool> {
+    let changed = connection
         .execute(
             "INSERT INTO thread_follows
              (thread_target_id, actor_id, followed_at_ms, unfollowed_at_ms)
              VALUES (?1, ?2, ?3, NULL)
              ON CONFLICT(thread_target_id, actor_id) DO UPDATE SET
                followed_at_ms = excluded.followed_at_ms,
-               unfollowed_at_ms = NULL",
+               unfollowed_at_ms = NULL
+             WHERE thread_follows.unfollowed_at_ms IS NOT NULL",
             (thread_target_id, actor_id, now),
         )
         .await?;
-    Ok(())
+    Ok(changed == 1)
+}
+
+async fn active_member_ids(connection: &Connection, target_id: &str) -> Result<Vec<String>> {
+    let mut rows = connection
+        .query(
+            "SELECT actor_id FROM memberships
+             WHERE target_id = ?1 AND left_at_ms IS NULL
+             ORDER BY actor_id",
+            [target_id],
+        )
+        .await?;
+    let mut actor_ids = Vec::new();
+    while let Some(row) = rows.next().await? {
+        actor_ids.push(row.get(0)?);
+    }
+    Ok(actor_ids)
+}
+
+async fn target_change_recipients(
+    connection: &Connection,
+    target_id: &str,
+    extra_actor_ids: &[&str],
+) -> Result<Vec<String>> {
+    let route = require_target_route(connection, target_id).await?;
+    let mut recipients = BTreeSet::new();
+    let statement = if route.kind == TargetKind::Thread {
+        "SELECT f.actor_id
+         FROM thread_follows f
+         JOIN memberships m
+           ON m.target_id = ?2 AND m.actor_id = f.actor_id
+         WHERE f.thread_target_id = ?1
+           AND f.unfollowed_at_ms IS NULL
+           AND m.left_at_ms IS NULL"
+    } else {
+        "SELECT actor_id
+         FROM memberships
+         WHERE target_id = ?1 AND left_at_ms IS NULL"
+    };
+    let mut rows = if route.kind == TargetKind::Thread {
+        connection
+            .query(
+                statement,
+                (target_id, route.permission_target_id(target_id)),
+            )
+            .await?
+    } else {
+        connection.query(statement, [target_id]).await?
+    };
+    while let Some(row) = rows.next().await? {
+        recipients.insert(row.get::<String>(0)?);
+    }
+    drop(rows);
+    recipients.extend(
+        extra_actor_ids
+            .iter()
+            .map(|actor_id| (*actor_id).to_owned()),
+    );
+    Ok(recipients.into_iter().collect())
+}
+
+async fn all_actor_ids(connection: &Connection) -> Result<Vec<String>> {
+    let mut rows = connection
+        .query("SELECT id FROM actors ORDER BY id", ())
+        .await?;
+    let mut actor_ids = Vec::new();
+    while let Some(row) = rows.next().await? {
+        actor_ids.push(row.get(0)?);
+    }
+    Ok(actor_ids)
+}
+
+async fn insert_change(
+    connection: &Connection,
+    kind: ChangeKind,
+    target_id: Option<&str>,
+    entity_id: &str,
+    recipient_ids: &[String],
+    now: i64,
+) -> Result<i64> {
+    let mut rows = connection
+        .query(
+            "INSERT INTO change_events
+             (kind, target_id, entity_id, created_at_ms)
+             VALUES (?1, ?2, ?3, ?4)
+             RETURNING seq",
+            (kind.as_str(), target_id, entity_id, now),
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(CollabError::Database(
+            "change insert returned no sequence".into(),
+        ));
+    };
+    let seq = row.get::<i64>(0)?;
+    drop(rows);
+    for actor_id in recipient_ids {
+        connection
+            .execute(
+                "INSERT INTO change_recipients (change_seq, actor_id)
+                 VALUES (?1, ?2)",
+                (seq, actor_id.as_str()),
+            )
+            .await?;
+    }
+    Ok(seq)
+}
+
+async fn insert_target_change(
+    connection: &Connection,
+    kind: ChangeKind,
+    target_id: &str,
+    entity_id: &str,
+    extra_actor_ids: &[&str],
+    now: i64,
+) -> Result<i64> {
+    let recipients = target_change_recipients(connection, target_id, extra_actor_ids).await?;
+    insert_change(
+        connection,
+        kind,
+        Some(target_id),
+        entity_id,
+        &recipients,
+        now,
+    )
+    .await
 }
 
 async fn current_generation(connection: &Connection, agent_id: &str) -> Result<i64> {
@@ -1780,17 +2499,22 @@ async fn find_task(connection: &Connection, message_id: &str) -> Result<Option<T
             [message_id],
         )
         .await?;
-    let Some(row) = rows.next().await? else {
-        return Ok(None);
-    };
+    rows.next()
+        .await?
+        .map(|row| task_from_row(&row))
+        .transpose()
+}
+
+fn task_from_row(row: &Row) -> Result<Task> {
+    let message_id = row.get::<String>(0)?;
     let status_text = row.get::<String>(3)?;
     let status = TaskStatus::parse(&status_text).ok_or_else(|| {
         CollabError::Database(format!(
             "task '{message_id}' has invalid status '{status_text}'"
         ))
     })?;
-    Ok(Some(Task {
-        message_id: row.get(0)?,
+    Ok(Task {
+        message_id,
         target_id: row.get(1)?,
         number: row.get(2)?,
         status,
@@ -1798,7 +2522,69 @@ async fn find_task(connection: &Connection, message_id: &str) -> Result<Option<T
         version: row.get(5)?,
         created_at_ms: row.get(6)?,
         updated_at_ms: row.get(7)?,
-    }))
+    })
+}
+
+async fn tasks_for_actor(
+    connection: &Connection,
+    actor_id: &str,
+    target_id: Option<&str>,
+) -> Result<Vec<Task>> {
+    let statement = if target_id.is_some() {
+        "SELECT task.message_id, task.target_id, task.number, task.status,
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms
+         FROM tasks task
+         JOIN targets target ON target.id = task.target_id
+         JOIN memberships membership
+           ON membership.target_id = CASE
+             WHEN target.kind = 'thread' THEN target.parent_target_id
+             ELSE target.id
+           END
+          AND membership.actor_id = ?1
+          AND membership.left_at_ms IS NULL
+         WHERE task.target_id = ?2 AND target.archived_at_ms IS NULL
+         ORDER BY task.number"
+    } else {
+        "SELECT task.message_id, task.target_id, task.number, task.status,
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms
+         FROM tasks task
+         JOIN targets target ON target.id = task.target_id
+         JOIN memberships membership
+           ON membership.target_id = CASE
+             WHEN target.kind = 'thread' THEN target.parent_target_id
+             ELSE target.id
+           END
+          AND membership.actor_id = ?1
+          AND membership.left_at_ms IS NULL
+         WHERE target.archived_at_ms IS NULL
+         ORDER BY task.target_id, task.number"
+    };
+    let mut rows = if let Some(target_id) = target_id {
+        connection.query(statement, (actor_id, target_id)).await?
+    } else {
+        connection.query(statement, [actor_id]).await?
+    };
+    let mut tasks = Vec::new();
+    while let Some(row) = rows.next().await? {
+        tasks.push(task_from_row(&row)?);
+    }
+    Ok(tasks)
+}
+
+fn task_transition_allowed(from: TaskStatus, to: TaskStatus) -> bool {
+    matches!(
+        (from, to),
+        (TaskStatus::Todo, TaskStatus::InProgress)
+            | (
+                TaskStatus::InProgress,
+                TaskStatus::Todo | TaskStatus::InReview
+            )
+            | (
+                TaskStatus::InReview,
+                TaskStatus::InProgress | TaskStatus::Done
+            )
+            | (TaskStatus::Done, TaskStatus::InProgress)
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2282,6 +3068,7 @@ mod tests {
             &beta_binding.session_id,
         )
         .await?;
+        let beta_change_cursor = core.snapshot(&beta.id).await?.cursor;
         let thread = core.create_thread(&root.message.id, &alpha.id).await?;
         assert_eq!(thread.kind, TargetKind::Thread);
         assert_eq!(
@@ -2296,6 +3083,10 @@ mod tests {
             core.create_thread(&root.message.id, &beta.id).await?,
             thread
         );
+        let beta_thread_changes = core.list_changes(&beta.id, beta_change_cursor, 50).await?;
+        assert!(beta_thread_changes.iter().any(|change| {
+            change.kind == ChangeKind::TargetCreated && change.entity_id == thread.id
+        }));
 
         let first_reply = core
             .send_message(SendMessageRequest {
@@ -2392,6 +3183,167 @@ mod tests {
             core.create_thread(&first_reply.message.id, &alpha.id).await,
             Err(CollabError::InvalidArgument(_))
         ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn snapshot_and_change_cursor_are_authorization_filtered() -> Result<()> {
+        let core = CollabCore::open_memory().await?;
+        let owner = core.ensure_user("cursor-owner", "Owner").await?;
+        assert_eq!(core.ensure_user("cursor-owner", "Ignored").await?, owner);
+        let alpha = core
+            .create_agent("cursor-alpha", "Alpha", "/tmp/cursor-alpha")
+            .await?;
+        let outsider = core.ensure_user("cursor-outsider", "Outsider").await?;
+        let channel = core.create_channel("cursor-channel", &owner.id).await?;
+        core.add_member(&channel.id, &owner.id, &owner.id).await?;
+        core.add_member(&channel.id, &alpha.id, &owner.id).await?;
+
+        let owner_snapshot = core.snapshot(&owner.id).await?;
+        assert_eq!(owner_snapshot.actor, owner);
+        assert_eq!(owner_snapshot.targets, vec![channel.clone()]);
+        assert!(owner_snapshot.tasks.is_empty());
+        assert!(core.snapshot(&outsider.id).await?.targets.is_empty());
+
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: owner.id.clone(),
+                client_request_id: "cursor-message".into(),
+                text: "durable change".into(),
+            })
+            .await?;
+        let owner_changes = core
+            .list_changes(&owner.id, owner_snapshot.cursor, 50)
+            .await?;
+        assert_eq!(owner_changes.len(), 1);
+        assert_eq!(owner_changes[0].kind, ChangeKind::MessageCreated);
+        assert_eq!(
+            owner_changes[0].target_id.as_deref(),
+            Some(channel.id.as_str())
+        );
+        assert_eq!(owner_changes[0].entity_id, sent.message.id);
+        assert_eq!(
+            core.list_changes(&alpha.id, owner_snapshot.cursor, 50)
+                .await?,
+            owner_changes
+        );
+        assert!(
+            core.list_changes(&outsider.id, owner_snapshot.cursor, 50)
+                .await?
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_lifecycle_uses_version_fencing_and_emits_changes() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let before = core.snapshot(&user.id).await?.cursor;
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "task-lifecycle-message".into(),
+                text: "finish the lifecycle".into(),
+            })
+            .await?;
+        let created = core.create_task(&sent.message.id, &user.id).await?;
+        let claimed = core.claim_task(&sent.message.id, &alpha.id).await?;
+        assert_eq!(claimed.version, created.version + 1);
+        assert!(matches!(
+            core.update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::InReview,
+                claimed.version,
+            )
+            .await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+
+        let owner_review = core
+            .update_task_status(
+                &sent.message.id,
+                &user.id,
+                TaskStatus::InReview,
+                claimed.version,
+            )
+            .await?;
+        let reopened = core
+            .update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::InProgress,
+                owner_review.version,
+            )
+            .await?;
+        let review = core
+            .update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::InReview,
+                reopened.version,
+            )
+            .await?;
+        assert!(matches!(
+            core.update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::Done,
+                claimed.version,
+            )
+            .await,
+            Err(CollabError::TaskVersionConflict { .. })
+        ));
+        let unclaimed = core
+            .unclaim_task(&sent.message.id, &alpha.id, review.version)
+            .await?;
+        assert_eq!(unclaimed.status, TaskStatus::InReview);
+        assert!(unclaimed.assignee_id.is_none());
+
+        let beta_claim = core.claim_task(&sent.message.id, &beta.id).await?;
+        let beta_review = core
+            .update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::InReview,
+                beta_claim.version,
+            )
+            .await?;
+        let done = core
+            .update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::Done,
+                beta_review.version,
+            )
+            .await?;
+        assert!(matches!(
+            core.unclaim_task(&sent.message.id, &beta.id, done.version)
+                .await,
+            Err(CollabError::TaskTransitionDenied { .. })
+        ));
+        assert_eq!(
+            core.list_tasks(&user.id, Some(&channel.id)).await?,
+            vec![done]
+        );
+        let changes = core.list_changes(&user.id, before, 50).await?;
+        assert_eq!(changes[0].kind, ChangeKind::MessageCreated);
+        assert_eq!(
+            changes
+                .iter()
+                .filter(|change| change.kind == ChangeKind::TaskCreated)
+                .count(),
+            1
+        );
+        assert_eq!(
+            changes
+                .iter()
+                .filter(|change| change.kind == ChangeKind::TaskUpdated)
+                .count(),
+            8
+        );
         Ok(())
     }
 

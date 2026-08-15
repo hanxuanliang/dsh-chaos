@@ -9,6 +9,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { DeliveryBridge } from './delivery.ts'
+import { installCollabRemote } from './remote.ts'
 import { RuntimeManager, type CreateRuntimeInput } from './runtime.ts'
 import { loadNativeModule, type NativeCollabHandle } from './native.ts'
 
@@ -16,9 +17,25 @@ export { DeliveryBridge } from './delivery.ts'
 export { RuntimeManager } from './runtime.ts'
 export type { CreateRuntimeInput } from './runtime.ts'
 export { installCollabTools } from './tools.ts'
+export {
+  COLLAB_EVENTS_PATH,
+  COLLAB_RPC_CHANNEL,
+  createCollabRpcHandler,
+  installCollabRemote,
+  isTrustedSseRequest,
+  serveCollabEvents,
+} from './remote.ts'
+export type {
+  CollabDomainError,
+  CollabDomainResult,
+  CollabRemoteApi,
+  CollabRemoteConfig,
+} from './remote.ts'
 
 export type {
   NativeActor as Actor,
+  NativeChangeEvent as ChangeEvent,
+  NativeCollabSnapshot as CollabSnapshot,
   NativeInboxBatch as InboxBatch,
   NativeMessage as Message,
   NativePendingWake as PendingWake,
@@ -33,6 +50,10 @@ export const name = 'dsh-chaos'
 export interface Config {
   path?: string
   deliveryPollMs?: number
+  remoteEnabled?: boolean
+  webUserHandle?: string
+  webUserDisplayName?: string
+  sseHeartbeatMs?: number
 }
 
 const DEFAULT_DATABASE_PATH = join(
@@ -44,6 +65,10 @@ const DEFAULT_DATABASE_PATH = join(
 export const Config: z<Config> = z.object({
   path: z.string().default(DEFAULT_DATABASE_PATH),
   deliveryPollMs: z.number().step(1).min(50).default(500),
+  remoteEnabled: z.boolean().default(true),
+  webUserHandle: z.string().default('local-user'),
+  webUserDisplayName: z.string().default('Local User'),
+  sseHeartbeatMs: z.number().step(1).min(1_000).default(15_000),
 })
 
 declare module '@deepseek-ai/cordis' {
@@ -61,6 +86,7 @@ export class CollabService extends Service {
   private handle: NativeCollabHandle | undefined
   private runtimes: RuntimeManager | undefined
   private delivery: DeliveryBridge | undefined
+  private readonly changeListeners = new Set<() => void>()
 
   constructor(ctx: Context, private readonly config: Config = {}) {
     super(ctx, 'collab')
@@ -86,6 +112,7 @@ export class CollabService extends Service {
       } catch (error) {
         errors.push(error)
       }
+      this.changeListeners.clear()
       if (this.handle === handle) this.handle = undefined
       try {
         await handle.close()
@@ -103,6 +130,18 @@ export class CollabService extends Service {
     }
     const runtimes = new RuntimeManager(this.ctx.agents, this, warnings)
     this.runtimes = runtimes
+
+    if (this.config.remoteEnabled ?? true) {
+      const webActor = await handle.ensureUser(
+        this.config.webUserHandle ?? 'local-user',
+        this.config.webUserDisplayName ?? 'Local User',
+      )
+      this.ctx.inject(['connection', 'webServer'], (remoteCtx) => {
+        installCollabRemote(remoteCtx, this, webActor.id, {
+          heartbeatMs: this.config.sseHeartbeatMs ?? 15_000,
+        })
+      })
+    }
 
     this.ctx.on('llm/stream', (options, next) => {
       const stream = next()
@@ -122,41 +161,61 @@ export class CollabService extends Service {
     delivery.start()
   }
 
-  createUser(handle: string, displayName: string) {
-    return this.requireHandle().createUser(handle, displayName)
+  async createUser(handle: string, displayName: string) {
+    const actor = await this.requireHandle().createUser(handle, displayName)
+    this.publishChange()
+    return actor
   }
 
-  createAgent(handle: string, displayName: string, workspacePath: string) {
-    return this.requireHandle().createAgent(handle, displayName, workspacePath)
+  async ensureUser(handle: string, displayName: string) {
+    const actor = await this.requireHandle().ensureUser(handle, displayName)
+    this.publishChange()
+    return actor
   }
 
-  createChannel(name: string, creatorId: string) {
-    return this.requireHandle().createChannel(name, creatorId)
+  async createAgent(handle: string, displayName: string, workspacePath: string) {
+    const actor = await this.requireHandle().createAgent(handle, displayName, workspacePath)
+    this.publishChange()
+    return actor
   }
 
-  createDirect(actorId: string, peerId: string) {
-    return this.requireHandle().createDirect(actorId, peerId)
+  async createChannel(name: string, creatorId: string) {
+    const target = await this.requireHandle().createChannel(name, creatorId)
+    this.publishChange()
+    return target
   }
 
-  createThread(rootMessageId: string, actorId: string) {
-    return this.requireHandle().createThread(rootMessageId, actorId)
+  async createDirect(actorId: string, peerId: string) {
+    const target = await this.requireHandle().createDirect(actorId, peerId)
+    this.publishChange()
+    return target
   }
 
-  followThread(threadTargetId: string, actorId: string) {
-    return this.requireHandle().followThread(threadTargetId, actorId)
+  async createThread(rootMessageId: string, actorId: string) {
+    const target = await this.requireHandle().createThread(rootMessageId, actorId)
+    this.publishChange()
+    return target
   }
 
-  unfollowThread(threadTargetId: string, actorId: string) {
-    return this.requireHandle().unfollowThread(threadTargetId, actorId)
+  async followThread(threadTargetId: string, actorId: string) {
+    await this.requireHandle().followThread(threadTargetId, actorId)
+    this.publishChange()
   }
 
-  addMember(targetId: string, actorId: string, addedBy: string) {
-    return this.requireHandle().addMember(targetId, actorId, addedBy)
+  async unfollowThread(threadTargetId: string, actorId: string) {
+    await this.requireHandle().unfollowThread(threadTargetId, actorId)
+    this.publishChange()
+  }
+
+  async addMember(targetId: string, actorId: string, addedBy: string) {
+    await this.requireHandle().addMember(targetId, actorId, addedBy)
+    this.publishChange()
   }
 
   async sendMessage(input: Parameters<NativeCollabHandle['sendMessage']>[0]) {
     const result = await this.requireHandle().sendMessage(input)
     this.delivery?.kick()
+    this.publishChange()
     return result
   }
 
@@ -210,6 +269,18 @@ export class CollabService extends Service {
     return this.requireHandle().readMessages(actorId, targetId, afterSeq, limit)
   }
 
+  listActors(actorId: string) {
+    return this.requireHandle().listActors(actorId)
+  }
+
+  snapshot(actorId: string) {
+    return this.requireHandle().snapshot(actorId)
+  }
+
+  listChanges(actorId: string, afterSeq = '0', limit = 100) {
+    return this.requireHandle().listChanges(actorId, afterSeq, limit)
+  }
+
   createRuntime(input: CreateRuntimeInput) {
     return this.requireRuntimes().create(input)
   }
@@ -226,12 +297,47 @@ export class CollabService extends Service {
     return this.requireRuntimes().stop(agentId)
   }
 
-  createTask(messageId: string, actorId: string) {
-    return this.requireHandle().createTask(messageId, actorId)
+  async createTask(messageId: string, actorId: string) {
+    const task = await this.requireHandle().createTask(messageId, actorId)
+    this.publishChange()
+    return task
   }
 
-  claimTask(messageId: string, actorId: string) {
-    return this.requireHandle().claimTask(messageId, actorId)
+  async claimTask(messageId: string, actorId: string) {
+    const task = await this.requireHandle().claimTask(messageId, actorId)
+    this.publishChange()
+    return task
+  }
+
+  listTasks(actorId: string, targetId?: string) {
+    return this.requireHandle().listTasks(actorId, targetId)
+  }
+
+  async unclaimTask(messageId: string, actorId: string, expectedVersion: string) {
+    const task = await this.requireHandle().unclaimTask(messageId, actorId, expectedVersion)
+    this.publishChange()
+    return task
+  }
+
+  async updateTaskStatus(
+    messageId: string,
+    actorId: string,
+    status: Parameters<NativeCollabHandle['updateTaskStatus']>[2],
+    expectedVersion: string,
+  ) {
+    const task = await this.requireHandle().updateTaskStatus(
+      messageId,
+      actorId,
+      status,
+      expectedVersion,
+    )
+    this.publishChange()
+    return task
+  }
+
+  onChange(listener: () => void): () => void {
+    this.changeListeners.add(listener)
+    return () => { this.changeListeners.delete(listener) }
   }
 
   private requireHandle(): NativeCollabHandle {
@@ -242,6 +348,17 @@ export class CollabService extends Service {
   private requireRuntimes(): RuntimeManager {
     if (this.runtimes === undefined) throw new Error('dsh-chaos RuntimeManager is not active')
     return this.runtimes
+  }
+
+  private publishChange(): void {
+    for (const listener of [...this.changeListeners]) {
+      try {
+        listener()
+      } catch (error) {
+        this.ctx.logger.warn('dsh-chaos change listener threw')
+        this.ctx.logger.warn(error)
+      }
+    }
   }
 }
 
