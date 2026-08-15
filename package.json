@@ -1,0 +1,50 @@
+{
+  "name": "dsh-chaos",
+  "version": "0.1.0",
+  "description": "Peer multi-Agent collaboration for DeepSeek Harness",
+  "type": "module",
+  "private": true,
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "native",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "pnpm build:native && pnpm build:ts",
+    "build:native": "cargo build -p dsh-chaos-core --features napi --release && node scripts/stage-native.mjs release",
+    "build:native:debug": "cargo build -p dsh-chaos-core --features napi && node scripts/stage-native.mjs debug",
+    "build:ts": "tsc -p tsconfig.json",
+    "check:rust": "cargo check --workspace",
+    "smoke:native": "node scripts/smoke-native.mjs",
+    "smoke:service": "node scripts/smoke-service.mjs",
+    "test:rust": "cargo test --workspace",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3"
+  }
+}

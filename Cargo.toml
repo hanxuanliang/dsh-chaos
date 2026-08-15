@@ -1,0 +1,23 @@
+[workspace]
+members = [
+  "crates/collab-core",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.94"
+
+[workspace.dependencies]
+napi = { version = "=3.12.1", default-features = false, features = ["async", "napi8"] }
+napi-build = "=2.4.1"
+napi-derive = "=3.6.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.23"
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "sync"] }
+turso = { version = "=0.8.0-pre.4", default-features = false }
+uuid = { version = "1.18", features = ["serde", "v7"] }

@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-chaos
+      name: dsh-chaos
+      config: {}
