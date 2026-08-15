@@ -25,7 +25,7 @@ use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
 use uuid::Uuid;
 
-use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_VERSION};
+use crate::schema::{META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_VERSION};
 
 /// One process-local handle over the authoritative local Turso database.
 pub struct CollabCore {
@@ -93,6 +93,8 @@ impl CollabCore {
             id: new_id(),
             kind: TargetKind::Channel,
             name: name.to_owned(),
+            parent_target_id: None,
+            root_message_id: None,
             created_by: creator_id.to_owned(),
             created_at_ms: now,
         };
@@ -128,6 +130,230 @@ impl CollabCore {
         Ok(target)
     }
 
+    /// Return the one stable Direct target for an unordered pair of actors,
+    /// creating it and its two memberships when absent.
+    pub async fn create_direct(&self, actor_id: &str, peer_id: &str) -> Result<Target> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        require_non_empty("peer_id", peer_id)?;
+        if actor_id == peer_id {
+            return Err(CollabError::InvalidArgument(
+                "a Direct target requires two distinct actors".into(),
+            ));
+        }
+        let (actor_low_id, actor_high_id) = if actor_id < peer_id {
+            (actor_id, peer_id)
+        } else {
+            (peer_id, actor_id)
+        };
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        require_actor(&transaction, peer_id).await?;
+
+        let mut rows = transaction
+            .query(
+                "SELECT target_id FROM direct_pairs
+                 WHERE actor_low_id = ?1 AND actor_high_id = ?2",
+                (actor_low_id, actor_high_id),
+            )
+            .await?;
+        if let Some(row) = rows.next().await? {
+            let target_id = row.get::<String>(0)?;
+            drop(rows);
+            let target = find_target(&transaction, &target_id).await?;
+            transaction.commit().await?;
+            return Ok(target);
+        }
+        drop(rows);
+
+        let low_handle = actor_handle(&transaction, actor_low_id).await?;
+        let high_handle = actor_handle(&transaction, actor_high_id).await?;
+        let target = Target {
+            id: new_id(),
+            kind: TargetKind::Direct,
+            name: format!("@{low_handle} ↔ @{high_handle}"),
+            parent_target_id: None,
+            root_message_id: None,
+            created_by: actor_id.to_owned(),
+            created_at_ms: now,
+        };
+        transaction
+            .execute(
+                "INSERT INTO targets
+                 (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
+                 VALUES (?1, 'direct', ?2, NULL, NULL, ?3, ?4, NULL)",
+                (
+                    target.id.as_str(),
+                    target.name.as_str(),
+                    target.created_by.as_str(),
+                    now,
+                ),
+            )
+            .await?;
+        for (member_id, role) in [(actor_id, "owner"), (peer_id, "member")] {
+            transaction
+                .execute(
+                    "INSERT INTO memberships
+                     (target_id, actor_id, role, joined_at_ms, left_at_ms)
+                     VALUES (?1, ?2, ?3, ?4, NULL)",
+                    (target.id.as_str(), member_id, role, now),
+                )
+                .await?;
+        }
+        transaction
+            .execute(
+                "INSERT INTO direct_pairs
+                 (target_id, actor_low_id, actor_high_id, created_at_ms)
+                 VALUES (?1, ?2, ?3, ?4)",
+                (target.id.as_str(), actor_low_id, actor_high_id, now),
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(target)
+    }
+
+    /// Return the one Thread target rooted at a top-level Message. The creator
+    /// and root author follow it immediately when they retain parent access.
+    pub async fn create_thread(&self, root_message_id: &str, actor_id: &str) -> Result<Target> {
+        self.assert_open()?;
+        require_non_empty("root_message_id", root_message_id)?;
+        require_non_empty("actor_id", actor_id)?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        let (parent_target_id, root_author_id) =
+            message_target_author(&transaction, root_message_id).await?;
+        if require_target(&transaction, &parent_target_id).await? == TargetKind::Thread {
+            return Err(CollabError::InvalidArgument(
+                "Threads cannot be nested under Thread messages".into(),
+            ));
+        }
+        require_active_member(
+            &transaction,
+            &parent_target_id,
+            actor_id,
+            "create Thread in",
+        )
+        .await?;
+
+        let mut rows = transaction
+            .query(
+                "SELECT id FROM targets WHERE root_message_id = ?1",
+                [root_message_id],
+            )
+            .await?;
+        if let Some(row) = rows.next().await? {
+            let target_id = row.get::<String>(0)?;
+            drop(rows);
+            let target = find_target(&transaction, &target_id).await?;
+            transaction.commit().await?;
+            return Ok(target);
+        }
+        drop(rows);
+
+        let target = Target {
+            id: new_id(),
+            kind: TargetKind::Thread,
+            name: format!("thread:{root_message_id}"),
+            parent_target_id: Some(parent_target_id.clone()),
+            root_message_id: Some(root_message_id.to_owned()),
+            created_by: actor_id.to_owned(),
+            created_at_ms: now,
+        };
+        transaction
+            .execute(
+                "INSERT INTO targets
+                 (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
+                 VALUES (?1, 'thread', ?2, ?3, ?4, ?5, ?6, NULL)",
+                (
+                    target.id.as_str(),
+                    target.name.as_str(),
+                    parent_target_id.as_str(),
+                    root_message_id,
+                    actor_id,
+                    now,
+                ),
+            )
+            .await?;
+        follow_thread_in_transaction(&transaction, &target.id, actor_id, now).await?;
+        if root_author_id != actor_id
+            && is_active_member(&transaction, &parent_target_id, &root_author_id).await?
+        {
+            follow_thread_in_transaction(&transaction, &target.id, &root_author_id, now).await?;
+        }
+        transaction.commit().await?;
+        Ok(target)
+    }
+
+    /// Follow one Thread after rechecking access to its parent target.
+    pub async fn follow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
+        self.assert_open()?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        let route = require_target_route(&transaction, thread_target_id).await?;
+        if route.kind != TargetKind::Thread {
+            return Err(CollabError::InvalidArgument(
+                "follow_thread requires a Thread target".into(),
+            ));
+        }
+        require_active_member(
+            &transaction,
+            route.permission_target_id(thread_target_id),
+            actor_id,
+            "follow",
+        )
+        .await?;
+        follow_thread_in_transaction(&transaction, thread_target_id, actor_id, now).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    /// Stop future ordinary Thread delivery for one current parent member.
+    pub async fn unfollow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
+        self.assert_open()?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        require_actor(&transaction, actor_id).await?;
+        let route = require_target_route(&transaction, thread_target_id).await?;
+        if route.kind != TargetKind::Thread {
+            return Err(CollabError::InvalidArgument(
+                "unfollow_thread requires a Thread target".into(),
+            ));
+        }
+        require_active_member(
+            &transaction,
+            route.permission_target_id(thread_target_id),
+            actor_id,
+            "unfollow",
+        )
+        .await?;
+        transaction
+            .execute(
+                "UPDATE thread_follows
+                 SET unfollowed_at_ms = ?3
+                 WHERE thread_target_id = ?1 AND actor_id = ?2
+                   AND unfollowed_at_ms IS NULL",
+                (thread_target_id, actor_id, now),
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
     /// Add or reactivate one Channel member.
     pub async fn add_member(&self, target_id: &str, actor_id: &str, added_by: &str) -> Result<()> {
         self.assert_open()?;
@@ -137,7 +363,11 @@ impl CollabCore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
         let actor_kind = require_actor(&transaction, actor_id).await?;
-        require_target(&transaction, target_id).await?;
+        if require_target(&transaction, target_id).await? != TargetKind::Channel {
+            return Err(CollabError::InvalidArgument(
+                "add_member only supports Channel targets".into(),
+            ));
+        }
         require_owner(&transaction, target_id, added_by).await?;
         transaction
             .execute(
@@ -291,8 +521,12 @@ impl CollabCore {
                  JOIN (
                    SELECT d.recipient_id AS agent_id, MAX(d.message_seq) AS pending_seq
                    FROM deliveries d
+                   JOIN targets target ON target.id = d.target_id
                    JOIN memberships mem
-                     ON mem.target_id = d.target_id
+                     ON mem.target_id = CASE
+                       WHEN target.kind = 'thread' THEN target.parent_target_id
+                       ELSE target.id
+                     END
                     AND mem.actor_id = d.recipient_id
                     AND mem.left_at_ms IS NULL
                    WHERE d.model_seen_at_ms IS NULL
@@ -302,8 +536,12 @@ impl CollabCore {
                     OR wake.notified_generation <> rb.generation
                     OR EXISTS (
                       SELECT 1 FROM deliveries d
+                      JOIN targets target ON target.id = d.target_id
                       JOIN memberships mem
-                        ON mem.target_id = d.target_id
+                        ON mem.target_id = CASE
+                          WHEN target.kind = 'thread' THEN target.parent_target_id
+                          ELSE target.id
+                        END
                        AND mem.actor_id = d.recipient_id
                        AND mem.left_at_ms IS NULL
                       WHERE d.recipient_id = rb.agent_id
@@ -394,8 +632,13 @@ impl CollabCore {
                    AND message_seq <= ?2
                    AND model_seen_at_ms IS NULL
                    AND EXISTS (
-                     SELECT 1 FROM memberships mem
-                     WHERE mem.target_id = deliveries.target_id
+                     SELECT 1 FROM targets target
+                     JOIN memberships mem
+                       ON mem.target_id = CASE
+                         WHEN target.kind = 'thread' THEN target.parent_target_id
+                         ELSE target.id
+                       END
+                     WHERE target.id = deliveries.target_id
                        AND mem.actor_id = deliveries.recipient_id
                        AND mem.left_at_ms IS NULL
                    )",
@@ -461,8 +704,13 @@ impl CollabCore {
                         m.client_request_id, m.body_json, m.created_at_ms
                  FROM deliveries d
                  JOIN messages m ON m.id = d.message_id
+                 JOIN targets target ON target.id = m.target_id
                  JOIN memberships mem
-                   ON mem.target_id = m.target_id AND mem.actor_id = ?1
+                   ON mem.target_id = CASE
+                     WHEN target.kind = 'thread' THEN target.parent_target_id
+                     ELSE target.id
+                   END
+                  AND mem.actor_id = ?1
                  WHERE d.recipient_id = ?1
                    AND d.model_seen_at_ms IS NULL
                    AND mem.left_at_ms IS NULL
@@ -604,8 +852,8 @@ impl CollabCore {
         Ok(())
     }
 
-    /// Read one exact Message only while the actor remains an active member of
-    /// that exact target.
+    /// Read one exact Message while the actor retains access to the exact
+    /// target, inherited from the parent for a Thread.
     pub async fn read_message(
         &self,
         actor_id: &str,
@@ -614,8 +862,7 @@ impl CollabCore {
     ) -> Result<Message> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
-        require_target(&connection, target_id).await?;
-        require_active_member(&connection, target_id, actor_id, "read").await?;
+        require_target_access(&connection, target_id, actor_id, "read").await?;
         let mut rows = connection
             .query(
                 "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
@@ -649,8 +896,7 @@ impl CollabCore {
             ));
         }
         let connection = self.connection.lock().await;
-        require_target(&connection, target_id).await?;
-        require_active_member(&connection, target_id, actor_id, "read").await?;
+        require_target_access(&connection, target_id, actor_id, "read").await?;
         let mut rows = connection
             .query(
                 "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
@@ -679,7 +925,13 @@ impl CollabCore {
             .await?;
         require_actor(&transaction, actor_id).await?;
         let target_id = message_target(&transaction, message_id).await?;
-        require_active_member(&transaction, &target_id, actor_id, "create task").await?;
+        let route =
+            require_target_access(&transaction, &target_id, actor_id, "create task").await?;
+        if route.kind == TargetKind::Thread {
+            return Err(CollabError::InvalidArgument(
+                "Thread replies cannot become Tasks".into(),
+            ));
+        }
 
         if let Some(task) = find_task(&transaction, message_id).await? {
             transaction.commit().await?;
@@ -761,7 +1013,7 @@ impl CollabCore {
         let current = find_task(&transaction, message_id)
             .await?
             .ok_or_else(|| not_found("task", message_id))?;
-        require_active_member(&transaction, &current.target_id, actor_id, "claim task").await?;
+        require_target_access(&transaction, &current.target_id, actor_id, "claim task").await?;
         if current.status == TaskStatus::Done {
             return Err(CollabError::TaskTransitionDenied {
                 message_id: message_id.to_owned(),
@@ -889,8 +1141,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_target(&transaction, &request.target_id).await?;
-        require_active_member(
+        let route = require_target_access(
             &transaction,
             &request.target_id,
             &request.author_id,
@@ -911,6 +1162,11 @@ impl CollabCore {
                 wake_agent_ids,
                 replayed: true,
             });
+        }
+
+        if route.kind == TargetKind::Thread {
+            follow_thread_in_transaction(&transaction, &request.target_id, &request.author_id, now)
+                .await?;
         }
 
         let message_id = new_id();
@@ -948,8 +1204,22 @@ impl CollabCore {
             return Err(CollabError::InjectedSendFailure);
         }
 
-        let mut recipient_rows = transaction
-            .query(
+        let (recipient_statement, permission_target_id) = if route.kind == TargetKind::Thread {
+            (
+                "SELECT a.id, a.kind
+                 FROM thread_follows f
+                 JOIN actors a ON a.id = f.actor_id
+                 JOIN memberships m
+                   ON m.target_id = ?3 AND m.actor_id = f.actor_id
+                 WHERE f.thread_target_id = ?1
+                   AND f.unfollowed_at_ms IS NULL
+                   AND m.left_at_ms IS NULL
+                   AND a.id <> ?2
+                 ORDER BY a.id",
+                route.permission_target_id(&request.target_id),
+            )
+        } else {
+            (
                 "SELECT a.id, a.kind
                  FROM memberships m
                  JOIN actors a ON a.id = m.actor_id
@@ -957,9 +1227,28 @@ impl CollabCore {
                    AND m.left_at_ms IS NULL
                    AND a.id <> ?2
                  ORDER BY a.id",
-                (request.target_id.as_str(), request.author_id.as_str()),
+                request.target_id.as_str(),
             )
-            .await?;
+        };
+        let mut recipient_rows = if route.kind == TargetKind::Thread {
+            transaction
+                .query(
+                    recipient_statement,
+                    (
+                        request.target_id.as_str(),
+                        request.author_id.as_str(),
+                        permission_target_id,
+                    ),
+                )
+                .await?
+        } else {
+            transaction
+                .query(
+                    recipient_statement,
+                    (request.target_id.as_str(), request.author_id.as_str()),
+                )
+                .await?
+        };
         let mut recipients = Vec::new();
         while let Some(row) = recipient_rows.next().await? {
             recipients.push((row.get::<String>(0)?, row.get::<String>(1)?));
@@ -1077,6 +1366,7 @@ async fn migrate(connection: &mut Connection) -> Result<()> {
         match next {
             1 => transaction.execute_batch(SCHEMA_V1).await?,
             2 => transaction.execute_batch(SCHEMA_V2).await?,
+            3 => transaction.execute_batch(SCHEMA_V3).await?,
             _ => {
                 return Err(CollabError::SchemaVersionMismatch {
                     found: version.to_string(),
@@ -1179,17 +1469,20 @@ async fn require_agent(connection: &Connection, agent_id: &str) -> Result<()> {
     Ok(())
 }
 
-async fn require_target(connection: &Connection, target_id: &str) -> Result<TargetKind> {
-    let mut rows = connection
-        .query(
-            "SELECT kind FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
-            [target_id],
-        )
-        .await?;
-    let Some(row) = rows.next().await? else {
-        return Err(not_found("active target", target_id));
-    };
-    match row.get::<String>(0)?.as_str() {
+#[derive(Clone, Debug)]
+struct TargetRoute {
+    kind: TargetKind,
+    parent_target_id: Option<String>,
+}
+
+impl TargetRoute {
+    fn permission_target_id<'a>(&'a self, exact_target_id: &'a str) -> &'a str {
+        self.parent_target_id.as_deref().unwrap_or(exact_target_id)
+    }
+}
+
+fn parse_target_kind(target_id: &str, value: &str) -> Result<TargetKind> {
+    match value {
         "channel" => Ok(TargetKind::Channel),
         "direct" => Ok(TargetKind::Direct),
         "thread" => Ok(TargetKind::Thread),
@@ -1197,6 +1490,57 @@ async fn require_target(connection: &Connection, target_id: &str) -> Result<Targ
             "target '{target_id}' has unknown kind '{other}'"
         ))),
     }
+}
+
+async fn require_target_route(connection: &Connection, target_id: &str) -> Result<TargetRoute> {
+    let mut rows = connection
+        .query(
+            "SELECT kind, parent_target_id
+             FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
+            [target_id],
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(not_found("active target", target_id));
+    };
+    let kind_text = row.get::<String>(0)?;
+    let parent_target_id = row.get::<Option<String>>(1)?;
+    let kind = parse_target_kind(target_id, &kind_text)?;
+    if kind == TargetKind::Thread && parent_target_id.is_none() {
+        return Err(CollabError::Database(format!(
+            "Thread target '{target_id}' has no parent target"
+        )));
+    }
+    if kind != TargetKind::Thread && parent_target_id.is_some() {
+        return Err(CollabError::Database(format!(
+            "non-Thread target '{target_id}' unexpectedly has a parent"
+        )));
+    }
+    Ok(TargetRoute {
+        kind,
+        parent_target_id,
+    })
+}
+
+async fn require_target(connection: &Connection, target_id: &str) -> Result<TargetKind> {
+    Ok(require_target_route(connection, target_id).await?.kind)
+}
+
+async fn require_target_access(
+    connection: &Connection,
+    target_id: &str,
+    actor_id: &str,
+    action: &'static str,
+) -> Result<TargetRoute> {
+    let route = require_target_route(connection, target_id).await?;
+    require_active_member(
+        connection,
+        route.permission_target_id(target_id),
+        actor_id,
+        action,
+    )
+    .await?;
+    Ok(route)
 }
 
 async fn require_owner(connection: &Connection, target_id: &str, actor_id: &str) -> Result<()> {
@@ -1238,6 +1582,75 @@ async fn require_active_member(
             target_id: target_id.to_owned(),
         });
     }
+    Ok(())
+}
+
+async fn is_active_member(
+    connection: &Connection,
+    target_id: &str,
+    actor_id: &str,
+) -> Result<bool> {
+    let mut rows = connection
+        .query(
+            "SELECT 1 FROM memberships
+             WHERE target_id = ?1 AND actor_id = ?2 AND left_at_ms IS NULL",
+            (target_id, actor_id),
+        )
+        .await?;
+    Ok(rows.next().await?.is_some())
+}
+
+async fn actor_handle(connection: &Connection, actor_id: &str) -> Result<String> {
+    let mut rows = connection
+        .query("SELECT handle FROM actors WHERE id = ?1", [actor_id])
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok(row.get(0)?),
+        None => Err(not_found("actor", actor_id)),
+    }
+}
+
+async fn find_target(connection: &Connection, target_id: &str) -> Result<Target> {
+    let mut rows = connection
+        .query(
+            "SELECT id, kind, name, parent_target_id, root_message_id,
+                    created_by, created_at_ms
+             FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
+            [target_id],
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(not_found("active target", target_id));
+    };
+    let kind_text = row.get::<String>(1)?;
+    Ok(Target {
+        id: row.get(0)?,
+        kind: parse_target_kind(target_id, &kind_text)?,
+        name: row.get(2)?,
+        parent_target_id: row.get(3)?,
+        root_message_id: row.get(4)?,
+        created_by: row.get(5)?,
+        created_at_ms: row.get(6)?,
+    })
+}
+
+async fn follow_thread_in_transaction(
+    connection: &Connection,
+    thread_target_id: &str,
+    actor_id: &str,
+    now: i64,
+) -> Result<()> {
+    connection
+        .execute(
+            "INSERT INTO thread_follows
+             (thread_target_id, actor_id, followed_at_ms, unfollowed_at_ms)
+             VALUES (?1, ?2, ?3, NULL)
+             ON CONFLICT(thread_target_id, actor_id) DO UPDATE SET
+               followed_at_ms = excluded.followed_at_ms,
+               unfollowed_at_ms = NULL",
+            (thread_target_id, actor_id, now),
+        )
+        .await?;
     Ok(())
 }
 
@@ -1338,6 +1751,22 @@ async fn message_target(connection: &Connection, message_id: &str) -> Result<Str
         .await?;
     match rows.next().await? {
         Some(row) => Ok(row.get(0)?),
+        None => Err(not_found("message", message_id)),
+    }
+}
+
+async fn message_target_author(
+    connection: &Connection,
+    message_id: &str,
+) -> Result<(String, String)> {
+    let mut rows = connection
+        .query(
+            "SELECT target_id, author_id FROM messages WHERE id = ?1",
+            [message_id],
+        )
+        .await?;
+    match rows.next().await? {
+        Some(row) => Ok((row.get(0)?, row.get(1)?)),
         None => Err(not_found("message", message_id)),
     }
 }
@@ -1784,6 +2213,189 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn direct_target_is_unique_for_an_unordered_actor_pair() -> Result<()> {
+        let (core, user, alpha, beta, _channel) = fixture().await?;
+        let direct = core.create_direct(&alpha.id, &beta.id).await?;
+        let reversed = core.create_direct(&beta.id, &alpha.id).await?;
+        assert_eq!(direct, reversed);
+        assert_eq!(direct.kind, TargetKind::Direct);
+        assert!(direct.parent_target_id.is_none());
+        assert!(direct.root_message_id.is_none());
+
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: direct.id.clone(),
+                author_id: alpha.id.clone(),
+                client_request_id: "direct-message".into(),
+                text: "only beta receives this".into(),
+            })
+            .await?;
+        assert_eq!(sent.recipient_ids, vec![beta.id.clone()]);
+        assert_eq!(
+            core.read_messages(&beta.id, &direct.id, 0, 10).await?,
+            vec![sent.message]
+        );
+        assert!(matches!(
+            core.read_messages(&user.id, &direct.id, 0, 10).await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+        assert!(matches!(
+            core.add_member(&direct.id, &user.id, &alpha.id).await,
+            Err(CollabError::InvalidArgument(_))
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn thread_inherits_parent_access_and_delivers_only_to_followers() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let outsider = core.create_user("thread-outsider", "Outsider").await?;
+        let root = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "thread-root".into(),
+                text: "review in a thread".into(),
+            })
+            .await?;
+        let beta_binding = core
+            .bind_runtime(
+                &beta.id,
+                "thread-beta-session",
+                "openai",
+                "codex",
+                "default",
+            )
+            .await?;
+        let root_batch = core
+            .check_inbox(
+                &beta.id,
+                beta_binding.generation,
+                &beta_binding.session_id,
+                10,
+            )
+            .await?;
+        core.mark_model_seen(
+            root_batch.id.as_deref().expect("root delivery batch"),
+            &beta.id,
+            beta_binding.generation,
+            &beta_binding.session_id,
+        )
+        .await?;
+        let thread = core.create_thread(&root.message.id, &alpha.id).await?;
+        assert_eq!(thread.kind, TargetKind::Thread);
+        assert_eq!(
+            thread.parent_target_id.as_deref(),
+            Some(channel.id.as_str())
+        );
+        assert_eq!(
+            thread.root_message_id.as_deref(),
+            Some(root.message.id.as_str())
+        );
+        assert_eq!(
+            core.create_thread(&root.message.id, &beta.id).await?,
+            thread
+        );
+
+        let first_reply = core
+            .send_message(SendMessageRequest {
+                target_id: thread.id.clone(),
+                author_id: alpha.id.clone(),
+                client_request_id: "thread-reply-1".into(),
+                text: "alpha reply".into(),
+            })
+            .await?;
+        assert_eq!(first_reply.recipient_ids, vec![user.id.clone()]);
+
+        core.follow_thread(&thread.id, &beta.id).await?;
+        let second_reply = core
+            .send_message(SendMessageRequest {
+                target_id: thread.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "thread-reply-2".into(),
+                text: "owner reply".into(),
+            })
+            .await?;
+        assert_eq!(
+            second_reply.recipient_ids,
+            vec![alpha.id.clone(), beta.id.clone()]
+        );
+        assert!(
+            core.list_pending_wakes(10)
+                .await?
+                .iter()
+                .any(|wake| wake.binding.agent_id == beta.id)
+        );
+        let thread_batch = core
+            .check_inbox(
+                &beta.id,
+                beta_binding.generation,
+                &beta_binding.session_id,
+                10,
+            )
+            .await?;
+        assert_eq!(thread_batch.messages.len(), 1);
+        assert_eq!(thread_batch.messages[0].message.id, second_reply.message.id);
+        core.mark_model_seen(
+            thread_batch.id.as_deref().expect("Thread delivery batch"),
+            &beta.id,
+            beta_binding.generation,
+            &beta_binding.session_id,
+        )
+        .await?;
+
+        core.unfollow_thread(&thread.id, &beta.id).await?;
+        assert_eq!(
+            core.read_message(&beta.id, &thread.id, &second_reply.message.id)
+                .await?,
+            second_reply.message
+        );
+        let after_unfollow = core
+            .send_message(SendMessageRequest {
+                target_id: thread.id.clone(),
+                author_id: alpha.id.clone(),
+                client_request_id: "thread-reply-3".into(),
+                text: "beta should not receive this".into(),
+            })
+            .await?;
+        assert_eq!(after_unfollow.recipient_ids, vec![user.id.clone()]);
+
+        let beta_reply = core
+            .send_message(SendMessageRequest {
+                target_id: thread.id.clone(),
+                author_id: beta.id.clone(),
+                client_request_id: "thread-reply-4".into(),
+                text: "participating follows again".into(),
+            })
+            .await?;
+        let mut expected_beta_reply_recipients = vec![user.id.clone(), alpha.id.clone()];
+        expected_beta_reply_recipients.sort();
+        assert_eq!(beta_reply.recipient_ids, expected_beta_reply_recipients);
+        let final_reply = core
+            .send_message(SendMessageRequest {
+                target_id: thread.id.clone(),
+                author_id: alpha.id.clone(),
+                client_request_id: "thread-reply-5".into(),
+                text: "beta follows again".into(),
+            })
+            .await?;
+        assert!(final_reply.recipient_ids.contains(&beta.id));
+        assert!(matches!(
+            core.read_messages(&outsider.id, &thread.id, 0, 10).await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+        assert!(matches!(
+            core.create_task(&first_reply.message.id, &alpha.id).await,
+            Err(CollabError::InvalidArgument(_))
+        ));
+        assert!(matches!(
+            core.create_thread(&first_reply.message.id, &alpha.id).await,
+            Err(CollabError::InvalidArgument(_))
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn only_one_concurrent_task_claim_wins() -> Result<()> {
         let (core, user, alpha, beta, channel) = fixture().await?;
         let sent = core
@@ -1859,7 +2471,7 @@ mod tests {
             .await?;
         assert_eq!(
             rows.next().await?.expect("schema row").get::<String>(0)?,
-            "2"
+            SCHEMA_VERSION.to_string()
         );
         Ok(())
     }

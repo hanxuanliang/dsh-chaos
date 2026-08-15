@@ -48,6 +48,44 @@ try {
   assert.equal(inbox.messages.length, 1)
   await core.markModelSeen(inbox.id, alpha.id, binding.generation, binding.sessionId)
 
+  const direct = await core.createDirect(alpha.id, beta.id)
+  assert.deepEqual(await core.createDirect(beta.id, alpha.id), direct)
+  const directMessage = await core.sendMessage({
+    targetId: direct.id,
+    authorId: alpha.id,
+    clientRequestId: 'native-direct-send',
+    text: 'beta only',
+  })
+  assert.deepEqual(directMessage.recipientIds, [beta.id])
+
+  const thread = await core.createThread(sent.message.id, alpha.id)
+  assert.equal(thread.parentTargetId, channel.id)
+  assert.equal(thread.rootMessageId, sent.message.id)
+  const firstReply = await core.sendMessage({
+    targetId: thread.id,
+    authorId: alpha.id,
+    clientRequestId: 'native-thread-1',
+    text: 'owner follows the root',
+  })
+  assert.deepEqual(firstReply.recipientIds, [owner.id])
+  await core.followThread(thread.id, beta.id)
+  const secondReply = await core.sendMessage({
+    targetId: thread.id,
+    authorId: owner.id,
+    clientRequestId: 'native-thread-2',
+    text: 'both agents now follow',
+  })
+  assert.equal(secondReply.recipientIds.length, 2)
+  assert.equal((await core.readMessages(alpha.id, thread.id, '0', 20)).length, 2)
+  await core.unfollowThread(thread.id, beta.id)
+  const afterUnfollow = await core.sendMessage({
+    targetId: thread.id,
+    authorId: alpha.id,
+    clientRequestId: 'native-thread-3',
+    text: 'beta no longer receives this',
+  })
+  assert.deepEqual(afterUnfollow.recipientIds, [owner.id])
+
   const task = await core.createTask(sent.message.id, owner.id)
   const claimed = await core.claimTask(task.messageId, alpha.id)
   assert.equal(claimed.status, 'in_progress')

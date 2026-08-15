@@ -14,6 +14,8 @@ export interface NativeTarget {
   id: string
   kind: 'channel' | 'direct' | 'thread'
   name: string
+  parentTargetId?: string
+  rootMessageId?: string
   createdBy: string
   createdAtMs: number
 }
@@ -75,6 +77,10 @@ export interface NativeCollabHandle {
   createUser(handle: string, displayName: string): Promise<NativeActor>
   createAgent(handle: string, displayName: string, workspacePath: string): Promise<NativeActor>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
+  createDirect(actorId: string, peerId: string): Promise<NativeTarget>
+  createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
+  followThread(threadTargetId: string, actorId: string): Promise<void>
+  unfollowThread(threadTargetId: string, actorId: string): Promise<void>
   addMember(targetId: string, actorId: string, addedBy: string): Promise<void>
   sendMessage(input: {
     targetId: string

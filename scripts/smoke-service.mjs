@@ -58,6 +58,25 @@ try {
     agent: runtimeAgent,
   })
   assert.equal(checked.messages.length, 1)
+  const execution = {
+    callId: 'service-tool-call',
+    signal: new AbortController().signal,
+    agent: runtimeAgent,
+  }
+  const history = await scopedTools.get('message_read').execute({
+    targetId: channel.id,
+    afterSeq: '0',
+    limit: 20,
+  }, execution)
+  assert.equal(history.messages[0].id, sent.message.id)
+  const task = await scopedTools.get('task_create').execute({
+    messageId: sent.message.id,
+  }, execution)
+  const claimed = await scopedTools.get('task_claim').execute({
+    messageId: sent.message.id,
+  }, execution)
+  assert.equal(task.status, 'todo')
+  assert.equal(claimed.assigneeId, alpha.id)
 
   const request = {
     provider: 'openai',

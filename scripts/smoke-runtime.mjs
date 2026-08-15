@@ -8,6 +8,7 @@ class FakeCollab {
   seen = []
   sends = []
   rearms = []
+  taskActors = []
   published = false
 
   async bindRuntime(agentId, sessionId, provider, model, preset) {
@@ -81,8 +82,49 @@ class FakeCollab {
       replayed: false,
     }
   }
-  async readMessage() { throw new Error('unused') }
-  async readMessages() { return [] }
+  async readMessage(actorId, targetId, messageId) {
+    assert.equal(actorId, 'agent-1')
+    return {
+      seq: '10',
+      id: messageId,
+      targetId,
+      authorId: 'agent-1',
+      clientRequestId: 'call-1',
+      text: 'reply',
+      createdAtMs: 3,
+    }
+  }
+  async readMessages(actorId, targetId, afterSeq, limit) {
+    assert.equal(actorId, 'agent-1')
+    assert.equal(afterSeq, '0')
+    assert.equal(limit, 5)
+    return [await this.readMessage(actorId, targetId, 'message-2')]
+  }
+  async createTask(messageId, actorId) {
+    this.taskActors.push(actorId)
+    return {
+      messageId,
+      targetId: 'target-1',
+      number: '1',
+      status: 'todo',
+      version: '1',
+      createdAtMs: 4,
+      updatedAtMs: 4,
+    }
+  }
+  async claimTask(messageId, actorId) {
+    this.taskActors.push(actorId)
+    return {
+      messageId,
+      targetId: 'target-1',
+      number: '1',
+      status: 'in_progress',
+      assigneeId: actorId,
+      version: '2',
+      createdAtMs: 4,
+      updatedAtMs: 5,
+    }
+  }
 }
 
 const tools = new Map()
@@ -120,7 +162,13 @@ const binding = await runtimes.create({
   sessionId: 'session-1',
 })
 assert.equal(runtimes.resolve(binding), fakeAgent)
-assert.deepEqual([...tools.keys()].sort(), ['message_check', 'message_send'])
+assert.deepEqual([...tools.keys()].sort(), [
+  'message_check',
+  'message_read',
+  'message_send',
+  'task_claim',
+  'task_create',
+])
 
 collab.pending = [{ binding, pendingSeq: '9' }]
 const bridge = new DeliveryBridge(collab, runtimes, warnings, 50)
@@ -150,6 +198,25 @@ const sent = await tools.get('message_send').execute({
 }, execution)
 assert.equal(sent.message.authorId, 'agent-1')
 assert.equal(collab.sends[0].clientRequestId, 'call-1')
+
+const history = await tools.get('message_read').execute({
+  targetId: 'target-1',
+  afterSeq: '0',
+  limit: 5,
+  actorId: 'forged-agent',
+}, execution)
+assert.equal(history.messages[0].id, 'message-2')
+const createdTask = await tools.get('task_create').execute({
+  messageId: 'message-2',
+  actorId: 'forged-agent',
+}, execution)
+assert.equal(createdTask.status, 'todo')
+const claimedTask = await tools.get('task_claim').execute({
+  messageId: 'message-2',
+  actorId: 'forged-agent',
+}, execution)
+assert.equal(claimedTask.assigneeId, 'agent-1')
+assert.deepEqual(collab.taskActors, ['agent-1', 'agent-1'])
 
 fakeAgent.status = 'running'
 collab.pending = [{ binding, pendingSeq: '10' }]

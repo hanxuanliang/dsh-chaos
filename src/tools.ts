@@ -18,6 +18,25 @@ const MESSAGE_SCHEMA = {
   },
 } as const
 
+const TASK_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    messageId: { type: 'string', required: true },
+    targetId: { type: 'string', required: true },
+    number: { type: 'string', required: true },
+    status: {
+      type: 'string',
+      required: true,
+      enum: ['todo', 'in_progress', 'in_review', 'done'],
+    },
+    assigneeId: { type: 'string' },
+    version: { type: 'string', required: true },
+    createdAtMs: { type: 'number', required: true },
+    updatedAtMs: { type: 'number', required: true },
+  },
+} as const
+
 const requireAgent = (agent: Agent | undefined): Agent => {
   if (agent === undefined) throw new Error('message tools require a DSH Agent execution identity')
   return agent
@@ -84,6 +103,44 @@ export function installCollabTools(
   }))
 
   agentCtx.tools.register(defineTool({
+    name: 'message_read',
+    description: 'Read one message or an ascending history page from one exact collaboration target. Thread access is inherited from its parent Channel or Direct target.',
+    parameters: {
+      targetId: { type: 'string', required: true, description: 'Exact Channel, Direct, or Thread target id.' },
+      messageId: { type: 'string', description: 'Read exactly this message id within targetId.' },
+      afterSeq: { type: 'string', description: 'For history reads, return messages after this decimal global sequence. Defaults to "0".' },
+      limit: { type: 'integer', description: 'For history reads, return 1 through 100 messages. Defaults to 50.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          targetId: { type: 'string', required: true },
+          messages: { type: 'array', required: true, items: MESSAGE_SCHEMA },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    async execute(args, exec) {
+      const limit = args.limit ?? 50
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error('limit must be an integer from 1 through 100')
+      }
+      const afterSeq = args.afterSeq ?? '0'
+      if (!/^(0|[1-9][0-9]*)$/.test(afterSeq)) {
+        throw new Error('afterSeq must be a non-negative decimal integer string')
+      }
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      const messages = args.messageId === undefined
+        ? await collab.readMessages(binding.agentId, args.targetId, afterSeq, limit)
+        : [await collab.readMessage(binding.agentId, args.targetId, args.messageId)]
+      return { targetId: args.targetId, messages }
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
     name: 'message_send',
     description: 'Commit one text message to an exact collaboration target. Author identity is derived from the calling Agent and cannot be supplied by arguments.',
     parameters: {
@@ -115,6 +172,46 @@ export function installCollabTools(
         clientRequestId: String(exec.callId),
         text: args.text,
       })
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
+    name: 'task_create',
+    description: 'Attach Task metadata to one committed top-level Channel or Direct message. Actor identity comes from the calling Agent.',
+    parameters: {
+      messageId: { type: 'string', required: true, description: 'Top-level Message id to convert to a Task.' },
+    },
+    output: {
+      schema: TASK_SCHEMA,
+      render: (_args, value) => [{
+        type: 'text',
+        text: `task ${value.number} created for message ${value.messageId}`,
+      }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      return collab.createTask(args.messageId, binding.agentId)
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
+    name: 'task_claim',
+    description: 'Claim one existing Task by its source message id. A concurrent claim by another actor fails with a typed conflict.',
+    parameters: {
+      messageId: { type: 'string', required: true, description: 'Source Message id of the Task.' },
+    },
+    output: {
+      schema: TASK_SCHEMA,
+      render: (_args, value) => [{
+        type: 'text',
+        text: `task ${value.number} is ${value.status} and assigned to ${value.assigneeId ?? 'nobody'}`,
+      }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      return collab.claimTask(args.messageId, binding.agentId)
     },
   }))
 }

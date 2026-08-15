@@ -4,6 +4,7 @@ import type {
   NativePendingWake,
   NativeRuntimeBinding,
   NativeSendResult,
+  NativeTask,
 } from './native.ts'
 
 /** Narrow host contract shared by runtime wiring, delivery, and model tools. */
@@ -38,6 +39,8 @@ export interface CollabRuntimeApi {
     generation: string,
     sessionId: string,
   ): Promise<void>
+  createTask(messageId: string, actorId: string): Promise<NativeTask>
+  claimTask(messageId: string, actorId: string): Promise<NativeTask>
   sendMessage(input: {
     targetId: string
     authorId: string

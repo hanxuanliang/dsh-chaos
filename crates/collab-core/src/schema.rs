@@ -1,4 +1,4 @@
-pub(crate) const SCHEMA_VERSION: u32 = 2;
+pub(crate) const SCHEMA_VERSION: u32 = 3;
 
 pub(crate) const META_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS collab_meta (
@@ -156,4 +156,29 @@ CREATE TABLE read_cursors (
 pub(crate) const SCHEMA_V2: &str = r#"
 CREATE UNIQUE INDEX runtime_bindings_session_id
   ON runtime_bindings (session_id);
+"#;
+
+pub(crate) const SCHEMA_V3: &str = r#"
+CREATE UNIQUE INDEX targets_root_message_id
+  ON targets (root_message_id);
+
+CREATE TABLE direct_pairs (
+  target_id TEXT PRIMARY KEY,
+  actor_low_id TEXT NOT NULL,
+  actor_high_id TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (actor_low_id < actor_high_id),
+  UNIQUE (actor_low_id, actor_high_id)
+);
+
+CREATE TABLE thread_follows (
+  thread_target_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  followed_at_ms INTEGER NOT NULL,
+  unfollowed_at_ms INTEGER,
+  PRIMARY KEY (thread_target_id, actor_id)
+);
+
+CREATE INDEX thread_follows_active
+  ON thread_follows (thread_target_id, unfollowed_at_ms, actor_id);
 "#;

@@ -27,8 +27,7 @@ pub struct Actor {
     pub created_at_ms: i64,
 }
 
-/// A collab target kind. V1 implements channels; direct/thread rows are
-/// reserved in the schema for the next vertical slice.
+/// A collab target kind.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TargetKind {
@@ -53,6 +52,8 @@ pub struct Target {
     pub id: String,
     pub kind: TargetKind,
     pub name: String,
+    pub parent_target_id: Option<String>,
+    pub root_message_id: Option<String>,
     pub created_by: String,
     pub created_at_ms: i64,
 }

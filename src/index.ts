@@ -134,6 +134,22 @@ export class CollabService extends Service {
     return this.requireHandle().createChannel(name, creatorId)
   }
 
+  createDirect(actorId: string, peerId: string) {
+    return this.requireHandle().createDirect(actorId, peerId)
+  }
+
+  createThread(rootMessageId: string, actorId: string) {
+    return this.requireHandle().createThread(rootMessageId, actorId)
+  }
+
+  followThread(threadTargetId: string, actorId: string) {
+    return this.requireHandle().followThread(threadTargetId, actorId)
+  }
+
+  unfollowThread(threadTargetId: string, actorId: string) {
+    return this.requireHandle().unfollowThread(threadTargetId, actorId)
+  }
+
   addMember(targetId: string, actorId: string, addedBy: string) {
     return this.requireHandle().addMember(targetId, actorId, addedBy)
   }
