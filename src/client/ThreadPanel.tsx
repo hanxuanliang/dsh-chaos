@@ -52,7 +52,12 @@ export function ThreadPanel({
           <span className={css.targetKind}>THREAD</span>
           <strong>{parentName} · {rootSuffix}</strong>
         </div>
-        <button type="button" className={css.iconButton} aria-label="关闭 Thread 面板" onClick={onClose}>×</button>
+        <button type="button" className={css.iconButton} aria-label="关闭 Thread 面板" onClick={onClose}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
       </header>
       <div ref={scrollRef} className={css.threadPanelMessages}>
         {messages.length === 0 && <p className={css.empty}>Thread 里还没有回复。</p>}

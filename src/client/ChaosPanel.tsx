@@ -52,12 +52,6 @@ const LANES: ReadonlyArray<{ status: NativeTask['status']; label: string }> = [
   { status: 'done', label: 'DONE' },
 ]
 
-const kindLabel: Record<NativeTarget['kind'], string> = {
-  channel: 'CHANNEL',
-  direct: 'DIRECT',
-  thread: 'THREAD',
-}
-
 function timeOf(createdAtMs: number): string {
   return new Date(createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -106,6 +100,13 @@ const ReplyIcon = (
   </svg>
 )
 
+const CloseIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+)
+
 /** Native Sidebar footer entry. The badge is authoritative pending Task count, not inferred unread state. */
 export function ChaosEntry({ wide, useChaos, ensure, togglePeek }: ChaosEntryProps) {
   const state = useChaos(value => value)
@@ -150,7 +151,9 @@ function QuickPeek({
           <strong>协作</strong>
           <small>{state.stream === 'connected' ? '实时连接' : state.stream === 'reconnecting' ? '重连中…' : state.stream}</small>
         </div>
-        <button type="button" className={css.iconButton} aria-label="关闭协作速览" onClick={closeSurface}>×</button>
+        <button type="button" className={css.iconButton} aria-label="关闭协作速览" onClick={closeSurface}>
+          {CloseIcon}
+        </button>
       </header>
       <div className={css.peekSummary}>
         <span>{channels.length} 个 Channel</span>
@@ -591,15 +594,15 @@ export function ChaosPanel({
   }
 
   const submitMessage = async (): Promise<void> => {
-    const text = draft.trim()
+    const snapshot = draft
+    const text = snapshot.trim()
     if (text === '' || sendPending) return
     setSendPending(true)
     setSendError(null)
     try {
       await send(text)
-      // Clear only when the draft is still the sent snapshot; anything typed
-      // while the request was in flight belongs to the next message.
-      setDrafts(previous => resolveSentDraft(previous, draftKey, text))
+      // Clear only when the raw draft is still the submit snapshot.
+      setDrafts(previous => resolveSentDraft(previous, draftKey, snapshot))
     } catch (error) {
       setSendError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -608,14 +611,14 @@ export function ChaosPanel({
   }
 
   const submitThreadMessage = async (): Promise<void> => {
-    const text = threadDraft.trim()
+    const snapshot = threadDraft
+    const text = snapshot.trim()
     if (text === '' || threadSendPending) return
     setThreadSendPending(true)
     setThreadSendError(null)
     try {
       await sendToThread(text)
-      // Same in-flight guard as the main composer: keep later typing.
-      setDrafts(previous => resolveSentDraft(previous, threadDraftKey, text))
+      setDrafts(previous => resolveSentDraft(previous, threadDraftKey, snapshot))
     } catch (error) {
       setThreadSendError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -708,17 +711,16 @@ export function ChaosPanel({
   return (
     <div className={css.backdrop}>
       <section className={css.workspace} aria-label="协作工作台">
-        <header className={css.workspaceHeader}>
+        <header className={css.workspaceHeader} data-stream={state.stream}>
           <div className={css.workspaceTitle}>
-            <span className={css.brandIcon} aria-hidden>◎</span>
-            <strong>协作工作台</strong>
-            <small>
-              {state.actor?.displayName ?? '本地用户'}
-              {' · '}
-              {state.stream === 'connected' ? '实时连接' : '重连中…'}
-            </small>
+            <strong>协作</strong>
+            {state.stream !== 'connected' && (
+              <small>重连中…</small>
+            )}
           </div>
-          <button type="button" className={css.iconButton} aria-label="关闭协作工作台" onClick={closeSurface}>×</button>
+          <button type="button" className={css.iconButton} aria-label="关闭协作工作台" onClick={closeSurface}>
+            {CloseIcon}
+          </button>
         </header>
 
         <div className={css.workspaceBody}>
@@ -759,15 +761,8 @@ export function ChaosPanel({
 
           <main className={css.conversation}>
             <header className={css.conversationHeader}>
-              <div>
-                <span className={css.targetKind}>{selected === undefined ? 'CHANNEL' : kindLabel[selected.kind]}</span>
-                <h2>{selected === undefined ? '请选择 Channel' : selected.name}</h2>
-              </div>
-              <button type="button" className={css.mobileDetailsButton} onClick={() => { setDetailsOpen(true) }}>
-                面板
-              </button>
-            </header>
-            <div className={css.viewTabs} role="tablist">
+              <h2>{selected === undefined ? '请选择 Channel' : selected.name}</h2>
+              <div className={css.viewTabs} role="tablist">
               <button
                 type="button"
                 role="tab"
@@ -786,26 +781,30 @@ export function ChaosPanel({
               >
                 任务{state.tasks.length > 0 ? ` ${String(state.tasks.length)}` : ''}
               </button>
-            </div>
+              </div>
+              {view === 'tasks' && (
+                <button
+                  ref={newTaskButtonRef}
+                  type="button"
+                  className={css.secondaryButton}
+                  disabled={pending || anchorCandidates.length === 0}
+                  onClick={() => {
+                    setNewTaskError(null)
+                    setNewTaskOpen(true)
+                  }}
+                >
+                  新建 Task
+                </button>
+              )}
+              <button type="button" className={css.mobileDetailsButton} aria-label="打开面板" onClick={() => { setDetailsOpen(true) }}>
+                成员
+              </button>
+            </header>
             {(state.error !== undefined || failure !== null) && (
               <div className={css.error} role="alert">{failure ?? state.error}</div>
             )}
             {view === 'tasks' ? (
               <div className={css.boardPane}>
-                <div className={css.boardToolbar}>
-                  <button
-                    ref={newTaskButtonRef}
-                    type="button"
-                    className={css.secondaryButton}
-                    disabled={pending || anchorCandidates.length === 0}
-                    onClick={() => {
-                      setNewTaskError(null)
-                      setNewTaskOpen(true)
-                    }}
-                  >
-                    新建 Task
-                  </button>
-                </div>
                 <TaskBoard
                   tasks={state.tasks}
                   textByMessage={textByMessage}
@@ -886,7 +885,7 @@ export function ChaosPanel({
                     aria-label="关闭面板"
                     onClick={closeDetails}
                   >
-                    ×
+                    {CloseIcon}
                   </button>
                 </div>
                 {state.members.map(actor => (

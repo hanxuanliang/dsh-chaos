@@ -467,13 +467,15 @@ function messageOf(error: unknown): string {
 
 /**
  * Draft clearing after a successful send: only an untouched draft is
- * cleared. Anything typed while the request was in flight belongs to the
- * next message and must survive the earlier request's completion.
+ * cleared. Compare against the raw snapshot taken at submit time — not the
+ * trimmed payload — so a trailing newline does not look like new typing.
+ * Anything typed while the request was in flight belongs to the next
+ * message and must survive the earlier request's completion.
  */
 export function resolveSentDraft(
   drafts: Readonly<Record<string, string>>,
   key: string,
-  sentText: string,
+  sentRaw: string,
 ): Readonly<Record<string, string>> {
-  return drafts[key] === sentText ? { ...drafts, [key]: '' } : drafts
+  return drafts[key] === sentRaw ? { ...drafts, [key]: '' } : drafts
 }

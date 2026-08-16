@@ -103,6 +103,12 @@ impl CollabCore {
                 )));
             }
             if actor.display_name != display_name {
+                // Only leftover default names migrate. A custom display name
+                // is user-owned and must survive later OS-username ensure.
+                if actor.display_name != "Local User" {
+                    transaction.commit().await?;
+                    return Ok(actor);
+                }
                 // Explicit display-name migration on the stable handle: the
                 // actor id, Memberships and Tasks are untouched.
                 transaction
@@ -2714,9 +2720,7 @@ async fn message_body_text(connection: &Connection, message_id: &str) -> Result<
         Some(row) => {
             let body_json = row.get::<String>(0)?;
             let body: StoredTextBody = serde_json::from_str(&body_json).map_err(|error| {
-                CollabError::Database(format!(
-                    "message '{message_id}' has invalid body: {error}"
-                ))
+                CollabError::Database(format!("message '{message_id}' has invalid body: {error}"))
             })?;
             Ok(Some(body.text))
         }
@@ -3379,6 +3383,12 @@ mod tests {
         // Repeating with the current name is a no-op.
         let stable = core.ensure_user("local-user", "Updated User").await?;
         assert_eq!(stable, renamed);
+
+        // A custom name is never overwritten by a later ensure.
+        let custom = core.ensure_user("alice", "Custom Alice").await?;
+        let kept = core.ensure_user("alice", "Updated User").await?;
+        assert_eq!(kept.id, custom.id);
+        assert_eq!(kept.display_name, "Custom Alice");
         Ok(())
     }
 
@@ -3423,7 +3433,10 @@ mod tests {
             .await?
             .message;
         let created = core.create_task(&anchor.id, &user.id).await?;
-        assert_eq!(created.anchor_text.as_deref(), Some("anchor body survives paging"));
+        assert_eq!(
+            created.anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
 
         // Push the anchor far outside any recent-message page; the Task read
         // still resolves the true anchor body from the store.
@@ -3438,11 +3451,17 @@ mod tests {
         }
         let tasks = core.list_tasks(&alpha.id, Some(&channel.id)).await?;
         assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].anchor_text.as_deref(), Some("anchor body survives paging"));
+        assert_eq!(
+            tasks[0].anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
 
         // Mutations keep the anchor attached.
         let claimed = core.claim_task(&anchor.id, &alpha.id).await?;
-        assert_eq!(claimed.anchor_text.as_deref(), Some("anchor body survives paging"));
+        assert_eq!(
+            claimed.anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
         Ok(())
     }
 

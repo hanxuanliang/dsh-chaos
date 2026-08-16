@@ -348,6 +348,18 @@ const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${
     { 'target-1': '', 'thread-1': 'draft' },
     'drafts stay isolated per target',
   )
+  // Compare raw snapshot, not the trimmed payload: trailing whitespace is
+  // part of the sent draft and must still clear.
+  assert.deepEqual(
+    resolveSentDraft({ 'target-1': 'hello\n' }, 'target-1', 'hello\n'),
+    { 'target-1': '' },
+    'raw snapshot including trailing newline clears after send',
+  )
+  assert.deepEqual(
+    resolveSentDraft({ 'target-1': 'hello\n' }, 'target-1', 'hello'),
+    { 'target-1': 'hello\n' },
+    'trimmed payload must not look like an untouched draft',
+  )
 }
 
 delete globalThis.EventSource

@@ -11,11 +11,15 @@ const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-'))
 try {
   const core = await native.openCollab(join(root, 'state.db'))
   const owner = await core.createUser('owner', 'Owner')
-  // Same name is a no-op; a different name is an explicit display-name
-  // migration on the stable handle (actor id and identity survive).
+  // Same name is a no-op; a custom name is never overwritten.
   assert.deepEqual(await core.ensureUser('owner', 'Owner'), owner)
-  const renamed = await core.ensureUser('owner', 'Local Owner')
-  assert.equal(renamed.id, owner.id)
+  const kept = await core.ensureUser('owner', 'Local Owner')
+  assert.equal(kept.id, owner.id)
+  assert.equal(kept.displayName, 'Owner')
+  // Only leftover default 'Local User' migrates on the stable handle.
+  const legacy = await core.createUser('local-user', 'Local User')
+  const renamed = await core.ensureUser('local-user', 'Local Owner')
+  assert.equal(renamed.id, legacy.id)
   assert.equal(renamed.displayName, 'Local Owner')
   const alpha = await core.createAgent('alpha', 'Alpha', join(root, 'alpha'))
   const beta = await core.createAgent('beta', 'Beta', join(root, 'beta'))
@@ -106,7 +110,7 @@ try {
   assert.equal(unclaimed.status, 'in_review')
   assert.equal(unclaimed.assigneeId, undefined)
   assert.equal((await core.listTasks(owner.id, channel.id)).length, 1)
-  assert.equal((await core.listActors(owner.id)).length, 3)
+  assert.equal((await core.listActors(owner.id)).length, 4)
   const snapshot = await core.snapshot(owner.id)
   assert.equal(snapshot.actor.id, owner.id)
   assert(snapshot.targets.some(target => target.id === channel.id))
