@@ -91,7 +91,7 @@ const rpc = {
     const values = {
       snapshot: { actor, cursor: '7', targets: [target], followedThreadIds: [], tasks: [globalTask] },
       actors: [actor],
-      history: [],
+      'history.tail': { count: '0', messages: [] },
       tasks: [],
     }
     return { ok: true, value: { ok: true, value: values[endpoint] ?? null } }
@@ -128,7 +128,8 @@ assert.equal(state.selectedTargetId, target.id)
 assert.deepEqual(state.followedThreadIds, [])
 assert.deepEqual(state.allTasks, [globalTask])
 assert.equal(source.url, '/dsh-chaos/events?cursor=7')
-assert(calls.some(call => call.endpoint === 'history'))
+assert(calls.some(call => call.endpoint === 'history.tail'))
+assert(calls.every(call => call.endpoint !== 'history'))
 await injected.followThread('thread-1')
 await injected.unfollowThread('thread-1')
 assert(calls.some(call => call.endpoint === 'thread.follow'))
@@ -183,8 +184,8 @@ const directRpc = {
     if (endpoint === 'actors') {
       return { ok: true, value: { ok: true, value: [actor] } }
     }
-    if (endpoint === 'history' || endpoint === 'tasks') {
-      return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'history.tail' || endpoint === 'tasks') {
+      return { ok: true, value: { ok: true, value: endpoint === 'tasks' ? [] : { count: '0', messages: [] } } }
     }
     if (endpoint === 'channel.create') {
       currentTargets = [...currentTargets, secondTarget]
@@ -252,6 +253,67 @@ pendingController.dispose()
 pendingGate.resolve()
 await pendingEnsure
 assert.equal(sources.length, sourceCount, 'dispose must prevent a late EventSource')
+
+// Thread panel and send routing: opening a thread panel must not move the
+// main selection, and sends must land on the right target.
+const threadTarget = {
+  id: 'thread-1',
+  kind: 'thread',
+  name: 'Thread',
+  parentTargetId: target.id,
+  rootMessageId: 'message-1',
+  createdBy: actor.id,
+  createdAtMs: 4,
+}
+const threadMessage = {
+  seq: '9',
+  id: 'message-2',
+  targetId: threadTarget.id,
+  authorId: actor.id,
+  clientRequestId: 'req-1',
+  text: 'thread reply',
+  createdAtMs: 5,
+}
+const sendCalls = []
+const threadRpc = {
+  async call(_channel, endpoint, payload) {
+    if (endpoint === 'snapshot') {
+      return {
+        ok: true,
+        value: { ok: true, value: { actor, cursor: '11', targets: [target, threadTarget], followedThreadIds: [], tasks: [] } },
+      }
+    }
+    if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'history.tail') {
+      const messages = payload.targetId === threadTarget.id ? [threadMessage] : []
+      return { ok: true, value: { ok: true, value: { count: String(messages.length), messages } } }
+    }
+    if (endpoint === 'message.send') {
+      sendCalls.push(payload)
+      return { ok: true, value: { ok: true, value: { message: threadMessage, recipientIds: [], wakeAgentIds: [], replayed: false } } }
+    }
+    throw new Error(`unexpected endpoint ${endpoint}`)
+  },
+}
+const threadController = new ChaosClientController(threadRpc)
+await threadController.ensure()
+assert.equal(threadController.getSnapshot().selectedTargetId, target.id)
+await threadController.openThreadPanel(threadTarget.id)
+assert.equal(threadController.getSnapshot().threadPanelId, threadTarget.id)
+assert.equal(
+  threadController.getSnapshot().selectedTargetId,
+  target.id,
+  'opening a Thread panel must not change the main selection',
+)
+assert.deepEqual(threadController.getSnapshot().threadPanelMessages, [threadMessage])
+await threadController.send('main hello')
+assert.equal(sendCalls.at(-1).targetId, target.id)
+await threadController.sendToThread('thread hello')
+assert.equal(sendCalls.at(-1).targetId, threadTarget.id)
+threadController.closeThreadPanel()
+assert.equal(threadController.getSnapshot().threadPanelId, undefined)
+threadController.dispose()
 
 delete globalThis.EventSource
 delete globalThis.window

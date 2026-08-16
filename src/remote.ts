@@ -7,6 +7,7 @@ import type {
   NativeChangeEvent,
   NativeCollabSnapshot,
   NativeMessage,
+  NativeMessageTail,
   NativeSendResult,
   NativeTarget,
   NativeTask,
@@ -20,6 +21,7 @@ export interface CollabRemoteApi {
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
+  readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
@@ -154,6 +156,12 @@ async function dispatchRemote(
         requiredString(input, 'targetId'),
         decimalString(input, 'afterSeq', '0'),
         integer(input, 'limit', 50, 100),
+      )
+    case 'history.tail':
+      return await api.readMessagesTail(
+        actorId,
+        requiredString(input, 'targetId'),
+        integer(input, 'limit', 10, 100),
       )
     case 'tasks':
       return await api.listTasks(actorId, optionalString(input, 'targetId'))

@@ -12,8 +12,8 @@ pub use napi_bridge::*;
 pub use error::{CollabError, Result};
 pub use model::{
     Actor, ActorKind, ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, Message,
-    PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target, TargetKind, Task,
-    TaskStatus,
+    MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
+    TargetKind, Task, TaskStatus,
 };
 
 use std::collections::BTreeSet;
@@ -1188,6 +1188,57 @@ impl CollabCore {
             messages.push(message_from_row(&row)?);
         }
         Ok(messages)
+    }
+
+    /// Read the exact total count and the latest `limit` messages (ascending)
+    /// of one exact target under a single locked snapshot. Unlike an
+    /// `after_seq = 0` page, `count` is never a lower bound and the returned
+    /// messages are always the true tail.
+    pub async fn read_messages_tail(
+        &self,
+        actor_id: &str,
+        target_id: &str,
+        limit: u32,
+    ) -> Result<MessageTail> {
+        self.assert_open()?;
+        if limit == 0 || limit > 100 {
+            return Err(CollabError::InvalidArgument(
+                "limit must be between 1 and 100".into(),
+            ));
+        }
+        let connection = self.connection.lock().await;
+        require_target_access(&connection, target_id, actor_id, "read").await?;
+        let mut count_rows = connection
+            .query(
+                "SELECT COUNT(*) FROM messages WHERE target_id = ?1",
+                (target_id,),
+            )
+            .await?;
+        let count_row = count_rows
+            .next()
+            .await?
+            .ok_or_else(|| CollabError::Database("count returned no row".into()))?;
+        let count: i64 = count_row.get(0)?;
+        drop(count_rows);
+        let mut rows = connection
+            .query(
+                "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
+                 FROM (
+                     SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
+                     FROM messages
+                     WHERE target_id = ?1
+                     ORDER BY seq DESC
+                     LIMIT ?2
+                 )
+                 ORDER BY seq",
+                (target_id, i64::from(limit)),
+            )
+            .await?;
+        let mut messages = Vec::new();
+        while let Some(row) = rows.next().await? {
+            messages.push(message_from_row(&row)?);
+        }
+        Ok(MessageTail { count, messages })
     }
 
     /// Convert a committed top-level Message to a Task with a target-local
@@ -3110,6 +3161,54 @@ mod tests {
             core.read_message(&alpha.id, &other.id, &sent.message.id)
                 .await,
             Err(CollabError::NotFound { .. })
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn read_messages_tail_returns_exact_count_and_true_tail() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        let outsider = core.create_user("tail-outsider", "Tail Outsider").await?;
+        let mut sent = Vec::new();
+        for index in 0..5 {
+            sent.push(
+                core.send_message(SendMessageRequest {
+                    target_id: channel.id.clone(),
+                    author_id: user.id.clone(),
+                    client_request_id: format!("tail-message-{index}"),
+                    text: format!("tail {index}"),
+                })
+                .await?
+                .message,
+            );
+        }
+
+        // A small limit still reports the exact total and the true latest page.
+        let tail = core.read_messages_tail(&alpha.id, &channel.id, 2).await?;
+        assert_eq!(tail.count, 5);
+        assert_eq!(tail.messages, sent[3..].to_vec());
+        // A limit above the total returns everything, ascending.
+        let full = core.read_messages_tail(&alpha.id, &channel.id, 100).await?;
+        assert_eq!(full.count, 5);
+        assert_eq!(full.messages, sent);
+        // An empty target reports zero with no messages.
+        let empty = core.create_channel("tail-empty", &user.id).await?;
+        core.add_member(&empty.id, &alpha.id, &user.id).await?;
+        let empty_tail = core.read_messages_tail(&alpha.id, &empty.id, 10).await?;
+        assert_eq!(empty_tail.count, 0);
+        assert!(empty_tail.messages.is_empty());
+        // Membership and argument validation match the paged read.
+        assert!(matches!(
+            core.read_messages_tail(&outsider.id, &channel.id, 2).await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+        assert!(matches!(
+            core.read_messages_tail(&alpha.id, &channel.id, 0).await,
+            Err(CollabError::InvalidArgument(_))
+        ));
+        assert!(matches!(
+            core.read_messages_tail(&alpha.id, &channel.id, 101).await,
+            Err(CollabError::InvalidArgument(_))
         ));
         Ok(())
     }

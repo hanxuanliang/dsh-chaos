@@ -95,6 +95,16 @@ export interface NativeCollabSnapshot {
   tasks: NativeTask[]
 }
 
+/**
+ * Authoritative tail page of one target. `count` is the exact total message
+ * count (decimal string), never a lower bound; `messages` is the true latest
+ * page in ascending order.
+ */
+export interface NativeMessageTail {
+  count: string
+  messages: NativeMessage[]
+}
+
 export interface NativeCollabHandle {
   close(): Promise<void>
   createUser(handle: string, displayName: string): Promise<NativeActor>
@@ -134,6 +144,7 @@ export interface NativeCollabHandle {
   markModelSeen(batchId: string, agentId: string, generation: string, sessionId: string): Promise<void>
   readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
+  readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
   listActors(actorId: string): Promise<NativeActor[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>

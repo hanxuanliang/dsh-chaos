@@ -289,6 +289,10 @@ export class CollabService extends Service {
     return this.requireHandle().readMessages(actorId, targetId, afterSeq, limit)
   }
 
+  readMessagesTail(actorId: string, targetId: string, limit = 10) {
+    return this.requireHandle().readMessagesTail(actorId, targetId, limit)
+  }
+
   listActors(actorId: string) {
     return this.requireHandle().listActors(actorId)
   }

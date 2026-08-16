@@ -4,6 +4,7 @@ import type {
   NativeActor,
   NativeCollabSnapshot,
   NativeMessage,
+  NativeMessageTail,
   NativeTask,
   NativeTarget,
 } from '../native.ts'
@@ -13,14 +14,17 @@ const RPC_CHANNEL = '/dsh-chaos'
 const EVENTS_PATH = '/dsh-chaos/events'
 
 export interface ThreadPreviewReply {
+  /** Stable message id, used as the preview row key. */
+  id: string
   authorId: string
   text: string
+  createdAtMs: number
 }
 
 export interface ThreadPreview {
+  /** Exact total reply count from the authoritative tail RPC. */
   count: number
-  /** True when history hit the fetch limit, so count is a lower bound. */
-  truncated: boolean
+  /** True latest replies, ascending. */
   latest: ThreadPreviewReply[]
 }
 
@@ -309,13 +313,13 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   private async reloadTarget(targetId: string): Promise<void> {
     const epoch = ++this.loadEpoch
     try {
-      const [messages, tasks] = await Promise.all([
-        this.call<NativeMessage[]>('history', { targetId, afterSeq: '0', limit: 100 }),
+      const [tail, tasks] = await Promise.all([
+        this.call<NativeMessageTail>('history.tail', { targetId, limit: 100 }),
         this.call<NativeTask[]>('tasks', { targetId }),
       ])
       if (epoch !== this.loadEpoch || this.state.selectedTargetId !== targetId) return
-      this.publish({ ...this.state, status: 'ready', messages, tasks, error: undefined })
-      await this.loadThreadPreviews(targetId, messages, epoch)
+      this.publish({ ...this.state, status: 'ready', messages: tail.messages, tasks, error: undefined })
+      await this.loadThreadPreviews(targetId, tail.messages, epoch)
     } catch (error) {
       if (epoch !== this.loadEpoch) return
       this.publish({ ...this.state, status: 'error', error: messageOf(error) })
@@ -323,7 +327,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   /**
-   * Inline reply previews come from real per-thread history RPCs, never from
+   * Inline reply previews come from the authoritative per-thread tail RPC
+   * (exact count + true latest replies in one consistent read), never from
    * the already-loaded parent messages or a frontend guess.
    */
   private async loadThreadPreviews(
@@ -342,17 +347,17 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     try {
       const entries = await Promise.all(
         threads.map(async thread => {
-          const history = await this.call<NativeMessage[]>('history', {
+          const tail = await this.call<NativeMessageTail>('history.tail', {
             targetId: thread.id,
-            afterSeq: '0',
-            limit: 100,
+            limit: 2,
           })
           const preview: ThreadPreview = {
-            count: history.length,
-            truncated: history.length >= 100,
-            latest: history.slice(-2).map(message => ({
+            count: Number(tail.count),
+            latest: tail.messages.map(message => ({
+              id: message.id,
               authorId: message.authorId,
               text: message.text,
+              createdAtMs: message.createdAtMs,
             })),
           }
           return [thread.id, preview] as const
@@ -370,13 +375,12 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     if (threadPanelId === undefined) return
     const epoch = ++this.panelEpoch
     try {
-      const messages = await this.call<NativeMessage[]>('history', {
+      const tail = await this.call<NativeMessageTail>('history.tail', {
         targetId: threadPanelId,
-        afterSeq: '0',
         limit: 100,
       })
       if (epoch !== this.panelEpoch || this.state.threadPanelId !== threadPanelId) return
-      this.publish({ ...this.state, threadPanelMessages: messages })
+      this.publish({ ...this.state, threadPanelMessages: tail.messages })
     } catch {
       if (epoch !== this.panelEpoch) return
       this.publish({ ...this.state, threadPanelMessages: [] })

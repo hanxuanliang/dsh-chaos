@@ -115,6 +115,25 @@ try {
   assert.equal(snapshot.ok, true)
   assert(snapshot.value.targets.some(target => target.id === created.value.id))
 
+  // history.tail: exact count plus the true latest page in one RPC.
+  for (let index = 0; index < 3; index += 1) {
+    const sent = await call('message.send', {
+      targetId: created.value.id,
+      requestId: `tail-${String(index)}`,
+      text: `tail message ${String(index)}`,
+    })
+    assert.equal(sent.ok, true)
+  }
+  const tail = await call('history.tail', { targetId: created.value.id, limit: 2 })
+  assert.equal(tail.ok, true)
+  assert.equal(tail.value.count, '3')
+  assert.equal(tail.value.messages.length, 2)
+  assert.equal(tail.value.messages[0].text, 'tail message 1')
+  assert.equal(tail.value.messages[1].text, 'tail message 2')
+  const badTail = await call('history.tail', { targetId: created.value.id, limit: 0 })
+  assert.equal(badTail.ok, false)
+  assert.equal(badTail.error.code, 'invalid_argument')
+
   const response = new MockResponse()
   const request = {
     method: 'GET',

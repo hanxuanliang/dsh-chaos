@@ -54,6 +54,14 @@ pub struct JsMessage {
 }
 
 #[napi(object)]
+pub struct JsMessageTail {
+    /// Exact total message count of the target, as a decimal string so
+    /// JavaScript never loses integer precision.
+    pub count: String,
+    pub messages: Vec<JsMessage>,
+}
+
+#[napi(object)]
 pub struct JsSendMessageResult {
     pub message: JsMessage,
     pub recipient_ids: Vec<String>,
@@ -388,6 +396,23 @@ impl CollabHandle {
             .read_messages(&actor_id, &target_id, after_seq, limit)
             .await
             .map(|messages| messages.into_iter().map(JsMessage::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn read_messages_tail(
+        &self,
+        actor_id: String,
+        target_id: String,
+        limit: u32,
+    ) -> Result<JsMessageTail> {
+        self.core
+            .read_messages_tail(&actor_id, &target_id, limit)
+            .await
+            .map(|tail| JsMessageTail {
+                count: tail.count.to_string(),
+                messages: tail.messages.into_iter().map(JsMessage::from).collect(),
+            })
             .map_err(to_napi_error)
     }
 

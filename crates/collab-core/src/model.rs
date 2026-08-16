@@ -123,6 +123,15 @@ pub struct Message {
     pub created_at_ms: i64,
 }
 
+/// Authoritative tail page of one target: the exact total message count plus
+/// the latest messages in ascending order, read from one consistent snapshot.
+/// `count` is always exact, even when it exceeds `messages.len()`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MessageTail {
+    pub count: i64,
+    pub messages: Vec<Message>,
+}
+
 /// One idempotent send command.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SendMessageRequest {
