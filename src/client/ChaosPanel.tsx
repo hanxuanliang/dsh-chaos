@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ChaosClientState } from './controller.ts'
-import type { NativeTarget, NativeTask } from '../native.ts'
+import type { ChaosClientState, ThreadPreview } from './controller.ts'
+import type { NativeMessage, NativeTarget, NativeTask } from '../native.ts'
+import { TaskStatusChip } from './TaskStatusChip.tsx'
+import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './ChaosPanel.module.css'
 
 export interface ChaosPanelInjected {
@@ -20,6 +22,9 @@ export interface ChaosPanelInjected {
   createThread: (rootMessageId: string) => Promise<void>
   followThread: (threadTargetId: string) => Promise<void>
   unfollowThread: (threadTargetId: string) => Promise<void>
+  openThreadPanel: (threadTargetId: string) => Promise<void>
+  closeThreadPanel: () => void
+  sendToThread: (text: string) => Promise<void>
   send: (text: string) => Promise<void>
   createTask: (messageId: string) => Promise<void>
   claimTask: (messageId: string) => Promise<void>
@@ -53,8 +58,11 @@ function visibleTargets(state: ChaosClientState): readonly NativeTarget[] {
 function targetDisplayName(target: NativeTarget, allTargets: readonly NativeTarget[]): string {
   if (target.kind !== 'thread') return target.name
   const parent = allTargets.find(candidate => candidate.id === target.parentTargetId)
-  const rootSuffix = target.rootMessageId?.slice(-5) ?? target.id.slice(-5)
-  return `${parent?.name ?? 'Thread'} · ${rootSuffix}`
+  return `${parent?.name ?? 'Thread'} · ${threadLeafName(target)}`
+}
+
+function threadLeafName(target: NativeTarget): string {
+  return target.rootMessageId?.slice(-5) ?? target.id.slice(-5)
 }
 
 /** Native Sidebar footer entry. The badge is authoritative pending Task count, not inferred unread state. */
@@ -129,37 +137,80 @@ function QuickPeek({
   )
 }
 
-function TargetGroup({
-  title,
-  targets,
-  selectedTargetId,
-  selectTarget,
-  allTargets,
+/** One chat-timeline row: no card chrome; actions appear on hover/focus. */
+function MessageRow({
+  message,
+  showHeader,
+  names,
+  thread,
+  preview,
+  hasTask,
+  pending,
+  readOnly,
+  onOpenThread,
+  onCreateThread,
+  onCreateTask,
 }: {
-  title: string
-  targets: readonly NativeTarget[]
-  selectedTargetId: string | undefined
-  selectTarget: (targetId: string) => Promise<void>
-  allTargets: readonly NativeTarget[]
+  message: NativeMessage
+  showHeader: boolean
+  names: ReadonlyMap<string, string>
+  thread: NativeTarget | undefined
+  preview: ThreadPreview | undefined
+  hasTask: boolean
+  pending: boolean
+  /** Thread panels and thread conversations render without row actions. */
+  readOnly: boolean
+  onOpenThread: (threadTargetId: string) => void
+  onCreateThread: (rootMessageId: string) => void
+  onCreateTask: (messageId: string) => void
 }) {
-  if (targets.length === 0) return null
   return (
-    <section className={css.targetGroup}>
-      <h3>{title}</h3>
-      {targets.map(target => (
+    <div className={css.messageRow} data-has-header={showHeader || undefined}>
+      {showHeader && (
+        <div className={css.messageRowHeader}>
+          <strong>{names.get(message.authorId) ?? message.authorId}</strong>
+          <time>{new Date(message.createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+        </div>
+      )}
+      <p className={css.messageText}>{message.text}</p>
+      {thread !== undefined && (
         <button
           type="button"
-          key={target.id}
-          className={css.targetButton}
-          data-selected={target.id === selectedTargetId || undefined}
-          aria-label={`打开 ${kindLabel[target.kind]} ${targetDisplayName(target, allTargets)}`}
-          onClick={() => { void selectTarget(target.id) }}
+          className={css.threadPreview}
+          disabled={pending}
+          onClick={() => { onOpenThread(thread.id) }}
         >
-          <span className={css.targetGlyph} aria-hidden>{target.kind === 'channel' ? '#' : target.kind === 'direct' ? '@' : '↳'}</span>
-          <span>{targetDisplayName(target, allTargets)}</span>
+          <span aria-hidden>↳</span>
+          <span className={css.threadPreviewCount}>
+            {preview === undefined
+              ? '查看 Thread'
+              : `${preview.truncated ? '99+' : String(preview.count)} 条回复`}
+          </span>
+          {preview?.latest.map(reply => (
+            <span key={`${reply.authorId}-${reply.text.slice(0, 12)}`} className={css.threadPreviewSnippet}>
+              {names.get(reply.authorId) ?? reply.authorId}: {reply.text}
+            </span>
+          ))}
         </button>
-      ))}
-    </section>
+      )}
+      {!readOnly && (
+        <div className={css.hoverActions}>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (thread !== undefined) onOpenThread(thread.id)
+              else onCreateThread(message.id)
+            }}
+          >
+            {thread === undefined ? '创建 Thread' : '打开 Thread'}
+          </button>
+          {!hasTask && (
+            <button type="button" disabled={pending} onClick={() => { onCreateTask(message.id) }}>创建 Task</button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -177,6 +228,9 @@ export function ChaosPanel({
   createThread,
   followThread,
   unfollowThread,
+  openThreadPanel,
+  closeThreadPanel,
+  sendToThread,
   send,
   createTask,
   claimTask,
@@ -190,6 +244,8 @@ export function ChaosPanel({
   const [memberId, setMemberId] = useState('')
   const [pending, setPending] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsTab, setDetailsTab] = useState<'work' | 'thread'>('work')
+  const [collapsedChannels, setCollapsedChannels] = useState<ReadonlySet<string>>(new Set())
   const [failure, setFailure] = useState<string | null>(null)
   const names = useMemo(
     () => new Map(state.actors.map(actor => [actor.id, actor.displayName])),
@@ -201,14 +257,29 @@ export function ChaosPanel({
     () => new Map(state.tasks.map(task => [task.messageId, task])),
     [state.tasks],
   )
+  const threadByRoot = useMemo(
+    () => new Map(
+      state.targets
+        .filter(target => target.kind === 'thread' && target.rootMessageId !== undefined)
+        .map(target => [target.rootMessageId as string, target]),
+    ),
+    [state.targets],
+  )
   const channels = state.targets.filter(target => target.kind === 'channel')
   const directs = state.targets.filter(target => target.kind === 'direct')
-  const threads = state.targets.filter(target => target.kind === 'thread' && followed.has(target.id))
+  const panelThread = state.targets.find(target => target.id === state.threadPanelId)
+  const panelParent = panelThread === undefined
+    ? undefined
+    : state.targets.find(target => target.id === panelThread.parentTargetId)
 
   useEffect(() => { void ensure() }, [ensure])
   useEffect(() => {
     if (state.surface !== 'workspace') setDetailsOpen(false)
   }, [state.surface])
+  // An open Thread panel owns the right rail; closing it returns to work items.
+  useEffect(() => {
+    setDetailsTab(state.threadPanelId === undefined ? 'work' : 'thread')
+  }, [state.threadPanelId])
   useEffect(() => {
     if (state.surface === 'closed') return
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -270,6 +341,15 @@ export function ChaosPanel({
     })
   }
 
+  const toggleChannelCollapse = (channelId: string): void => {
+    setCollapsedChannels(previous => {
+      const next = new Set(previous)
+      if (next.has(channelId)) next.delete(channelId)
+      else next.add(channelId)
+      return next
+    })
+  }
+
   if (state.surface === 'closed') return null
   if (state.surface === 'peek') {
     return (
@@ -315,9 +395,78 @@ export function ChaosPanel({
               <button disabled={pending || peerId === ''}>直聊</button>
             </form>
             <nav className={css.targets} aria-label="协作目标">
-              <TargetGroup title="Channels" targets={channels} selectedTargetId={state.selectedTargetId} selectTarget={selectTarget} allTargets={state.targets} />
-              <TargetGroup title="Direct" targets={directs} selectedTargetId={state.selectedTargetId} selectTarget={selectTarget} allTargets={state.targets} />
-              <TargetGroup title="Followed Threads" targets={threads} selectedTargetId={state.selectedTargetId} selectTarget={selectTarget} allTargets={state.targets} />
+              {channels.length > 0 && (
+                <section className={css.targetGroup}>
+                  <h3>Channels</h3>
+                  {channels.map(channel => {
+                    const nested = state.targets.filter(
+                      target => target.kind === 'thread'
+                        && target.parentTargetId === channel.id
+                        && followed.has(target.id),
+                    )
+                    const isCollapsed = collapsedChannels.has(channel.id)
+                    return (
+                      <div key={channel.id} className={css.channelBlock}>
+                        <div className={css.channelRow}>
+                          <button
+                            type="button"
+                            className={css.targetButton}
+                            data-selected={channel.id === state.selectedTargetId || undefined}
+                            aria-label={`打开 Channel ${channel.name}`}
+                            onClick={() => { void selectTarget(channel.id) }}
+                          >
+                            <span className={css.targetGlyph} aria-hidden>#</span>
+                            <span>{channel.name}</span>
+                          </button>
+                          {nested.length > 0 && (
+                            <button
+                              type="button"
+                              className={css.chevron}
+                              data-open={!isCollapsed || undefined}
+                              aria-expanded={!isCollapsed}
+                              aria-label={`${isCollapsed ? '展开' : '折叠'} ${channel.name} 的 Thread`}
+                              onClick={() => { toggleChannelCollapse(channel.id) }}
+                            >
+                              ▸
+                            </button>
+                          )}
+                        </div>
+                        {!isCollapsed && nested.map(thread => (
+                          <button
+                            type="button"
+                            key={thread.id}
+                            className={`${css.targetButton} ${css.threadNestButton}`}
+                            data-selected={thread.id === state.selectedTargetId || undefined}
+                            aria-label={`打开 Thread ${threadLeafName(thread)}`}
+                            onClick={() => { void selectTarget(thread.id) }}
+                          >
+                            <span className={css.targetGlyph} aria-hidden>↳</span>
+                            <span>{threadLeafName(thread)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </section>
+              )}
+              {directs.length > 0 && (
+                <section className={css.targetGroup}>
+                  <h3>Direct</h3>
+                  {directs.map(target => (
+                    <button
+                      type="button"
+                      key={target.id}
+                      className={css.targetButton}
+                      data-selected={target.id === state.selectedTargetId || undefined}
+                      aria-label={`打开 Direct ${target.name}`}
+                      onClick={() => { void selectTarget(target.id) }}
+                    >
+                      <span className={css.targetGlyph} aria-hidden>@</span>
+                      <span>{target.name}</span>
+                    </button>
+                  ))}
+                </section>
+              )}
               {state.targets.length === 0 && <p className={css.empty}>新建一个 Channel 开始协作。</p>}
             </nav>
           </aside>
@@ -350,23 +499,26 @@ export function ChaosPanel({
             <div className={css.messages}>
               {state.status === 'loading' && <p className={css.empty}>正在加载……</p>}
               {selected !== undefined && state.messages.length === 0 && <p className={css.empty}>这里还没有消息。</p>}
-              {state.messages.map(message => (
-                <article key={message.id} className={css.message}>
-                  <header>
-                    <strong>{names.get(message.authorId) ?? message.authorId}</strong>
-                    <time>{new Date(message.createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
-                  </header>
-                  <p>{message.text}</p>
-                  {selected?.kind !== 'thread' && (
-                    <footer>
-                      <button type="button" disabled={pending} onClick={() => { void run(() => createThread(message.id)) }}>打开 Thread</button>
-                      {!taskByMessage.has(message.id) && (
-                        <button type="button" disabled={pending} onClick={() => { void run(() => createTask(message.id)) }}>创建 Task</button>
-                      )}
-                    </footer>
-                  )}
-                </article>
-              ))}
+              {state.messages.map((message, index) => {
+                const previous = index > 0 ? state.messages[index - 1] : undefined
+                const thread = threadByRoot.get(message.id)
+                return (
+                  <MessageRow
+                    key={message.id}
+                    message={message}
+                    showHeader={previous === undefined || previous.authorId !== message.authorId}
+                    names={names}
+                    thread={thread}
+                    preview={thread === undefined ? undefined : state.threadPreviews[thread.id]}
+                    hasTask={taskByMessage.has(message.id)}
+                    pending={pending}
+                    readOnly={selected?.kind === 'thread'}
+                    onOpenThread={threadTargetId => { void run(() => openThreadPanel(threadTargetId)) }}
+                    onCreateThread={rootMessageId => { void run(() => createThread(rootMessageId)) }}
+                    onCreateTask={messageId => { void run(() => createTask(messageId)) }}
+                  />
+                )
+              })}
             </div>
             <form onSubmit={submitMessage} className={css.composer}>
               <input
@@ -384,43 +536,91 @@ export function ChaosPanel({
               <strong>工作项与成员</strong>
               <button type="button" className={css.iconButton} aria-label="关闭工作项" onClick={() => { setDetailsOpen(false) }}>×</button>
             </div>
-            <section>
-              <h3>Tasks</h3>
-              {state.tasks.length === 0 && <p className={css.empty}>当前目标没有 Task。</p>}
-              <div className={css.taskList}>
-                {state.tasks.map(task => (
-                  <article key={task.messageId} className={css.task}>
-                    <header><strong>#{task.number}</strong><span data-status={task.status}>{task.status}</span></header>
-                    <p>{task.assigneeId === undefined ? '未认领' : names.get(task.assigneeId) ?? task.assigneeId}</p>
-                    <div className={css.taskActions}>
-                      {task.assigneeId === undefined && task.status !== 'done' && (
-                        <button type="button" disabled={pending} onClick={() => { void run(() => claimTask(task.messageId)) }}>认领</button>
-                      )}
-                      {task.assigneeId === state.actor?.id && task.status !== 'done' && (
-                        <button type="button" disabled={pending} onClick={() => { void run(() => unclaimTask(task)) }}>取消认领</button>
-                      )}
-                      {(task.assigneeId === undefined || task.assigneeId === state.actor?.id || selected?.createdBy === state.actor?.id)
-                        && taskTransitions[task.status].map(status => (
-                          <button type="button" key={status} disabled={pending} onClick={() => { void run(() => updateTask(task, status)) }}>{status}</button>
-                        ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-            {selected?.kind === 'channel' && (
-              <section>
-                <h3>Channel 成员</h3>
-                <form onSubmit={submitMember} className={css.memberForm}>
-                  <select value={memberId} onChange={event => { setMemberId(event.target.value) }}>
-                    <option value="">选择要加入的成员</option>
-                    {state.actors.filter(actor => actor.id !== state.actor?.id).map(actor => (
-                      <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
+            <div className={css.detailsTabs} role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailsTab === 'work'}
+                data-active={detailsTab === 'work' || undefined}
+                onClick={() => { setDetailsTab('work') }}
+              >
+                工作项{state.tasks.length > 0 ? ` ${String(state.tasks.length)}` : ''}
+              </button>
+              {panelThread !== undefined && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={detailsTab === 'thread'}
+                  data-active={detailsTab === 'thread' || undefined}
+                  onClick={() => { setDetailsTab('thread') }}
+                >
+                  Thread
+                </button>
+              )}
+            </div>
+            {detailsTab === 'thread' && panelThread !== undefined ? (
+              <ThreadPanel
+                thread={panelThread}
+                parentName={panelParent?.name ?? 'Thread'}
+                messages={state.threadPanelMessages}
+                names={names}
+                followed={followed.has(panelThread.id)}
+                pending={pending}
+                onFollow={() => { void run(() => followThread(panelThread.id)) }}
+                onUnfollow={() => { void run(() => unfollowThread(panelThread.id)) }}
+                onClose={closeThreadPanel}
+                onSend={sendToThread}
+              />
+            ) : (
+              <>
+                <section>
+                  <h3>Tasks</h3>
+                  {state.tasks.length === 0 && <p className={css.empty}>当前目标没有 Task。</p>}
+                  <div className={css.taskList}>
+                    {state.tasks.map(task => (
+                      <article key={task.messageId} className={css.task}>
+                        <header>
+                          <strong>#{task.number}</strong>
+                          <TaskStatusChip
+                            task={task}
+                            transitions={taskTransitions[task.status]}
+                            canUpdate={
+                              task.assigneeId === undefined
+                              || task.assigneeId === state.actor?.id
+                              || selected?.createdBy === state.actor?.id
+                            }
+                            pending={pending}
+                            onUpdate={status => { void run(() => updateTask(task, status)) }}
+                          />
+                        </header>
+                        <p>{task.assigneeId === undefined ? '未认领' : names.get(task.assigneeId) ?? task.assigneeId}</p>
+                        <div className={css.taskActions}>
+                          {task.assigneeId === undefined && task.status !== 'done' && (
+                            <button type="button" disabled={pending} onClick={() => { void run(() => claimTask(task.messageId)) }}>认领</button>
+                          )}
+                          {task.assigneeId === state.actor?.id && task.status !== 'done' && (
+                            <button type="button" disabled={pending} onClick={() => { void run(() => unclaimTask(task)) }}>取消认领</button>
+                          )}
+                        </div>
+                      </article>
                     ))}
-                  </select>
-                  <button disabled={pending || memberId === ''}>加入</button>
-                </form>
-              </section>
+                  </div>
+                </section>
+                {selected?.kind === 'channel' && (
+                  <section>
+                    <h3>Channel 成员</h3>
+                    <form onSubmit={submitMember} className={css.memberForm}>
+                      <select value={memberId} onChange={event => { setMemberId(event.target.value) }}>
+                        <option value="">选择要加入的成员</option>
+                        {state.actors.filter(actor => actor.id !== state.actor?.id).map(actor => (
+                          <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
+                        ))}
+                      </select>
+                      <button disabled={pending || memberId === ''}>加入</button>
+                    </form>
+                  </section>
+                )}
+              </>
             )}
           </aside>
         </div>

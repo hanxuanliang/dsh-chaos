@@ -103,8 +103,8 @@
 .workspaceTitle,
 .headerActions,
 .conversationHeader,
-.message header,
-.message footer,
+.messageRowHeader,
+.threadPreview,
 .task header,
 .taskActions {
   display: flex;
@@ -114,7 +114,7 @@
 .peekHeader,
 .workspaceHeader,
 .conversationHeader,
-.message header,
+.messageRowHeader,
 .task header {
   justify-content: space-between;
 }
@@ -283,7 +283,7 @@
 
 .compactForm button,
 .memberForm button,
-.message footer button,
+.hoverActions button,
 .taskActions button {
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
@@ -350,43 +350,290 @@
 .messages {
   grid-row: 3;
   min-height: 0;
-  padding: 18px;
+  padding: 14px 18px;
   overflow-y: auto;
 }
 
-.message {
+/* Chat timeline: rows, not cards. Actions surface on hover/focus only. */
+.messageRow {
+  position: relative;
   max-width: 760px;
-  margin: 0 auto 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-1);
+  margin: 0 auto;
+  padding: 3px 10px;
+  border-radius: 8px;
 }
 
-.message header {
+.messageRow[data-has-header] {
+  margin-top: 10px;
+}
+
+.messageRow:hover,
+.messageRow:focus-within {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.messageRowHeader {
   gap: 10px;
 }
 
-.message time {
+.messageRowHeader time {
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }
 
-.message p {
-  margin: 8px 0 0;
+.messageText {
+  margin: 2px 0 0;
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.message footer {
+.hoverActions {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+
+.messageRow:hover .hoverActions,
+.messageRow:focus-within .hoverActions {
+  opacity: 1;
+}
+
+.hoverActions button,
+.taskActions button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.hoverActions button {
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv1, 0 1px 2px rgb(0 0 0 / .08));
+}
+
+.threadPreview {
+  gap: 7px;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.threadPreview:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.threadPreviewCount {
+  flex: none;
+  font-weight: 600;
+}
+
+.threadPreviewSnippet {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Left nav: followed Threads nest under their parent Channel. */
+.channelBlock + .channelBlock {
+  margin-top: 2px;
+}
+
+.channelRow {
+  display: flex;
+  align-items: center;
+}
+
+.channelRow .targetButton {
+  flex: 1;
+}
+
+.chevron {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: transform .12s ease;
+}
+
+.chevron[data-open] {
+  transform: rotate(90deg);
+}
+
+.threadNestButton {
+  padding-left: 26px;
+  font-size: 13px;
+}
+
+/* Right rail tabs: work items vs the open Thread panel. */
+.detailsTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.detailsTabs button {
+  flex: 1;
+  min-height: 30px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.detailsTabs button[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+
+.threadPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100% - 44px);
+}
+
+.threadPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.threadPanelTitle {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.threadPanelTitle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadPanelMessages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.threadPanelComposer {
+  display: flex;
   gap: 7px;
   margin-top: 10px;
 }
 
-.message footer button,
-.taskActions button {
-  padding: 4px 8px;
-  font-size: 12px;
+.threadPanelComposer input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-base);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+/* Task status chip + portaled dropdown menu. */
+.statusChipRoot {
+  position: relative;
+  display: inline-flex;
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.statusChip:disabled {
+  cursor: default;
+}
+
+.statusChipCaret {
+  font-size: 9px;
+}
+
+.statusChip[data-status='todo'] { color: var(--dsw-alias-state-warn-primary, #b26a00); }
+.statusChip[data-status='in_progress'] { color: var(--dsw-alias-state-business-primary, #4c6fff); }
+.statusChip[data-status='in_review'] { color: var(--dsw-alias-state-business-secondary, #7a5af8); }
+.statusChip[data-status='done'] { color: var(--dsw-alias-state-success-primary, #1a7f37); }
+
+.statusMenu {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  min-width: 140px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.statusMenuCurrent,
+.statusMenuOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.statusMenuCurrent {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.statusMenuOption {
+  cursor: pointer;
+}
+
+.statusMenuOption:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .composer {

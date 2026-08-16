@@ -21,6 +21,7 @@ export default {
     neverBundle: [
       'react',
       'react/jsx-runtime',
+      'react-dom',
       '@deepseek-ai/cordis',
       '@deepseek-ai/dsh-client-ui-slots',
     ],

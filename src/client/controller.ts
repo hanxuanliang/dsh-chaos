@@ -12,6 +12,18 @@ import type { CollabDomainResult } from '../remote.ts'
 const RPC_CHANNEL = '/dsh-chaos'
 const EVENTS_PATH = '/dsh-chaos/events'
 
+export interface ThreadPreviewReply {
+  authorId: string
+  text: string
+}
+
+export interface ThreadPreview {
+  count: number
+  /** True when history hit the fetch limit, so count is a lower bound. */
+  truncated: boolean
+  latest: ThreadPreviewReply[]
+}
+
 export interface ChaosClientState {
   status: 'cold' | 'loading' | 'ready' | 'error'
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
@@ -25,6 +37,11 @@ export interface ChaosClientState {
   tasks: readonly NativeTask[]
   selectedTargetId?: string
   messages: readonly NativeMessage[]
+  /** Inline reply previews for threads of the selected target, keyed by thread target id. */
+  threadPreviews: Record<string, ThreadPreview>
+  /** Right-rail Thread panel: stays open (and keeps SSE) even after unfollow. */
+  threadPanelId?: string
+  threadPanelMessages: readonly NativeMessage[]
   error: string | undefined
 }
 
@@ -39,6 +56,8 @@ const INITIAL_STATE: ChaosClientState = {
   allTasks: [],
   tasks: [],
   messages: [],
+  threadPreviews: {},
+  threadPanelMessages: [],
   error: undefined,
 }
 
@@ -52,6 +71,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   private projectionRequested = false
   private projectionRunner: Promise<NativeCollabSnapshot> | undefined
   private loadEpoch = 0
+  private panelEpoch = 0
 
   constructor(private readonly rpc: ClientConnectionRpc) {}
 
@@ -127,7 +147,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   async createThread(rootMessageId: string): Promise<void> {
     const target = await this.call<NativeTarget>('thread.create', { rootMessageId })
     await this.reloadProjection()
-    await this.selectTarget(target.id)
+    // Threads open in the right-rail panel; the main conversation stays put.
+    await this.openThreadPanel(target.id)
   }
 
   async followThread(threadTargetId: string): Promise<void> {
@@ -151,6 +172,36 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     const target = this.state.targets.find(candidate => candidate.id === targetId)
     if (target?.kind === 'thread') await this.reloadProjection()
     else await this.reloadTarget(targetId)
+  }
+
+  async openThreadPanel(threadTargetId: string): Promise<void> {
+    const thread = this.state.targets.find(
+      target => target.id === threadTargetId && target.kind === 'thread',
+    )
+    if (thread === undefined) return
+    this.publish({ ...this.state, threadPanelId: thread.id, threadPanelMessages: [] })
+    await this.reloadThreadPanel()
+  }
+
+  closeThreadPanel(): void {
+    if (this.state.threadPanelId === undefined) return
+    this.panelEpoch += 1
+    const next: ChaosClientState = { ...this.state, threadPanelMessages: [] }
+    delete next.threadPanelId
+    this.publish(next)
+  }
+
+  async sendToThread(text: string): Promise<void> {
+    const threadTargetId = this.state.threadPanelId
+    if (threadTargetId === undefined) throw new Error('没有打开的 Thread')
+    await this.call('message.send', {
+      targetId: threadTargetId,
+      requestId: crypto.randomUUID(),
+      text,
+    })
+    // Sending in a thread can change follow state and the parent preview,
+    // so the whole projection (and with it the main target) reloads.
+    await this.reloadProjection()
   }
 
   async createTask(messageId: string): Promise<void> {
@@ -185,6 +236,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     this.started = false
     this.projectionRequested = false
     this.loadEpoch += 1
+    this.panelEpoch += 1
     this.source?.close()
     this.source = undefined
     this.listeners.clear()
@@ -224,6 +276,10 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       ? this.state.selectedTargetId
       : snapshot.targets[0]?.id
     const selectionChanged = selectedTargetId !== this.state.selectedTargetId
+    const threadPanelId = this.state.threadPanelId !== undefined
+      && snapshot.targets.some(target => target.id === this.state.threadPanelId)
+      ? this.state.threadPanelId
+      : undefined
     const next: ChaosClientState = {
       ...this.state,
       status: 'ready',
@@ -235,12 +291,18 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       allTasks: snapshot.tasks,
       tasks: selectedTargetId === undefined || selectionChanged ? [] : this.state.tasks,
       messages: selectedTargetId === undefined || selectionChanged ? [] : this.state.messages,
+      threadPanelMessages: threadPanelId === undefined ? [] : this.state.threadPanelMessages,
       error: undefined,
     }
     delete next.selectedTargetId
+    delete next.threadPanelId
     if (selectedTargetId !== undefined) next.selectedTargetId = selectedTargetId
+    if (threadPanelId !== undefined) next.threadPanelId = threadPanelId
     this.publish(next)
     if (selectedTargetId !== undefined) await this.reloadTarget(selectedTargetId)
+    // The open Thread panel keeps reading and keeps receiving SSE refreshes
+    // even after its follow is removed from the left nav.
+    if (threadPanelId !== undefined) await this.reloadThreadPanel()
     return snapshot
   }
 
@@ -253,9 +315,71 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       ])
       if (epoch !== this.loadEpoch || this.state.selectedTargetId !== targetId) return
       this.publish({ ...this.state, status: 'ready', messages, tasks, error: undefined })
+      await this.loadThreadPreviews(targetId, messages, epoch)
     } catch (error) {
       if (epoch !== this.loadEpoch) return
       this.publish({ ...this.state, status: 'error', error: messageOf(error) })
+    }
+  }
+
+  /**
+   * Inline reply previews come from real per-thread history RPCs, never from
+   * the already-loaded parent messages or a frontend guess.
+   */
+  private async loadThreadPreviews(
+    targetId: string,
+    messages: readonly NativeMessage[],
+    epoch: number,
+  ): Promise<void> {
+    const rootIds = new Set(messages.map(message => message.id))
+    const threads = this.state.targets.filter(
+      target =>
+        target.kind === 'thread'
+        && target.parentTargetId === targetId
+        && target.rootMessageId !== undefined
+        && rootIds.has(target.rootMessageId),
+    )
+    try {
+      const entries = await Promise.all(
+        threads.map(async thread => {
+          const history = await this.call<NativeMessage[]>('history', {
+            targetId: thread.id,
+            afterSeq: '0',
+            limit: 100,
+          })
+          const preview: ThreadPreview = {
+            count: history.length,
+            truncated: history.length >= 100,
+            latest: history.slice(-2).map(message => ({
+              authorId: message.authorId,
+              text: message.text,
+            })),
+          }
+          return [thread.id, preview] as const
+        }),
+      )
+      if (epoch !== this.loadEpoch || this.state.selectedTargetId !== targetId) return
+      this.publish({ ...this.state, threadPreviews: Object.fromEntries(entries) })
+    } catch {
+      // Preview failure must not break the main message list; keep stale/empty.
+    }
+  }
+
+  private async reloadThreadPanel(): Promise<void> {
+    const threadPanelId = this.state.threadPanelId
+    if (threadPanelId === undefined) return
+    const epoch = ++this.panelEpoch
+    try {
+      const messages = await this.call<NativeMessage[]>('history', {
+        targetId: threadPanelId,
+        afterSeq: '0',
+        limit: 100,
+      })
+      if (epoch !== this.panelEpoch || this.state.threadPanelId !== threadPanelId) return
+      this.publish({ ...this.state, threadPanelMessages: messages })
+    } catch {
+      if (epoch !== this.panelEpoch) return
+      this.publish({ ...this.state, threadPanelMessages: [] })
     }
   }
 
