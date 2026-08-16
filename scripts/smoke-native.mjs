@@ -105,6 +105,7 @@ try {
   const snapshot = await core.snapshot(owner.id)
   assert.equal(snapshot.actor.id, owner.id)
   assert(snapshot.targets.some(target => target.id === channel.id))
+  assert(snapshot.followedThreadIds.includes(thread.id))
   assert(snapshot.tasks.some(current => current.messageId === task.messageId))
   const changes = await core.listChanges(owner.id, '0', 500)
   assert(changes.some(change => change.kind === 'message_created'))

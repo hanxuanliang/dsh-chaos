@@ -120,6 +120,7 @@ pub struct JsCollabSnapshot {
     pub actor: JsActor,
     pub cursor: String,
     pub targets: Vec<JsTarget>,
+    pub followed_thread_ids: Vec<String>,
     pub tasks: Vec<JsTask>,
 }
 
@@ -635,6 +636,7 @@ impl From<CollabSnapshot> for JsCollabSnapshot {
             actor: snapshot.actor.into(),
             cursor: snapshot.cursor.to_string(),
             targets: snapshot.targets.into_iter().map(JsTarget::from).collect(),
+            followed_thread_ids: snapshot.followed_thread_ids,
             tasks: snapshot.tasks.into_iter().map(JsTask::from).collect(),
         }
     }

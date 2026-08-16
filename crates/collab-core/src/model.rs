@@ -230,5 +230,6 @@ pub struct CollabSnapshot {
     pub actor: Actor,
     pub cursor: i64,
     pub targets: Vec<Target>,
+    pub followed_thread_ids: Vec<String>,
     pub tasks: Vec<Task>,
 }

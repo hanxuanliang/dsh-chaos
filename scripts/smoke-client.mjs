@@ -3,11 +3,11 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 let clientModule
-let registration
-let cleanup
 let source
-let slotFactory
 const sources = []
+const registrations = new Map()
+const slotCleanups = new Map()
+let controllerCleanup
 
 class FakeEventSource {
   listeners = new Map()
@@ -74,12 +74,22 @@ const target = {
   createdBy: actor.id,
   createdAtMs: 2,
 }
+const globalTask = {
+  messageId: 'message-1',
+  targetId: target.id,
+  number: '1',
+  status: 'in_review',
+  assigneeId: actor.id,
+  version: '1',
+  createdAtMs: 3,
+  updatedAtMs: 3,
+}
 const calls = []
 const rpc = {
   async call(_channel, endpoint, payload) {
     calls.push({ endpoint, payload })
     const values = {
-      snapshot: { actor, cursor: '7', targets: [target], tasks: [] },
+      snapshot: { actor, cursor: '7', targets: [target], followedThreadIds: [], tasks: [globalTask] },
       actors: [actor],
       history: [],
       tasks: [],
@@ -92,39 +102,49 @@ const ctx = {
     assert.equal(name, 'connection')
     return { rpc }
   },
+  effect(factory) {
+    controllerCleanup = factory()
+  },
   slots: {
     inject(name, factory) {
-      assert.equal(name, 'shell.overlay')
-      slotFactory = factory
-      cleanup = factory()
+      assert(['shell.overlay', 'sidebar.footer.action'].includes(name))
+      slotCleanups.set(name, factory())
     },
     register(options, component) {
-      registration = { options, component }
-      return () => { registration = undefined }
+      registrations.set(options.name, { options, component })
+      return () => { registrations.delete(options.name) }
     },
   },
 }
 
 clientModule.apply(ctx)
-assert.equal(registration.options.id, 'dsh-chaos')
-const injected = registration.options.inject()
+assert.equal(registrations.get('shell.overlay').options.id, 'dsh-chaos-workspace')
+assert.equal(registrations.get('sidebar.footer.action').options.id, 'dsh-chaos-entry')
+const injected = registrations.get('shell.overlay').options.inject()
 await injected.ensure()
 const state = injected.hooks.chaos.getSnapshot()
 assert.equal(state.status, 'ready')
 assert.equal(state.selectedTargetId, target.id)
+assert.deepEqual(state.followedThreadIds, [])
+assert.deepEqual(state.allTasks, [globalTask])
 assert.equal(source.url, '/dsh-chaos/events?cursor=7')
 assert(calls.some(call => call.endpoint === 'history'))
+await injected.followThread('thread-1')
+await injected.unfollowThread('thread-1')
+assert(calls.some(call => call.endpoint === 'thread.follow'))
+assert(calls.some(call => call.endpoint === 'thread.unfollow'))
+injected.togglePeek()
+assert.equal(injected.hooks.chaos.getSnapshot().surface, 'peek')
+injected.openWorkspace()
+assert.equal(injected.hooks.chaos.getSnapshot().surface, 'workspace')
+injected.closeSurface()
+assert.equal(injected.hooks.chaos.getSnapshot().surface, 'closed')
 source.emit('change')
 await new Promise(resolve => setTimeout(resolve, 0))
 assert(calls.filter(call => call.endpoint === 'snapshot').length >= 2)
-cleanup()
-assert.equal(source.closed, true)
-const remountSourceCount = sources.length
-cleanup = slotFactory()
-const remountInjected = registration.options.inject()
-await remountInjected.ensure()
-assert.equal(sources.length, remountSourceCount + 1, 'slot remount needs a fresh controller')
-cleanup()
+slotCleanups.get('shell.overlay')()
+slotCleanups.get('sidebar.footer.action')()
+controllerCleanup()
 assert.equal(source.closed, true)
 
 const { ChaosClientController } = await import(`../lib/client/controller.js?smoke=${String(Date.now())}`)
@@ -153,7 +173,7 @@ const directRpc = {
           ok: true,
           value: {
             ok: true,
-            value: { actor, cursor: String(callNumber), targets: currentTargets, tasks: [] },
+            value: { actor, cursor: String(callNumber), targets: currentTargets, followedThreadIds: [], tasks: [] },
           },
         }
       } finally {
@@ -217,7 +237,7 @@ const pendingRpc = {
       await pendingGate.promise
       return {
         ok: true,
-        value: { ok: true, value: { actor, cursor: '99', targets: [target], tasks: [] } },
+        value: { ok: true, value: { actor, cursor: '99', targets: [target], followedThreadIds: [], tasks: [] } },
       }
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }

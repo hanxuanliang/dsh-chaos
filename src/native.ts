@@ -91,6 +91,7 @@ export interface NativeCollabSnapshot {
   actor: NativeActor
   cursor: string
   targets: NativeTarget[]
+  followedThreadIds: string[]
   tasks: NativeTask[]
 }
 

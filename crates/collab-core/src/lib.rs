@@ -540,11 +540,13 @@ impl CollabCore {
         let actor = find_actor(&connection, actor_id).await?;
         let cursor = latest_change_seq(&connection).await?;
         let targets = targets_for_actor(&connection, actor_id).await?;
+        let followed_thread_ids = followed_thread_ids_for_actor(&connection, actor_id).await?;
         let tasks = tasks_for_actor(&connection, actor_id, None).await?;
         Ok(CollabSnapshot {
             actor,
             cursor,
             targets,
+            followed_thread_ids,
             tasks,
         })
     }
@@ -2343,6 +2345,37 @@ async fn follow_thread_in_transaction(
     Ok(changed == 1)
 }
 
+async fn followed_thread_ids_for_actor(
+    connection: &Connection,
+    actor_id: &str,
+) -> Result<Vec<String>> {
+    let mut rows = connection
+        .query(
+            "SELECT f.thread_target_id
+             FROM thread_follows f
+             JOIN targets t
+               ON t.id = f.thread_target_id AND t.kind = 'thread'
+             JOIN targets parent
+               ON parent.id = t.parent_target_id
+              AND parent.kind IN ('channel', 'direct')
+             JOIN memberships m
+               ON m.target_id = t.parent_target_id AND m.actor_id = f.actor_id
+             WHERE f.actor_id = ?1
+               AND f.unfollowed_at_ms IS NULL
+               AND t.archived_at_ms IS NULL
+               AND parent.archived_at_ms IS NULL
+               AND m.left_at_ms IS NULL
+             ORDER BY t.created_at_ms DESC, f.thread_target_id",
+            [actor_id],
+        )
+        .await?;
+    let mut target_ids = Vec::new();
+    while let Some(row) = rows.next().await? {
+        target_ids.push(row.get(0)?);
+    }
+    Ok(target_ids)
+}
+
 async fn active_member_ids(connection: &Connection, target_id: &str) -> Result<Vec<String>> {
     let mut rows = connection
         .query(
@@ -2366,29 +2399,17 @@ async fn target_change_recipients(
 ) -> Result<Vec<String>> {
     let route = require_target_route(connection, target_id).await?;
     let mut recipients = BTreeSet::new();
-    let statement = if route.kind == TargetKind::Thread {
-        "SELECT f.actor_id
-         FROM thread_follows f
-         JOIN memberships m
-           ON m.target_id = ?2 AND m.actor_id = f.actor_id
-         WHERE f.thread_target_id = ?1
-           AND f.unfollowed_at_ms IS NULL
-           AND m.left_at_ms IS NULL"
-    } else {
-        "SELECT actor_id
-         FROM memberships
-         WHERE target_id = ?1 AND left_at_ms IS NULL"
-    };
-    let mut rows = if route.kind == TargetKind::Thread {
-        connection
-            .query(
-                statement,
-                (target_id, route.permission_target_id(target_id)),
-            )
-            .await?
-    } else {
-        connection.query(statement, [target_id]).await?
-    };
+    // Change events drive authorized UI invalidation, not attention delivery.
+    // A Thread therefore addresses every active parent member even when they
+    // unfollow it; only Message Delivery/wake snapshots are follower-scoped.
+    let mut rows = connection
+        .query(
+            "SELECT actor_id
+             FROM memberships
+             WHERE target_id = ?1 AND left_at_ms IS NULL",
+            [route.permission_target_id(target_id)],
+        )
+        .await?;
     while let Some(row) = rows.next().await? {
         recipients.insert(row.get::<String>(0)?);
     }
@@ -3192,8 +3213,22 @@ mod tests {
             })
             .await?;
         assert_eq!(first_reply.recipient_ids, vec![user.id.clone()]);
+        assert_eq!(
+            core.snapshot(&alpha.id).await?.followed_thread_ids,
+            vec![thread.id.clone()]
+        );
+        assert!(
+            core.snapshot(&beta.id)
+                .await?
+                .followed_thread_ids
+                .is_empty()
+        );
 
         core.follow_thread(&thread.id, &beta.id).await?;
+        assert_eq!(
+            core.snapshot(&beta.id).await?.followed_thread_ids,
+            vec![thread.id.clone()]
+        );
         let second_reply = core
             .send_message(SendMessageRequest {
                 target_id: thread.id.clone(),
@@ -3231,6 +3266,13 @@ mod tests {
         .await?;
 
         core.unfollow_thread(&thread.id, &beta.id).await?;
+        assert!(
+            core.snapshot(&beta.id)
+                .await?
+                .followed_thread_ids
+                .is_empty()
+        );
+        let beta_unfollowed_cursor = core.snapshot(&beta.id).await?.cursor;
         assert_eq!(
             core.read_message(&beta.id, &thread.id, &second_reply.message.id)
                 .await?,
@@ -3245,6 +3287,13 @@ mod tests {
             })
             .await?;
         assert_eq!(after_unfollow.recipient_ids, vec![user.id.clone()]);
+        let beta_realtime_changes = core
+            .list_changes(&beta.id, beta_unfollowed_cursor, 50)
+            .await?;
+        assert!(beta_realtime_changes.iter().any(|change| {
+            change.kind == ChangeKind::MessageCreated
+                && change.entity_id == after_unfollow.message.id
+        }));
 
         let beta_reply = core
             .send_message(SendMessageRequest {
@@ -3266,6 +3315,10 @@ mod tests {
             })
             .await?;
         assert!(final_reply.recipient_ids.contains(&beta.id));
+        assert_eq!(
+            core.snapshot(&beta.id).await?.followed_thread_ids,
+            vec![thread.id.clone()]
+        );
         assert!(matches!(
             core.read_messages(&outsider.id, &thread.id, 0, 10).await,
             Err(CollabError::PermissionDenied { .. })
@@ -3297,6 +3350,7 @@ mod tests {
         let owner_snapshot = core.snapshot(&owner.id).await?;
         assert_eq!(owner_snapshot.actor, owner);
         assert_eq!(owner_snapshot.targets, vec![channel.clone()]);
+        assert!(owner_snapshot.followed_thread_ids.is_empty());
         assert!(owner_snapshot.tasks.is_empty());
         assert!(core.snapshot(&outsider.id).await?.targets.is_empty());
 

@@ -15,10 +15,13 @@ const EVENTS_PATH = '/dsh-chaos/events'
 export interface ChaosClientState {
   status: 'cold' | 'loading' | 'ready' | 'error'
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
+  surface: 'closed' | 'peek' | 'workspace'
   cursor: string
   actor?: NativeActor
   actors: readonly NativeActor[]
   targets: readonly NativeTarget[]
+  followedThreadIds: readonly string[]
+  allTasks: readonly NativeTask[]
   tasks: readonly NativeTask[]
   selectedTargetId?: string
   messages: readonly NativeMessage[]
@@ -28,9 +31,12 @@ export interface ChaosClientState {
 const INITIAL_STATE: ChaosClientState = {
   status: 'cold',
   stream: 'idle',
+  surface: 'closed',
   cursor: '0',
   actors: [],
   targets: [],
+  followedThreadIds: [],
+  allTasks: [],
   tasks: [],
   messages: [],
   error: undefined,
@@ -82,6 +88,19 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     }
   }
 
+  togglePeek(): void {
+    const surface = this.state.surface === 'peek' ? 'closed' : 'peek'
+    this.publish({ ...this.state, surface })
+  }
+
+  openWorkspace(): void {
+    this.publish({ ...this.state, surface: 'workspace' })
+  }
+
+  closeSurface(): void {
+    this.publish({ ...this.state, surface: 'closed' })
+  }
+
   async selectTarget(targetId: string): Promise<void> {
     if (!this.state.targets.some(target => target.id === targetId)) return
     this.publish({ ...this.state, selectedTargetId: targetId, messages: [], tasks: [] })
@@ -111,6 +130,16 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     await this.selectTarget(target.id)
   }
 
+  async followThread(threadTargetId: string): Promise<void> {
+    await this.call('thread.follow', { threadTargetId })
+    await this.reloadProjection()
+  }
+
+  async unfollowThread(threadTargetId: string): Promise<void> {
+    await this.call('thread.unfollow', { threadTargetId })
+    await this.reloadProjection()
+  }
+
   async send(text: string): Promise<void> {
     const targetId = this.state.selectedTargetId
     if (targetId === undefined) throw new Error('请先选择一个协作目标')
@@ -119,7 +148,9 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       requestId: crypto.randomUUID(),
       text,
     })
-    await this.reloadTarget(targetId)
+    const target = this.state.targets.find(candidate => candidate.id === targetId)
+    if (target?.kind === 'thread') await this.reloadProjection()
+    else await this.reloadTarget(targetId)
   }
 
   async createTask(messageId: string): Promise<void> {
@@ -200,6 +231,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       actor: snapshot.actor,
       actors,
       targets: snapshot.targets,
+      followedThreadIds: snapshot.followedThreadIds,
+      allTasks: snapshot.tasks,
       tasks: selectedTargetId === undefined || selectionChanged ? [] : this.state.tasks,
       messages: selectedTargetId === undefined || selectionChanged ? [] : this.state.messages,
       error: undefined,
