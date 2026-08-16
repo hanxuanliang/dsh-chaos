@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
@@ -91,6 +92,7 @@ const rpc = {
     const values = {
       snapshot: { actor, cursor: '7', targets: [target], followedThreadIds: [], tasks: [globalTask] },
       actors: [actor],
+      'target.members': [actor],
       'history.tail': { count: '0', messages: [] },
       tasks: [],
     }
@@ -130,6 +132,8 @@ assert.deepEqual(state.allTasks, [globalTask])
 assert.equal(source.url, '/dsh-chaos/events?cursor=7')
 assert(calls.some(call => call.endpoint === 'history.tail'))
 assert(calls.every(call => call.endpoint !== 'history'))
+assert(calls.some(call => call.endpoint === 'target.members'))
+assert.deepEqual(state.members, [actor], 'members pane reads the membership projection, not the actor directory')
 await injected.followThread('thread-1')
 await injected.unfollowThread('thread-1')
 assert(calls.some(call => call.endpoint === 'thread.follow'))
@@ -182,6 +186,9 @@ const directRpc = {
       }
     }
     if (endpoint === 'actors') {
+      return { ok: true, value: { ok: true, value: [actor] } }
+    }
+    if (endpoint === 'target.members') {
       return { ok: true, value: { ok: true, value: [actor] } }
     }
     if (endpoint === 'history.tail' || endpoint === 'tasks') {
@@ -284,6 +291,7 @@ const threadRpc = {
       }
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'target.members') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
     if (endpoint === 'history.tail') {
       const messages = payload.targetId === threadTarget.id ? [threadMessage] : []
@@ -315,5 +323,42 @@ threadController.closeThreadPanel()
 assert.equal(threadController.getSnapshot().threadPanelId, undefined)
 threadController.dispose()
 
+// In-flight draft guard: a send that resolves late must not wipe text the
+// user typed after the request started (component-level guard, unit-tested
+// here through its pure decision function).
+const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${String(Date.now())}`)
+{
+  // Send A; while in flight the user appends B -> A's success keeps 'AB'.
+  let drafts = { 'target-1': 'A' }
+  drafts = { ...drafts, 'target-1': 'AB' } // typed during the flight of A
+  assert.deepEqual(
+    resolveSentDraft(drafts, 'target-1', 'A'),
+    { 'target-1': 'AB' },
+    'late send success must preserve in-flight typing',
+  )
+  // Untouched draft clears normally.
+  assert.deepEqual(
+    resolveSentDraft({ 'target-1': 'A' }, 'target-1', 'A'),
+    { 'target-1': '' },
+    'untouched draft clears after send',
+  )
+  // Other targets' drafts are never touched.
+  assert.deepEqual(
+    resolveSentDraft({ 'target-1': 'A', 'thread-1': 'draft' }, 'target-1', 'A'),
+    { 'target-1': '', 'thread-1': 'draft' },
+    'drafts stay isolated per target',
+  )
+}
+
 delete globalThis.EventSource
 delete globalThis.window
+
+// CSS scope guard: the reduced-motion override must stay inside plugin
+// roots — a bare universal selector would disable host transitions.
+{
+  const cssSource = readFileSync(new URL('../src/client/ChaosPanel.module.css', import.meta.url), 'utf8')
+  const motionBlock = cssSource.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/)
+  assert(motionBlock !== null, 'reduced-motion block exists')
+  assert(motionBlock[0].includes('.backdrop'), 'reduced-motion is scoped under plugin roots')
+  assert(!/(^|\n)\s*\*\s*[{},]/.test(motionBlock[0]), 'no bare universal selector leaks globally')
+}

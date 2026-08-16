@@ -231,6 +231,9 @@ pub struct Task {
     pub version: i64,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
+    /// Authoritative snippet of the anchor Message body, resolved in the same
+    /// read as the Task row; `None` only when the anchor row is unreadable.
+    pub anchor_text: Option<String>,
 }
 
 /// One authorization-filtered bootstrap projection and its durable cursor.

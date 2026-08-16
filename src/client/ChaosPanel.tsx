@@ -3,6 +3,7 @@ import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ChaosClientState, ThreadPreview } from './controller.ts'
+import { resolveSentDraft } from './controller.ts'
 import type { NativeMessage, NativeTarget, NativeTask } from '../native.ts'
 import { Avatar } from './Avatar.tsx'
 import { Composer } from './Composer.tsx'
@@ -59,6 +60,44 @@ const kindLabel: Record<NativeTarget['kind'], string> = {
 
 function timeOf(createdAtMs: number): string {
   return new Date(createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * Modal dialog keyboard contract: Escape cancels, and Tab/Shift+Tab cycle
+ * inside the dialog instead of escaping into the host page.
+ */
+function useDialogKeys(
+  containerRef: { readonly current: HTMLElement | null },
+  onCancel: () => void,
+): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onCancel()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const root = containerRef.current
+      if (root === null) return
+      const focusables = root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusables.length === 0) return
+      const first = focusables.item(0)
+      const last = focusables.item(focusables.length - 1)
+      const active = document.activeElement
+      if (event.shiftKey && (active === first || !root.contains(active))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (active === last || !root.contains(active))) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => { window.removeEventListener('keydown', onKeyDown, true) }
+  }, [containerRef, onCancel])
 }
 
 const ReplyIcon = (
@@ -153,18 +192,10 @@ function CreateChannelDialog({
 }) {
   const [name, setName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        onCancel()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => { window.removeEventListener('keydown', onKeyDown, true) }
-  }, [onCancel])
+  useDialogKeys(dialogRef, onCancel)
 
   const submit = (event: FormEvent): void => {
     event.preventDefault()
@@ -183,7 +214,14 @@ function CreateChannelDialog({
         if (event.target === event.currentTarget) onCancel()
       }}
     >
-      <form className={css.dialog} aria-label="新建 Channel" onSubmit={submit}>
+      <form
+        ref={dialogRef}
+        className={css.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="新建 Channel"
+        onSubmit={submit}
+      >
         <strong className={css.dialogTitle}>新建 Channel</strong>
         <input
           ref={inputRef}
@@ -200,6 +238,75 @@ function CreateChannelDialog({
           </button>
         </div>
       </form>
+    </div>
+  )
+}
+
+/**
+ * Board-side Task creation: pick a top-level Channel message as the Task
+ * anchor (Tasks are anchored to Messages by contract). Candidates exclude
+ * messages that already carry a Task.
+ */
+function NewTaskDialog({
+  candidates,
+  names,
+  pending,
+  error,
+  onCancel,
+  onCreate,
+}: {
+  candidates: readonly NativeMessage[]
+  names: ReadonlyMap<string, string>
+  pending: boolean
+  error: string | null
+  onCancel: () => void
+  onCreate: (messageId: string) => void
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>('button:not([disabled])')?.focus()
+  }, [])
+  useDialogKeys(dialogRef, onCancel)
+
+  return (
+    <div
+      className={css.dialogOverlay}
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className={css.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="新建 Task"
+      >
+        <strong className={css.dialogTitle}>新建 Task</strong>
+        <p className={css.dialogHint}>选择一条消息作为 Task 锚点：</p>
+        <div ref={listRef} className={css.anchorList}>
+          {candidates.length === 0 && <p className={css.empty}>没有可锚定的消息。</p>}
+          {candidates.map(message => (
+            <button
+              type="button"
+              key={message.id}
+              className={css.anchorOption}
+              disabled={pending}
+              onClick={() => { onCreate(message.id) }}
+            >
+              <b>{names.get(message.authorId) ?? message.authorId}</b>
+              <span className={css.anchorSnippet}>{message.text}</span>
+              <time>{timeOf(message.createdAtMs)}</time>
+            </button>
+          ))}
+        </div>
+        {error !== null && <div className={css.composerError} role="alert">{error}</div>}
+        <div className={css.dialogActions}>
+          <button type="button" className={css.secondaryButton} onClick={onCancel}>取消</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -316,7 +423,9 @@ function TaskBoard({
               <span className={css.laneCount}>{laneTasks.length}</span>
             </h4>
             {laneTasks.map(task => {
-              const title = textByMessage.get(task.messageId)
+              // Prefer the live message; fall back to the store-resolved
+              // anchor snippet so old Tasks keep a real title.
+              const title = textByMessage.get(task.messageId) ?? task.anchorText
               return (
                 <article key={task.messageId} className={css.taskCard}>
                   <header>
@@ -376,6 +485,7 @@ export function ChaosPanel({
   closeThreadPanel,
   sendToThread,
   send,
+  createTask,
   claimTask,
   unclaimTask,
   updateTask,
@@ -384,6 +494,9 @@ export function ChaosPanel({
   const [createOpen, setCreateOpen] = useState(false)
   const [createPending, setCreatePending] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [newTaskOpen, setNewTaskOpen] = useState(false)
+  const [newTaskPending, setNewTaskPending] = useState(false)
+  const [newTaskError, setNewTaskError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({})
   const [sendPending, setSendPending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -395,6 +508,7 @@ export function ChaosPanel({
   const [view, setView] = useState<'messages' | 'tasks'>('messages')
   const [failure, setFailure] = useState<string | null>(null)
   const plusRef = useRef<HTMLButtonElement>(null)
+  const newTaskButtonRef = useRef<HTMLButtonElement>(null)
   const threadTriggerRef = useRef<HTMLElement | null>(null)
 
   const names = useMemo(
@@ -435,11 +549,12 @@ export function ChaosPanel({
   }, [state.threadPanelId])
   // Reset the channel view when switching targets.
   useEffect(() => { setView('messages') }, [state.selectedTargetId])
+  useEffect(() => { setNewTaskOpen(false) }, [state.selectedTargetId])
   useEffect(() => {
     if (state.surface === 'closed') return
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
-      if (createOpen) return // The dialog handles its own Escape.
+      if (createOpen || newTaskOpen) return // Dialogs handle their own Escape.
       if (detailsOpen) closeDetails()
       else closeSurface()
     }
@@ -482,7 +597,9 @@ export function ChaosPanel({
     setSendError(null)
     try {
       await send(text)
-      setDraft('')
+      // Clear only when the draft is still the sent snapshot; anything typed
+      // while the request was in flight belongs to the next message.
+      setDrafts(previous => resolveSentDraft(previous, draftKey, text))
     } catch (error) {
       setSendError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -497,7 +614,8 @@ export function ChaosPanel({
     setThreadSendError(null)
     try {
       await sendToThread(text)
-      setThreadDraft('')
+      // Same in-flight guard as the main composer: keep later typing.
+      setDrafts(previous => resolveSentDraft(previous, threadDraftKey, text))
     } catch (error) {
       setThreadSendError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -523,6 +641,28 @@ export function ChaosPanel({
     }
   }
 
+  const anchorCandidates = useMemo(() => {
+    const anchored = new Set(state.tasks.map(task => task.messageId))
+    return state.messages.filter(message => !anchored.has(message.id))
+  }, [state.messages, state.tasks])
+
+  const submitNewTask = (messageId: string): void => {
+    if (newTaskPending) return
+    setNewTaskPending(true)
+    setNewTaskError(null)
+    void (async () => {
+      try {
+        await createTask(messageId)
+        setNewTaskOpen(false)
+        newTaskButtonRef.current?.focus()
+      } catch (error) {
+        setNewTaskError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setNewTaskPending(false)
+      }
+    })()
+  }
+
   const submitMember = (event: FormEvent): void => {
     event.preventDefault()
     if (selected?.kind !== 'channel' || memberId === '') return
@@ -534,6 +674,17 @@ export function ChaosPanel({
 
   const openThreadFrom = (threadTargetId: string): void => {
     void run(() => openThreadPanel(threadTargetId))
+  }
+
+  const moveTask = (task: NativeTask, status: NativeTask['status']): void => {
+    void (async () => {
+      await run(() => updateTask(task, status))
+      // The card changes lanes on success, which remounts the chip; restore
+      // keyboard focus to the same Task's chip once the board has settled.
+      document
+        .querySelector<HTMLButtonElement>(`button[aria-label^="Task #${task.number} 状态"]`)
+        ?.focus()
+    })()
   }
 
   const replyTo = (message: NativeMessage): void => {
@@ -640,17 +791,33 @@ export function ChaosPanel({
               <div className={css.error} role="alert">{failure ?? state.error}</div>
             )}
             {view === 'tasks' ? (
-              <TaskBoard
-                tasks={state.tasks}
-                textByMessage={textByMessage}
-                names={names}
-                actorId={state.actor?.id}
-                channelCreatorId={selected?.createdBy}
-                pending={pending}
-                onUpdate={(task, status) => { void run(() => updateTask(task, status)) }}
-                onClaim={task => { void run(() => claimTask(task.messageId)) }}
-                onUnclaim={task => { void run(() => unclaimTask(task)) }}
-              />
+              <div className={css.boardPane}>
+                <div className={css.boardToolbar}>
+                  <button
+                    ref={newTaskButtonRef}
+                    type="button"
+                    className={css.secondaryButton}
+                    disabled={pending || anchorCandidates.length === 0}
+                    onClick={() => {
+                      setNewTaskError(null)
+                      setNewTaskOpen(true)
+                    }}
+                  >
+                    新建 Task
+                  </button>
+                </div>
+                <TaskBoard
+                  tasks={state.tasks}
+                  textByMessage={textByMessage}
+                  names={names}
+                  actorId={state.actor?.id}
+                  channelCreatorId={selected?.createdBy}
+                  pending={pending}
+                  onUpdate={(task, status) => { moveTask(task, status) }}
+                  onClaim={task => { void run(() => claimTask(task.messageId)) }}
+                  onUnclaim={task => { void run(() => unclaimTask(task)) }}
+                />
+              </div>
             ) : (
               <>
                 <div className={css.messages}>
@@ -712,7 +879,7 @@ export function ChaosPanel({
             ) : (
               <div className={css.membersPane}>
                 <div className={css.membersHead}>
-                  <h3>成员 {state.actors.length}</h3>
+                  <h3>成员 {state.members.length}</h3>
                   <button
                     type="button"
                     className={`${css.iconButton} ${css.railClose}`}
@@ -722,7 +889,7 @@ export function ChaosPanel({
                     ×
                   </button>
                 </div>
-                {state.actors.map(actor => (
+                {state.members.map(actor => (
                   <div key={actor.id} className={css.memberRow}>
                     <Avatar seed={actor.id} size={18} />
                     <span className={css.memberName}>
@@ -731,7 +898,7 @@ export function ChaosPanel({
                     <span className={css.badge} data-kind={actor.kind}>{actor.kind}</span>
                   </div>
                 ))}
-                {selected?.kind === 'channel' && (
+                {selected?.kind === 'channel' && selected.createdBy === state.actor?.id && (
                   <form onSubmit={submitMember} className={css.memberForm}>
                     <select
                       value={memberId}
@@ -739,9 +906,14 @@ export function ChaosPanel({
                       aria-label="邀请成员或 agent"
                     >
                       <option value="">邀请成员或 agent…</option>
-                      {state.actors.filter(actor => actor.id !== state.actor?.id).map(actor => (
-                        <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
-                      ))}
+                      {state.actors
+                        .filter(actor =>
+                          actor.id !== state.actor?.id
+                          && !state.members.some(member => member.id === actor.id),
+                        )
+                        .map(actor => (
+                          <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
+                        ))}
                     </select>
                     <button className={css.secondaryButton} disabled={pending || memberId === ''}>加入</button>
                   </form>
@@ -760,6 +932,19 @@ export function ChaosPanel({
             plusRef.current?.focus()
           }}
           onCreate={submitCreateChannel}
+        />
+      )}
+      {newTaskOpen && (
+        <NewTaskDialog
+          candidates={anchorCandidates}
+          names={names}
+          pending={newTaskPending}
+          error={newTaskError}
+          onCancel={() => {
+            setNewTaskOpen(false)
+            newTaskButtonRef.current?.focus()
+          }}
+          onCreate={submitNewTask}
         />
       )}
     </div>

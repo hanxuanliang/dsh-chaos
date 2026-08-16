@@ -134,6 +134,25 @@ try {
   assert.equal(badTail.ok, false)
   assert.equal(badTail.error.code, 'invalid_argument')
 
+  // target.members: the membership projection, not the actor directory.
+  const members = await call('target.members', { targetId: created.value.id })
+  assert.equal(members.ok, true)
+  assert.equal(members.value.length, 1)
+  assert.equal(members.value[0].id, firstSnapshot.value.actor.id)
+  const otherUser = await call('actors', {})
+  assert.equal(otherUser.ok, true)
+  const badMembers = await call('target.members', { targetId: 'missing-target' })
+  assert.equal(badMembers.ok, false)
+
+  // task.create carries the authoritative anchor text from the store.
+  const anchored = await call('task.create', { messageId: tail.value.messages[0].id })
+  assert.equal(anchored.ok, true)
+  assert.equal(anchored.value.anchorText, 'tail message 1')
+  const tasks = await call('tasks', { targetId: created.value.id })
+  assert.equal(tasks.ok, true)
+  assert.equal(tasks.value.length, 1)
+  assert.equal(tasks.value[0].anchorText, 'tail message 1')
+
   const response = new MockResponse()
   const request = {
     method: 'GET',

@@ -77,6 +77,9 @@ export function TaskStatusChip({
   const toggleOpen = (event: React.MouseEvent): void => {
     event.preventDefault()
     event.stopPropagation()
+    // Pending only guards opening; the chip stays enabled so an in-flight
+    // update never yanks keyboard focus away from it.
+    if (pending) return
     if (!open) {
       const rect = rootRef.current?.getBoundingClientRect()
       if (rect !== undefined) {
@@ -121,7 +124,7 @@ export function TaskStatusChip({
         aria-haspopup={canUpdate ? 'menu' : undefined}
         aria-expanded={canUpdate ? open : undefined}
         aria-label={`Task #${task.number} 状态 ${task.status}${canUpdate ? '，点击修改' : ''}`}
-        disabled={pending || !canUpdate}
+        disabled={!canUpdate}
         onClick={toggleOpen}
       >
         {task.status}
@@ -184,6 +187,9 @@ export function TaskStatusChip({
                     event.stopPropagation()
                     setOpen(false)
                     onUpdate(status)
+                    // Selecting via keyboard or mouse returns focus to the
+                    // chip, same as the Escape path.
+                    chipRef.current?.focus()
                   }}
                 >
                   {status}

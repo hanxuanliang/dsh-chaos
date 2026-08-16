@@ -102,6 +102,31 @@ impl CollabCore {
                     "actor handle '{handle}' belongs to an Agent"
                 )));
             }
+            if actor.display_name != display_name {
+                // Explicit display-name migration on the stable handle: the
+                // actor id, Memberships and Tasks are untouched.
+                transaction
+                    .execute(
+                        "UPDATE actors SET display_name = ?2 WHERE id = ?1",
+                        (actor.id.as_str(), display_name),
+                    )
+                    .await?;
+                let actor_ids = all_actor_ids(&transaction).await?;
+                insert_change(
+                    &transaction,
+                    ChangeKind::ActorCreated,
+                    None,
+                    &actor.id,
+                    &actor_ids,
+                    now,
+                )
+                .await?;
+                transaction.commit().await?;
+                return Ok(Actor {
+                    display_name: display_name.to_owned(),
+                    ..actor
+                });
+            }
             transaction.commit().await?;
             return Ok(actor);
         }
@@ -530,6 +555,36 @@ impl CollabCore {
             actors.push(actor_from_row(&row)?);
         }
         Ok(actors)
+    }
+
+    /// List the active members of one Channel after authorizing the caller's
+    /// own access to that Channel. This is the membership projection the web
+    /// members pane must use; the actor directory is not a member list.
+    pub async fn list_target_members(&self, actor_id: &str, target_id: &str) -> Result<Vec<Actor>> {
+        self.assert_open()?;
+        let connection = self.connection.lock().await;
+        require_target_access(&connection, target_id, actor_id, "list members of").await?;
+        if require_target(&connection, target_id).await? != TargetKind::Channel {
+            return Err(CollabError::InvalidArgument(
+                "list_target_members only supports Channel targets".into(),
+            ));
+        }
+        let mut rows = connection
+            .query(
+                "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms
+                 FROM memberships membership
+                 JOIN actors actor ON actor.id = membership.actor_id
+                 WHERE membership.target_id = ?1
+                   AND membership.left_at_ms IS NULL
+                 ORDER BY actor.handle, actor.id",
+                (target_id,),
+            )
+            .await?;
+        let mut members = Vec::new();
+        while let Some(row) = rows.next().await? {
+            members.push(actor_from_row(&row)?);
+        }
+        Ok(members)
     }
 
     /// Return one authorization-filtered bootstrap projection and the global
@@ -1206,9 +1261,14 @@ impl CollabCore {
                 "limit must be between 1 and 100".into(),
             ));
         }
-        let connection = self.connection.lock().await;
-        require_target_access(&connection, target_id, actor_id, "read").await?;
-        let mut count_rows = connection
+        let mut connection = self.connection.lock().await;
+        // Explicit read transaction: COUNT and the tail page observe one DB
+        // snapshot even when a second connection writes concurrently.
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .await?;
+        require_target_access(&transaction, target_id, actor_id, "read").await?;
+        let mut count_rows = transaction
             .query(
                 "SELECT COUNT(*) FROM messages WHERE target_id = ?1",
                 (target_id,),
@@ -1220,7 +1280,7 @@ impl CollabCore {
             .ok_or_else(|| CollabError::Database("count returned no row".into()))?;
         let count: i64 = count_row.get(0)?;
         drop(count_rows);
-        let mut rows = connection
+        let mut rows = transaction
             .query(
                 "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
                  FROM (
@@ -1238,6 +1298,8 @@ impl CollabCore {
         while let Some(row) = rows.next().await? {
             messages.push(message_from_row(&row)?);
         }
+        drop(rows);
+        transaction.commit().await?;
         Ok(MessageTail { count, messages })
     }
 
@@ -1322,6 +1384,7 @@ impl CollabCore {
             now,
         )
         .await?;
+        let anchor_text = message_body_text(&transaction, message_id).await?;
         transaction.commit().await?;
 
         Ok(Task {
@@ -1333,6 +1396,7 @@ impl CollabCore {
             version: 1,
             created_at_ms: now,
             updated_at_ms: now,
+            anchor_text,
         })
     }
 
@@ -1414,6 +1478,7 @@ impl CollabCore {
             version: next_version,
             created_at_ms: current.created_at_ms,
             updated_at_ms: now,
+            anchor_text: current.anchor_text,
         })
     }
 
@@ -2641,6 +2706,24 @@ async fn message_target(connection: &Connection, message_id: &str) -> Result<Str
     }
 }
 
+async fn message_body_text(connection: &Connection, message_id: &str) -> Result<Option<String>> {
+    let mut rows = connection
+        .query("SELECT body_json FROM messages WHERE id = ?1", [message_id])
+        .await?;
+    match rows.next().await? {
+        Some(row) => {
+            let body_json = row.get::<String>(0)?;
+            let body: StoredTextBody = serde_json::from_str(&body_json).map_err(|error| {
+                CollabError::Database(format!(
+                    "message '{message_id}' has invalid body: {error}"
+                ))
+            })?;
+            Ok(Some(body.text))
+        }
+        None => Ok(None),
+    }
+}
+
 async fn message_target_author(
     connection: &Connection,
     message_id: &str,
@@ -2660,9 +2743,11 @@ async fn message_target_author(
 async fn find_task(connection: &Connection, message_id: &str) -> Result<Option<Task>> {
     let mut rows = connection
         .query(
-            "SELECT message_id, target_id, number, status, assignee_id,
-                    version, created_at_ms, updated_at_ms
-             FROM tasks WHERE message_id = ?1",
+            "SELECT task.message_id, task.target_id, task.number, task.status, task.assignee_id,
+                    task.version, task.created_at_ms, task.updated_at_ms, message.body_json
+             FROM tasks task
+             LEFT JOIN messages message ON message.id = task.message_id
+             WHERE task.message_id = ?1",
             [message_id],
         )
         .await?;
@@ -2680,6 +2765,18 @@ fn task_from_row(row: &Row) -> Result<Task> {
             "task '{message_id}' has invalid status '{status_text}'"
         ))
     })?;
+    let anchor_text = row
+        .get::<Option<String>>(8)?
+        .map(|body_json| {
+            serde_json::from_str::<StoredTextBody>(&body_json)
+                .map(|body| body.text)
+                .map_err(|error| {
+                    CollabError::Database(format!(
+                        "task '{message_id}' anchor has invalid body: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
     Ok(Task {
         message_id,
         target_id: row.get(1)?,
@@ -2689,6 +2786,7 @@ fn task_from_row(row: &Row) -> Result<Task> {
         version: row.get(5)?,
         created_at_ms: row.get(6)?,
         updated_at_ms: row.get(7)?,
+        anchor_text,
     })
 }
 
@@ -2699,7 +2797,8 @@ async fn tasks_for_actor(
 ) -> Result<Vec<Task>> {
     let statement = if target_id.is_some() {
         "SELECT task.message_id, task.target_id, task.number, task.status,
-                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms,
+                message.body_json
          FROM tasks task
          JOIN targets target ON target.id = task.target_id
          JOIN memberships membership
@@ -2709,11 +2808,13 @@ async fn tasks_for_actor(
            END
           AND membership.actor_id = ?1
           AND membership.left_at_ms IS NULL
+         LEFT JOIN messages message ON message.id = task.message_id
          WHERE task.target_id = ?2 AND target.archived_at_ms IS NULL
          ORDER BY task.number"
     } else {
         "SELECT task.message_id, task.target_id, task.number, task.status,
-                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms,
+                message.body_json
          FROM tasks task
          JOIN targets target ON target.id = task.target_id
          JOIN memberships membership
@@ -2723,6 +2824,7 @@ async fn tasks_for_actor(
            END
           AND membership.actor_id = ?1
           AND membership.left_at_ms IS NULL
+         LEFT JOIN messages message ON message.id = task.message_id
          WHERE target.archived_at_ms IS NULL
          ORDER BY task.target_id, task.number"
     };
@@ -3214,6 +3316,137 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn read_messages_tail_holds_one_snapshot_under_concurrent_writes() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("tail-snapshot.db");
+        let reader = CollabCore::open(&path).await?;
+        let user = reader.create_user("owner", "Owner").await?;
+        let channel = reader.create_channel("busy", &user.id).await?;
+        let writer = CollabCore::open(&path).await?;
+
+        let writer_user = writer.ensure_user("owner", "Owner").await?;
+        let write_target = channel.id.clone();
+
+        let writer_task = tokio::spawn(async move {
+            for index in 0..30 {
+                writer
+                    .send_message(SendMessageRequest {
+                        target_id: write_target.clone(),
+                        author_id: writer_user.id.clone(),
+                        client_request_id: format!("concurrent-{index}"),
+                        text: format!("concurrent {index}"),
+                    })
+                    .await?;
+                tokio::task::yield_now().await;
+            }
+            Ok::<(), CollabError>(())
+        });
+
+        // Every read must be self-consistent: the page is the contiguous
+        // suffix implied by the count of the same snapshot.
+        for _ in 0..30 {
+            let tail = reader.read_messages_tail(&user.id, &channel.id, 5).await?;
+            let page_len = i64::try_from(tail.messages.len()).unwrap();
+            assert!(page_len <= tail.count);
+            if page_len > 0 {
+                let first_seq = tail.messages[0].seq;
+                assert_eq!(first_seq, tail.count - page_len + 1);
+                for (offset, message) in tail.messages.iter().enumerate() {
+                    assert_eq!(message.seq, first_seq + i64::try_from(offset).unwrap());
+                }
+            }
+            tokio::task::yield_now().await;
+        }
+        writer_task.await.unwrap()?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ensure_user_migrates_display_name_on_stable_handle() -> Result<()> {
+        let core = CollabCore::open_memory().await?;
+        let created = core.ensure_user("local-user", "Local User").await?;
+        let channel = core.create_channel("identity", &created.id).await?;
+
+        // Same handle with a new display name keeps the actor id, so
+        // Memberships and Tasks survive the rename.
+        let renamed = core.ensure_user("local-user", "Updated User").await?;
+        assert_eq!(renamed.id, created.id);
+        assert_eq!(renamed.display_name, "Updated User");
+        let members = core.list_target_members(&renamed.id, &channel.id).await?;
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].id, created.id);
+
+        // Repeating with the current name is a no-op.
+        let stable = core.ensure_user("local-user", "Updated User").await?;
+        assert_eq!(stable, renamed);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn list_target_members_returns_only_active_channel_members() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let outsider = core.create_user("outsider", "Outsider").await?;
+
+        // The projection is the Channel membership, not the actor directory:
+        // the fixture created extra actors that never joined this channel.
+        let members = core.list_target_members(&user.id, &channel.id).await?;
+        let mut member_ids: Vec<&str> = members.iter().map(|actor| actor.id.as_str()).collect();
+        member_ids.sort_unstable();
+        let mut expected_ids = vec![alpha.id.as_str(), beta.id.as_str(), user.id.as_str()];
+        expected_ids.sort_unstable();
+        assert_eq!(member_ids, expected_ids);
+
+        // A second channel has its own membership.
+        let other = core.create_channel("other", &user.id).await?;
+        let other_members = core.list_target_members(&user.id, &other.id).await?;
+        assert_eq!(other_members.len(), 1);
+        assert_eq!(other_members[0].id, user.id);
+
+        // Non-members are rejected, and left members disappear.
+        assert!(matches!(
+            core.list_target_members(&outsider.id, &channel.id).await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_reads_carry_authoritative_anchor_text() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        let anchor = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "anchor-1".into(),
+                text: "anchor body survives paging".into(),
+            })
+            .await?
+            .message;
+        let created = core.create_task(&anchor.id, &user.id).await?;
+        assert_eq!(created.anchor_text.as_deref(), Some("anchor body survives paging"));
+
+        // Push the anchor far outside any recent-message page; the Task read
+        // still resolves the true anchor body from the store.
+        for index in 0..120 {
+            core.send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: format!("filler-{index}"),
+                text: format!("filler {index}"),
+            })
+            .await?;
+        }
+        let tasks = core.list_tasks(&alpha.id, Some(&channel.id)).await?;
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].anchor_text.as_deref(), Some("anchor body survives paging"));
+
+        // Mutations keep the anchor attached.
+        let claimed = core.claim_task(&anchor.id, &alpha.id).await?;
+        assert_eq!(claimed.anchor_text.as_deref(), Some("anchor body survives paging"));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn direct_target_is_unique_for_an_unordered_actor_pair() -> Result<()> {
         let (core, user, alpha, beta, _channel) = fixture().await?;
         let direct = core.create_direct(&alpha.id, &beta.id).await?;
@@ -3437,7 +3670,10 @@ mod tests {
     async fn snapshot_and_change_cursor_are_authorization_filtered() -> Result<()> {
         let core = CollabCore::open_memory().await?;
         let owner = core.ensure_user("cursor-owner", "Owner").await?;
-        assert_eq!(core.ensure_user("cursor-owner", "Ignored").await?, owner);
+        // A repeated ensure with the current name is a no-op returning the
+        // same actor; a different name is an explicit migration (covered by
+        // ensure_user_migrates_display_name_on_stable_handle).
+        assert_eq!(core.ensure_user("cursor-owner", "Owner").await?, owner);
         let alpha = core
             .create_agent("cursor-alpha", "Alpha", "/tmp/cursor-alpha")
             .await?;

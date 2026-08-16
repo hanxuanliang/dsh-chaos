@@ -18,6 +18,7 @@ export const COLLAB_EVENTS_PATH = '/dsh-chaos/events'
 
 export interface CollabRemoteApi {
   listActors(actorId: string): Promise<NativeActor[]>
+  listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
@@ -144,6 +145,8 @@ async function dispatchRemote(
       return await api.snapshot(actorId)
     case 'actors':
       return await api.listActors(actorId)
+    case 'target.members':
+      return await api.listTargetMembers(actorId, requiredString(input, 'targetId'))
     case 'changes':
       return await api.listChanges(
         actorId,

@@ -41,6 +41,8 @@ export interface ChaosClientState {
   tasks: readonly NativeTask[]
   selectedTargetId?: string
   messages: readonly NativeMessage[]
+  /** Active members of the selected Channel from the membership projection. */
+  members: readonly NativeActor[]
   /** Inline reply previews for threads of the selected target, keyed by thread target id. */
   threadPreviews: Record<string, ThreadPreview>
   /** Right-rail Thread panel: stays open (and keeps SSE) even after unfollow. */
@@ -60,6 +62,7 @@ const INITIAL_STATE: ChaosClientState = {
   allTasks: [],
   tasks: [],
   messages: [],
+  members: [],
   threadPreviews: {},
   threadPanelMessages: [],
   error: undefined,
@@ -127,7 +130,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
 
   async selectTarget(targetId: string): Promise<void> {
     if (!this.state.targets.some(target => target.id === targetId)) return
-    this.publish({ ...this.state, selectedTargetId: targetId, messages: [], tasks: [] })
+    this.publish({ ...this.state, selectedTargetId: targetId, messages: [], tasks: [], members: [] })
     await this.reloadTarget(targetId)
   }
 
@@ -295,6 +298,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       allTasks: snapshot.tasks,
       tasks: selectedTargetId === undefined || selectionChanged ? [] : this.state.tasks,
       messages: selectedTargetId === undefined || selectionChanged ? [] : this.state.messages,
+      members: selectedTargetId === undefined || selectionChanged ? [] : this.state.members,
       threadPanelMessages: threadPanelId === undefined ? [] : this.state.threadPanelMessages,
       error: undefined,
     }
@@ -313,12 +317,23 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   private async reloadTarget(targetId: string): Promise<void> {
     const epoch = ++this.loadEpoch
     try {
-      const [tail, tasks] = await Promise.all([
+      const kind = this.state.targets.find(target => target.id === targetId)?.kind
+      const [tail, tasks, members] = await Promise.all([
         this.call<NativeMessageTail>('history.tail', { targetId, limit: 100 }),
         this.call<NativeTask[]>('tasks', { targetId }),
+        kind === 'channel'
+          ? this.call<NativeActor[]>('target.members', { targetId })
+          : Promise.resolve<NativeActor[]>([]),
       ])
       if (epoch !== this.loadEpoch || this.state.selectedTargetId !== targetId) return
-      this.publish({ ...this.state, status: 'ready', messages: tail.messages, tasks, error: undefined })
+      this.publish({
+        ...this.state,
+        status: 'ready',
+        messages: tail.messages,
+        tasks,
+        members,
+        error: undefined,
+      })
       await this.loadThreadPreviews(targetId, tail.messages, epoch)
     } catch (error) {
       if (epoch !== this.loadEpoch) return
@@ -448,4 +463,17 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Draft clearing after a successful send: only an untouched draft is
+ * cleared. Anything typed while the request was in flight belongs to the
+ * next message and must survive the earlier request's completion.
+ */
+export function resolveSentDraft(
+  drafts: Readonly<Record<string, string>>,
+  key: string,
+  sentText: string,
+): Readonly<Record<string, string>> {
+  return drafts[key] === sentText ? { ...drafts, [key]: '' } : drafts
 }

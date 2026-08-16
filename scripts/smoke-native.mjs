@@ -11,7 +11,12 @@ const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-'))
 try {
   const core = await native.openCollab(join(root, 'state.db'))
   const owner = await core.createUser('owner', 'Owner')
-  assert.deepEqual(await core.ensureUser('owner', 'Ignored'), owner)
+  // Same name is a no-op; a different name is an explicit display-name
+  // migration on the stable handle (actor id and identity survive).
+  assert.deepEqual(await core.ensureUser('owner', 'Owner'), owner)
+  const renamed = await core.ensureUser('owner', 'Local Owner')
+  assert.equal(renamed.id, owner.id)
+  assert.equal(renamed.displayName, 'Local Owner')
   const alpha = await core.createAgent('alpha', 'Alpha', join(root, 'alpha'))
   const beta = await core.createAgent('beta', 'Beta', join(root, 'beta'))
   const channel = await core.createChannel('design', owner.id)

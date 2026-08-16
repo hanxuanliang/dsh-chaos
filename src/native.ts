@@ -70,6 +70,8 @@ export interface NativeTask {
   version: string
   createdAtMs: number
   updatedAtMs: number
+  /** Authoritative snippet of the anchor Message body, resolved by the store. */
+  anchorText?: string
 }
 
 export interface NativeChangeEvent {
@@ -146,6 +148,7 @@ export interface NativeCollabHandle {
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
   listActors(actorId: string): Promise<NativeActor[]>
+  listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   pruneChangesBefore(beforeMs: number): Promise<string>

@@ -112,6 +112,7 @@ pub struct JsTask {
     pub version: String,
     pub created_at_ms: f64,
     pub updated_at_ms: f64,
+    pub anchor_text: Option<String>,
 }
 
 #[napi(object)]
@@ -426,6 +427,19 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn list_target_members(
+        &self,
+        actor_id: String,
+        target_id: String,
+    ) -> Result<Vec<JsActor>> {
+        self.core
+            .list_target_members(&actor_id, &target_id)
+            .await
+            .map(|members| members.into_iter().map(JsActor::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn snapshot(&self, actor_id: String) -> Result<JsCollabSnapshot> {
         self.core
             .snapshot(&actor_id)
@@ -639,6 +653,7 @@ impl From<Task> for JsTask {
             version: task.version.to_string(),
             created_at_ms: task.created_at_ms as f64,
             updated_at_ms: task.updated_at_ms as f64,
+            anchor_text: task.anchor_text,
         }
     }
 }

@@ -3,7 +3,7 @@
  * @module dsh-chaos
  */
 
-import { homedir } from 'node:os'
+import { homedir, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -65,12 +65,21 @@ const DEFAULT_DATABASE_PATH = join(
   'state.db',
 )
 
+function defaultWebUserDisplayName(): string {
+  try {
+    const username = userInfo().username.trim()
+    return username === '' ? 'Local User' : username
+  } catch {
+    return 'Local User'
+  }
+}
+
 export const Config: z<Config> = z.object({
   path: z.string().default(DEFAULT_DATABASE_PATH),
   deliveryPollMs: z.number().step(1).min(50).default(500),
   remoteEnabled: z.boolean().default(true),
   webUserHandle: z.string().default('local-user'),
-  webUserDisplayName: z.string().default('Local User'),
+  webUserDisplayName: z.string().default(''),
   sseHeartbeatMs: z.number().step(1).min(1_000).default(15_000),
 })
 
@@ -152,9 +161,11 @@ export class CollabService extends Service {
     this.runtimes = runtimes
 
     if (this.config.remoteEnabled ?? true) {
+      // Default to the OS username; the stable handle keeps identity while
+      // ensure_user migrates the display name of legacy 'Local User' rows.
       const webActor = await handle.ensureUser(
         this.config.webUserHandle ?? 'local-user',
-        this.config.webUserDisplayName ?? 'Local User',
+        this.config.webUserDisplayName || defaultWebUserDisplayName(),
       )
       this.ctx.inject(['connection', 'webServer'], (remoteCtx) => {
         installCollabRemote(remoteCtx, this, webActor.id, {
@@ -295,6 +306,10 @@ export class CollabService extends Service {
 
   listActors(actorId: string) {
     return this.requireHandle().listActors(actorId)
+  }
+
+  listTargetMembers(actorId: string, targetId: string) {
+    return this.requireHandle().listTargetMembers(actorId, targetId)
   }
 
   snapshot(actorId: string) {
