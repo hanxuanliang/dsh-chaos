@@ -123,22 +123,25 @@ const ctx = {
   },
   slots: {
     inject(name, factory) {
-      assert(['shell.overlay', 'conversation.input.dock', 'conversation.input.overlay'].includes(name))
+      assert(['shell.overlay', 'conversation.input.dock', 'conversation.input.overlay', 'tool.call.toolview'].includes(name))
       slotCleanups.set(name, factory())
     },
     register(options, component) {
-      registrations.set(options.name, { options, component })
-      return () => { registrations.delete(options.name) }
+      const key = options.id ?? options.key ?? options.name
+      registrations.set(key, { options, component })
+      return () => { registrations.delete(key) }
     },
   },
 }
 
 clientModule.apply(ctx)
-assert.equal(registrations.get('shell.overlay').options.id, 'dsh-chaos-workspace')
-assert.equal(registrations.get('conversation.input.dock').options.id, 'dsh-chaos-dock')
-assert.equal(registrations.get('conversation.input.overlay').options.id, 'dsh-chaos-hash')
+assert.equal(registrations.get('dsh-chaos-workspace').options.id, 'dsh-chaos-workspace')
+assert.equal(registrations.get('dsh-chaos-dock').options.id, 'dsh-chaos-dock')
+assert.equal(registrations.get('dsh-chaos-room-preview').options.id, 'dsh-chaos-room-preview')
+assert.equal(registrations.get('dsh-chaos-hash').options.id, 'dsh-chaos-hash')
+assert.equal(registrations.get('message_send').options.key, 'message_send')
 assert.equal(registrations.has('sidebar.footer.action'), false)
-const injected = registrations.get('shell.overlay').options.inject()
+const injected = registrations.get('dsh-chaos-workspace').options.inject()
 await injected.ensure()
 const state = injected.hooks.chaos.getSnapshot()
 assert.equal(state.status, 'ready')
@@ -176,6 +179,7 @@ assert(calls.filter(call => call.endpoint === 'snapshot').length >= 2)
 slotCleanups.get('shell.overlay')()
 slotCleanups.get('conversation.input.dock')()
 slotCleanups.get('conversation.input.overlay')()
+slotCleanups.get('tool.call.toolview')()
 controllerCleanup()
 assert.equal(source.closed, true)
 

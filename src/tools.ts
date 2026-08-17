@@ -169,6 +169,12 @@ export function installCollabTools(
         type: 'text',
         text: `message ${value.message.id} committed to ${value.message.targetId}`,
       }],
+      presentationMeta: (_args, value) => ({
+        kind: 'room-card',
+        targetId: value.message.targetId,
+        messageId: value.message.id,
+        text: value.message.text,
+      }),
     },
     async execute(args, exec) {
       exec.signal.throwIfAborted()

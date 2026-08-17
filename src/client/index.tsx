@@ -7,10 +7,12 @@ import {
   ChaosDock,
   ChaosPanel,
   ChannelsPage,
+  RoomPreviewDock,
   ThreadPage,
   type ChaosPanelInjected,
 } from './ChaosPanel.tsx'
 import { HashPicker } from './HashPicker.tsx'
+import { RoomCard } from './RoomCard.tsx'
 import { ChaosClientController } from './controller.ts'
 import { installChannelSendHook } from './send-hook.ts'
 import { betterSidebarOf, type BetterSidebarLite } from './sidecar.ts'
@@ -149,6 +151,23 @@ export function apply(ctx: ClientContext): void {
     order: 20,
     inject: injectFace,
   }, ChaosDock))
+
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'dsh-chaos-room-preview',
+    order: 10,
+    inject: injectFace,
+  }, RoomPreviewDock))
+
+  const slots = ctx.slots as typeof ctx.slots & {
+    inject(name: string, factory: () => () => void): void
+    register(options: object, component: unknown): () => void
+  }
+  slots.inject('tool.call.toolview', () => slots.register({
+    name: 'tool.call.toolview',
+    key: 'message_send',
+    inject: injectFace,
+  }, RoomCard))
 
   ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
     name: 'conversation.input.overlay',

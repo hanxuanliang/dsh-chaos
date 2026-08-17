@@ -598,6 +598,29 @@ function paintedRight(root: Element): number | null {
 }
 
 /** Official composer chips: sit on the Standard mode row, same 28px pill. */
+/** Human-sent room preview above the official box. Does not leave the Session log. */
+export function RoomPreviewDock({
+  useChaos,
+  selectTarget,
+}: ChaosDockProps) {
+  const state = useChaos(value => value)
+  const selected = state.targets.find(target => target.id === state.selectedTargetId)
+  const latest = state.messages.at(-1)
+  if (selected === undefined || latest === undefined) return null
+  return (
+    <button
+      type="button"
+      className={css.roomCard}
+      data-chaos-preview="room"
+      aria-label={`打开 #${selected.name}`}
+      onClick={() => { void selectTarget(selected.id) }}
+    >
+      <strong>#{selected.name}</strong>
+      <span>{latest.text}</span>
+    </button>
+  )
+}
+
 export function ChaosDock({
   useChaos,
   ensure,
