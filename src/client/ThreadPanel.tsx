@@ -12,14 +12,13 @@ export function ThreadPanel({
   messages,
   names,
   kinds,
-  onClose,
 }: {
   thread: NativeTarget
   parentName: string
   messages: readonly NativeMessage[]
   names: ReadonlyMap<string, string>
   kinds: ReadonlyMap<string, string>
-  onClose: () => void
+  onClose?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -32,18 +31,6 @@ export function ThreadPanel({
 
   return (
     <section className={css.threadPanel} aria-label={`Thread ${parentName} · ${rootSuffix}`}>
-      <header className={css.threadPanelHeader}>
-        <div className={css.threadPanelTitle}>
-          <span className={css.targetKind}>THREAD</span>
-          <strong>{parentName} · {rootSuffix}</strong>
-        </div>
-        <button type="button" className={css.iconButton} aria-label="关闭 Thread 面板" onClick={onClose}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-      </header>
       <div ref={scrollRef} className={css.threadPanelMessages}>
         {messages.length === 0 && <p className={css.empty}>Thread 里还没有回复。</p>}
         {messages.map(message => (

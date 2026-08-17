@@ -197,7 +197,11 @@ function RoomWorkbench({
   tasks,
   threadByRoot,
   previews,
+  thread,
+  threadParent,
+  threadMessages,
   onClose,
+  onBack,
   onOpenThread,
 }: {
   title: string
@@ -208,41 +212,63 @@ function RoomWorkbench({
   tasks: readonly NativeTask[]
   threadByRoot: ReadonlyMap<string, string>
   previews: Record<string, ThreadPreview>
+  thread: { id: string; name: string; rootMessageId?: string } | undefined
+  threadParent: string | undefined
+  threadMessages: readonly NativeMessage[]
   onClose: () => void
+  onBack: () => void
   onOpenThread: (rootMessageId: string, threadId?: string) => void
 }): ReactNode {
   useLayoutEffect(() => claimRoomLayout(), [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+      if (thread !== undefined) onBack()
+      else onClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => { window.removeEventListener('keydown', onKeyDown) }
-  }, [onClose])
+  }, [onBack, onClose, thread])
 
   return (
     <aside
       className={css.workbench}
-      aria-label={title}
+      aria-label={thread === undefined ? title : `Thread ${threadParent ?? title}`}
       data-rail={railOpen || undefined}
     >
       <header className={css.workbenchHead}>
-        <strong>{title}</strong>
-        <button type="button" className={css.iconButton} aria-label="关闭房间" onClick={onClose}>
+        {thread === undefined ? (
+          <strong>{title}</strong>
+        ) : (
+          <button type="button" className={css.backButton} onClick={onBack}>
+            ← {threadParent ?? title}
+          </button>
+        )}
+        <button type="button" className={css.iconButton} aria-label={thread === undefined ? '关闭房间' : '关闭 Thread'} onClick={thread === undefined ? onClose : onBack}>
           {CloseIcon}
         </button>
       </header>
       <div className={css.workbenchBody}>
-        <RoomTimeline
-          messages={messages}
-          names={names}
-          kinds={kinds}
-          tasks={tasks}
-          threadByRoot={threadByRoot}
-          previews={previews}
-          onOpenThread={onOpenThread}
-        />
+        {thread === undefined ? (
+          <RoomTimeline
+            messages={messages}
+            names={names}
+            kinds={kinds}
+            tasks={tasks}
+            threadByRoot={threadByRoot}
+            previews={previews}
+            onOpenThread={onOpenThread}
+          />
+        ) : (
+          <ThreadPanel
+            thread={thread as never}
+            parentName={threadParent ?? title}
+            messages={threadMessages}
+            names={names}
+            kinds={kinds}
+          />
+        )}
       </div>
     </aside>
   )
@@ -592,9 +618,7 @@ export function ChaosDock({
 }: ChaosDockProps) {
   const state = useChaos(value => value)
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
-  const thread = state.railTab === 'thread'
-    ? state.targets.find(target => target.id === state.threadPanelId)
-    : undefined
+  const thread = state.targets.find(target => target.id === state.threadPanelId && target.kind === 'thread')
   const parent = thread === undefined
     ? undefined
     : state.targets.find(target => target.id === thread.parentTargetId)
@@ -693,6 +717,7 @@ export function ChaosPanel(props: ChaosPanelProps) {
     setRailTab,
     closeSurface,
     closeWorkbench,
+    closeThreadPanel,
     clearTarget,
     createThread,
     openThreadPanel,
@@ -700,6 +725,10 @@ export function ChaosPanel(props: ChaosPanelProps) {
   const state = useChaos(value => value)
   const open = state.surface === 'rail'
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
+  const thread = state.targets.find(target => target.id === state.threadPanelId && target.kind === 'thread')
+  const threadParent = thread === undefined
+    ? undefined
+    : state.targets.find(target => target.id === thread.parentTargetId)?.name
   const workbenchOpen = state.workbench === 'open' && selected !== undefined
   const names = useMemo(
     () => new Map(state.actors.map(actor => [actor.id, actor.displayName])),
@@ -760,26 +789,13 @@ export function ChaosPanel(props: ChaosPanelProps) {
           >
             Agents
           </button>
-          {state.threadPanelId !== undefined && (
-            <button
-              type="button"
-              className={css.tab}
-              data-active={tab === 'thread' || undefined}
-              onClick={() => { setRailTab('thread') }}
-            >
-              Thread
-            </button>
-          )}
+
           <button type="button" className={css.iconButton} aria-label="关闭协作面板" onClick={closeSurface}>
             {CloseIcon}
           </button>
         </div>
         <div className={css.panelBody}>
-          {tab === 'agents'
-            ? <AgentsPage {...props} />
-            : tab === 'thread'
-              ? <ThreadPage {...props} />
-              : <ChannelsPage {...props} />}
+          {tab === 'agents' ? <AgentsPage {...props} /> : <ChannelsPage {...props} />}
         </div>
       </aside>
       {workbenchOpen && selected !== undefined && (
@@ -792,10 +808,15 @@ export function ChaosPanel(props: ChaosPanelProps) {
           tasks={state.tasks}
           threadByRoot={threadByRoot}
           previews={state.threadPreviews}
+          thread={thread}
+          threadParent={threadParent === undefined ? undefined : `#${threadParent}`}
+          threadMessages={state.threadPanelMessages}
           onClose={() => {
+            closeThreadPanel()
             closeWorkbench()
             clearTarget()
           }}
+          onBack={() => { closeThreadPanel() }}
           onOpenThread={(rootMessageId, threadId) => {
             if (threadId !== undefined) void openThreadPanel(threadId)
             else void createThread(rootMessageId)

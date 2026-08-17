@@ -44,7 +44,7 @@ export function installChannelSendHook(
       return original(session, text, imageIds, mode)
     }
     const state = controller.getSnapshot()
-    const intoThread = state.railTab === 'thread' && state.threadPanelId !== undefined
+    const intoThread = state.threadPanelId !== undefined
     const intoChannel = state.selectedTargetId !== undefined
     if (!intoThread && !intoChannel) {
       return original(session, text, imageIds, mode)

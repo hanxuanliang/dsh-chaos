@@ -293,7 +293,6 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     this.publish({
       ...this.state,
       workbench: 'open',
-      railTab: 'thread',
       threadPanelId: thread.id,
       threadPanelMessages: [],
     })
