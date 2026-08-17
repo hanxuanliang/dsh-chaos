@@ -123,7 +123,7 @@ const ctx = {
   },
   slots: {
     inject(name, factory) {
-      assert(['shell.overlay', 'conversation.input.dock'].includes(name))
+      assert(['shell.overlay', 'conversation.input.dock', 'conversation.input.overlay'].includes(name))
       slotCleanups.set(name, factory())
     },
     register(options, component) {
@@ -136,6 +136,7 @@ const ctx = {
 clientModule.apply(ctx)
 assert.equal(registrations.get('shell.overlay').options.id, 'dsh-chaos-workspace')
 assert.equal(registrations.get('conversation.input.dock').options.id, 'dsh-chaos-dock')
+assert.equal(registrations.get('conversation.input.overlay').options.id, 'dsh-chaos-hash')
 assert.equal(registrations.has('sidebar.footer.action'), false)
 const injected = registrations.get('shell.overlay').options.inject()
 await injected.ensure()
@@ -174,6 +175,7 @@ await new Promise(resolve => setTimeout(resolve, 0))
 assert(calls.filter(call => call.endpoint === 'snapshot').length >= 2)
 slotCleanups.get('shell.overlay')()
 slotCleanups.get('conversation.input.dock')()
+slotCleanups.get('conversation.input.overlay')()
 controllerCleanup()
 assert.equal(source.closed, true)
 
@@ -498,6 +500,20 @@ const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${
   uninstall()
   await conversation.sendSession({}, 'after uninstall', [], 'default')
   assert.equal(prompted.at(-1).text, 'after uninstall')
+}
+
+{
+  const { detectHashTrigger, rankChannels, applyHashPick } = await import(`../lib/client/hash-picker.js?smoke=${String(Date.now())}`)
+  assert.deepEqual(detectHashTrigger('#acc', 4), { query: 'acc', start: 0, end: 4 })
+  assert.deepEqual(detectHashTrigger('go #acc', 7), { query: 'acc', start: 3, end: 7 })
+  assert.equal(detectHashTrigger('foo#acc', 7), null)
+  assert.equal(detectHashTrigger('/acc', 4), null)
+  assert.equal(detectHashTrigger('@acc', 4), null)
+  assert.deepEqual(
+    rankChannels([{ id: '1', name: 'acceptance' }, { id: '2', name: 'ops' }], 'acc').map(row => row.name),
+    ['acceptance'],
+  )
+  assert.deepEqual(applyHashPick('go #acc later', { query: 'acc', start: 3, end: 7 }), { draft: 'go  later', caret: 3 })
 }
 
 delete globalThis.EventSource

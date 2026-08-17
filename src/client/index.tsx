@@ -10,6 +10,7 @@ import {
   ThreadPage,
   type ChaosPanelInjected,
 } from './ChaosPanel.tsx'
+import { HashPicker } from './HashPicker.tsx'
 import { ChaosClientController } from './controller.ts'
 import { installChannelSendHook } from './send-hook.ts'
 import { betterSidebarOf, type BetterSidebarLite } from './sidecar.ts'
@@ -19,6 +20,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.input.dock': {
       kind: 'list'
       scope: 'session-maybe'
+    }
+    'conversation.input.overlay': {
+      kind: 'list'
+      scope: 'session'
     }
   }
 }
@@ -144,6 +149,13 @@ export function apply(ctx: ClientContext): void {
     order: 20,
     inject: injectFace,
   }, ChaosDock))
+
+  ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
+    name: 'conversation.input.overlay',
+    id: 'dsh-chaos-hash',
+    order: 30,
+    inject: injectFace,
+  }, HashPicker))
 
   const sidecar = betterSidebarOf(ctx as unknown as { betterSidebar?: BetterSidebarLite })
 

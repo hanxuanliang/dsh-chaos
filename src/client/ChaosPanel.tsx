@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { ChaosClientState } from './controller.ts'
-import type { NativeActor } from '../native.ts'
+import type { ChaosClientState, ThreadPreview } from './controller.ts'
+import type { NativeActor, NativeMessage, NativeTask } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import { claimWorkbenchDock, WORKBENCH_DEFAULT_WIDTH, type WorkbenchDockLease } from './workbench-dock.ts'
 import css from './ChaosPanel.module.css'
@@ -93,15 +93,124 @@ const PanelIcon = (
 )
 
 const RAIL_WIDTH_PX = 276
+const COMPACT_GAP_MS = 5 * 60 * 1000
+
+function dayKey(ms: number): string {
+  const date = new Date(ms)
+  return `${String(date.getFullYear())}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function dayLabel(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function clock(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function RoomTimeline({
+  messages,
+  names,
+  kinds,
+  tasks,
+  threadByRoot,
+  previews,
+  onOpenThread,
+}: {
+  messages: readonly NativeMessage[]
+  names: ReadonlyMap<string, string>
+  kinds: ReadonlyMap<string, string>
+  tasks: readonly NativeTask[]
+  threadByRoot: ReadonlyMap<string, string>
+  previews: Record<string, ThreadPreview>
+  onOpenThread: (rootMessageId: string, threadId?: string) => void
+}): ReactNode {
+  const taskByMessage = new Map(tasks.map(task => [task.messageId, task]))
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const node = scrollRef.current
+    if (node !== null) node.scrollTop = node.scrollHeight
+  }, [messages.length])
+
+  if (messages.length === 0) {
+    return <p className={css.empty}>房间还没有消息。底下官方框发出去就会出现在这里。</p>
+  }
+
+  return (
+    <div ref={scrollRef} className={css.timeline} aria-label="房间消息">
+      {messages.map((message, index) => {
+        const previous = index > 0 ? messages[index - 1] : undefined
+        const showDay = previous === undefined || dayKey(previous.createdAtMs) !== dayKey(message.createdAtMs)
+        const compact = previous !== undefined
+          && !showDay
+          && previous.authorId === message.authorId
+          && message.createdAtMs - previous.createdAtMs <= COMPACT_GAP_MS
+        const threadId = threadByRoot.get(message.id)
+        const preview = threadId === undefined ? undefined : previews[threadId]
+        const task = taskByMessage.get(message.id)
+        return (
+          <div key={message.id}>
+            {showDay && <div className={css.dayDivider}>{dayLabel(message.createdAtMs)}</div>}
+            <article className={css.timelineRow} data-compact={compact || undefined}>
+              {compact ? null : (
+                <div className={css.timelineHead}>
+                  <strong>{names.get(message.authorId) ?? message.authorId}</strong>
+                  {kinds.get(message.authorId) === 'agent' && <span className={css.badge}>agent</span>}
+                  <time>{clock(message.createdAtMs)}</time>
+                </div>
+              )}
+              <p className={css.messageText}>{message.text}</p>
+              {task !== undefined && (
+                <span className={css.taskChip} data-status={task.status}>Task {task.status}</span>
+              )}
+              {preview !== undefined && preview.count > 0 && (
+                <button
+                  type="button"
+                  className={css.replyCard}
+                  onClick={() => { onOpenThread(message.id, threadId) }}
+                >
+                  {preview.count} {preview.count === 1 ? 'reply' : 'replies'}
+                </button>
+              )}
+              {preview === undefined && (
+                <button
+                  type="button"
+                  className={css.replyGhost}
+                  onClick={() => { onOpenThread(message.id) }}
+                >
+                  回复
+                </button>
+              )}
+            </article>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function RoomWorkbench({
   title,
   railOpen,
+  messages,
+  names,
+  kinds,
+  tasks,
+  threadByRoot,
+  previews,
   onClose,
+  onOpenThread,
 }: {
   title: string
   railOpen: boolean
+  messages: readonly NativeMessage[]
+  names: ReadonlyMap<string, string>
+  kinds: ReadonlyMap<string, string>
+  tasks: readonly NativeTask[]
+  threadByRoot: ReadonlyMap<string, string>
+  previews: Record<string, ThreadPreview>
   onClose: () => void
+  onOpenThread: (rootMessageId: string, threadId?: string) => void
 }): ReactNode {
   const leaseRef = useRef<WorkbenchDockLease>()
   const ownerId = 'dsh-chaos-workbench'
@@ -145,7 +254,15 @@ function RoomWorkbench({
         </button>
       </header>
       <div className={css.workbenchBody}>
-        <p className={css.empty}>房间时间线下一刀再铺。</p>
+        <RoomTimeline
+          messages={messages}
+          names={names}
+          kinds={kinds}
+          tasks={tasks}
+          threadByRoot={threadByRoot}
+          previews={previews}
+          onOpenThread={onOpenThread}
+        />
       </div>
     </aside>
   )
@@ -592,11 +709,30 @@ export function ChaosPanel(props: ChaosPanelProps) {
     closeSurface,
     closeWorkbench,
     clearTarget,
+    createThread,
+    openThreadPanel,
   } = props
   const state = useChaos(value => value)
   const open = state.surface === 'rail'
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
   const workbenchOpen = state.workbench === 'open' && selected !== undefined
+  const names = useMemo(
+    () => new Map(state.actors.map(actor => [actor.id, actor.displayName])),
+    [state.actors],
+  )
+  const kinds = useMemo(
+    () => new Map(state.actors.map(actor => [actor.id, actor.kind])),
+    [state.actors],
+  )
+  const threadByRoot = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const target of state.targets) {
+      if (target.kind === 'thread' && target.rootMessageId !== undefined && target.parentTargetId === selected?.id) {
+        map.set(target.rootMessageId, target.id)
+      }
+    }
+    return map
+  }, [state.targets, selected?.id])
 
   useEffect(() => { void ensure() }, [ensure])
 
@@ -665,9 +801,19 @@ export function ChaosPanel(props: ChaosPanelProps) {
         <RoomWorkbench
           title={`#${selected.name}`}
           railOpen={open}
+          messages={state.messages}
+          names={names}
+          kinds={kinds}
+          tasks={state.tasks}
+          threadByRoot={threadByRoot}
+          previews={state.threadPreviews}
           onClose={() => {
             closeWorkbench()
             clearTarget()
+          }}
+          onOpenThread={(rootMessageId, threadId) => {
+            if (threadId !== undefined) void openThreadPanel(threadId)
+            else void createThread(rootMessageId)
           }}
         />
       )}

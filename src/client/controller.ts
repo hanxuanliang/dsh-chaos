@@ -292,7 +292,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     if (thread === undefined) return
     this.publish({
       ...this.state,
-      surface: 'rail',
+      workbench: 'open',
       railTab: 'thread',
       threadPanelId: thread.id,
       threadPanelMessages: [],
