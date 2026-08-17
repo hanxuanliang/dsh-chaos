@@ -15,6 +15,7 @@ import { HashPicker } from './HashPicker.tsx'
 import { RoomCard } from './RoomCard.tsx'
 import { ChaosClientController } from './controller.ts'
 import { installChannelSendHook } from './send-hook.ts'
+import { mountActivitySidebar } from './activity-sidebar.ts'
 import { betterSidebarOf, type BetterSidebarLite } from './sidecar.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -99,6 +100,7 @@ export function apply(ctx: ClientContext): void {
     toggleRail: () => { controller.toggleRail() },
     openRail: () => { controller.openRail() },
     setRailTab: tab => { controller.setRailTab(tab) },
+    setLeftPane: pane => { controller.setLeftPane(pane) },
     openWorkbench: () => { controller.openWorkbench() },
     closeWorkbench: () => { controller.closeWorkbench() },
     setAsTask: asTask => { controller.setAsTask(asTask) },
@@ -138,7 +140,13 @@ export function apply(ctx: ClientContext): void {
         (ctx as unknown as { conversation?: unknown }).conversation,
         controller,
       )
+    const stopActivity = mountActivitySidebar(controller, {
+      selectTarget: targetId => controller.selectTarget(targetId),
+      openThreadPanel: threadTargetId => controller.openThreadPanel(threadTargetId),
+      ensure: () => controller.ensure(),
+    })
     return () => {
+      stopActivity()
       stopSend()
       stopSessions()
       controller.dispose()

@@ -1,5 +1,33 @@
 /* Official seating only. Tokens: --dsw-alias-* / --dsw-font-*. No IM room, no self-built composer. */
 
+html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; }
+.activityTabs {
+  display: flex; align-items: center; gap: 2px; flex: none;
+  margin: 0 2px 8px; padding: 2px; border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.activityTab {
+  flex: 1; min-height: 28px; border: none; border-radius: 8px;
+  background: transparent; color: var(--dsw-alias-label-tertiary);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.activityTab:hover { color: var(--dsw-alias-label-primary); }
+.activityTab[data-active] {
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600;
+}
+.activityInbox {
+  display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0;
+  margin: 0 2px 8px; overflow: auto;
+}
+.activityInbox[hidden] { display: none; }
+.activityRow {
+  min-height: 32px; padding: 0 10px; border: none; border-radius: 8px;
+  background: transparent; color: var(--dsw-alias-label-primary);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.activityRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.activityRow[data-active] { background: var(--dsw-alias-interactive-bg-hover); font-weight: 600; }
+.activityEmpty { margin: 12px 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .toggleCluster {
   position: fixed; top: 3px; right: 10px; z-index: 45;
   display: flex; flex-direction: row; gap: 4px;

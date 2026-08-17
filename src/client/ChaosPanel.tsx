@@ -14,6 +14,7 @@ export interface ChaosPanelInjected {
   toggleRail: () => void
   openRail: () => void
   setRailTab: (tab: ChaosClientState['railTab']) => void
+  setLeftPane: (pane: ChaosClientState['leftPane']) => void
   openWorkbench: () => void
   closeWorkbench: () => void
   setAsTask: (asTask: boolean) => void

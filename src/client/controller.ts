@@ -36,6 +36,7 @@ export interface ChaosClientState {
   surface: 'closed' | 'rail'
   railTab: 'channels' | 'agents' | 'thread'
   workbench: 'closed' | 'open'
+  leftPane: 'sessions' | 'activity'
   asTask: boolean
   cursor: string
   actor?: NativeActor
@@ -65,6 +66,7 @@ const INITIAL_STATE: ChaosClientState = {
   surface: 'closed',
   railTab: 'channels',
   workbench: 'closed',
+  leftPane: 'sessions',
   asTask: false,
   cursor: '0',
   actors: [],
@@ -153,6 +155,11 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
 
   setRailTab(tab: ChaosClientState['railTab']): void {
     this.publish({ ...this.state, railTab: tab })
+  }
+
+  setLeftPane(pane: ChaosClientState['leftPane']): void {
+    if (this.state.leftPane === pane) return
+    this.publish({ ...this.state, leftPane: pane })
   }
 
   openDesk(agentId?: string): void {
