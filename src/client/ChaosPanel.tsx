@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ChaosClientState, ThreadPreview } from './controller.ts'
 import type { NativeActor, NativeMessage, NativeTask } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
-import { claimWorkbenchDock, WORKBENCH_DEFAULT_WIDTH, type WorkbenchDockLease } from './workbench-dock.ts'
+import { claimRoomLayout } from './room-layout.ts'
 import css from './ChaosPanel.module.css'
 
 export interface ChaosPanelInjected {
@@ -92,7 +92,6 @@ const PanelIcon = (
   </svg>
 )
 
-const RAIL_WIDTH_PX = 276
 const COMPACT_GAP_MS = 5 * 60 * 1000
 
 function dayKey(ms: number): string {
@@ -212,26 +211,7 @@ function RoomWorkbench({
   onClose: () => void
   onOpenThread: (rootMessageId: string, threadId?: string) => void
 }): ReactNode {
-  const leaseRef = useRef<WorkbenchDockLease>()
-  const ownerId = 'dsh-chaos-workbench'
-  const dockWidth = WORKBENCH_DEFAULT_WIDTH + (railOpen ? RAIL_WIDTH_PX : 0)
-
-  useLayoutEffect(() => {
-    const root = document.getElementById('root')
-    if (root === null) return
-    const computed = Number.parseFloat(window.getComputedStyle(root).marginRight)
-    const lease = claimWorkbenchDock(root, ownerId, dockWidth, computed)
-    if (lease === undefined) return
-    leaseRef.current = lease
-    return () => {
-      if (leaseRef.current === lease) leaseRef.current = undefined
-      lease.release()
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    leaseRef.current?.update(dockWidth)
-  }, [dockWidth])
+  useLayoutEffect(() => claimRoomLayout(), [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -245,7 +225,7 @@ function RoomWorkbench({
     <aside
       className={css.workbench}
       aria-label={title}
-      style={{ right: railOpen ? `${String(RAIL_WIDTH_PX)}px` : '0' }}
+      data-rail={railOpen || undefined}
     >
       <header className={css.workbenchHead}>
         <strong>{title}</strong>
@@ -598,27 +578,9 @@ function paintedRight(root: Element): number | null {
 }
 
 /** Official composer chips: sit on the Standard mode row, same 28px pill. */
-/** Human-sent room preview above the official box. Does not leave the Session log. */
-export function RoomPreviewDock({
-  useChaos,
-  selectTarget,
-}: ChaosDockProps) {
-  const state = useChaos(value => value)
-  const selected = state.targets.find(target => target.id === state.selectedTargetId)
-  const latest = state.messages.at(-1)
-  if (selected === undefined || latest === undefined) return null
-  return (
-    <button
-      type="button"
-      className={css.roomCard}
-      data-chaos-preview="room"
-      aria-label={`打开 #${selected.name}`}
-      onClick={() => { void selectTarget(selected.id) }}
-    >
-      <strong>#{selected.name}</strong>
-      <span>{latest.text}</span>
-    </button>
-  )
+/** Hidden while the room canvas covers the official hero. */
+export function RoomPreviewDock(): null {
+  return null
 }
 
 export function ChaosDock({
