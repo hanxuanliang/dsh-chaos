@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalS
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ChaosClientState } from './controller.ts'
-import type { NativeActor, NativeTarget } from '../native.ts'
+import type { NativeActor } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
+import { claimWorkbenchDock, WORKBENCH_DEFAULT_WIDTH, type WorkbenchDockLease } from './workbench-dock.ts'
 import css from './ChaosPanel.module.css'
 
 export interface ChaosPanelInjected {
@@ -13,6 +14,8 @@ export interface ChaosPanelInjected {
   toggleRail: () => void
   openRail: () => void
   setRailTab: (tab: ChaosClientState['railTab']) => void
+  openWorkbench: () => void
+  closeWorkbench: () => void
   setAsTask: (asTask: boolean) => void
   openDesk: (agentId?: string) => void
   closeSurface: () => void
@@ -36,8 +39,6 @@ export interface ChaosPanelInjected {
 
 export type ChaosPanelProps = PropsRuntime<'shell.overlay'> & InjectFace<ChaosPanelInjected>
 export type ChaosDockProps = PropsRuntime<'conversation.input.dock'> & InjectFace<ChaosPanelInjected>
-
-const RAIL_WIDTH_PX = 276
 
 /**
  * Modal dialog keyboard contract: Escape cancels, and Tab/Shift+Tab cycle
@@ -91,11 +92,63 @@ const PanelIcon = (
   </svg>
 )
 
-function pushOfficialCenter(open: boolean): void {
-  if (typeof document === 'undefined') return
-  const root = document.getElementById('root')
-  if (root === null) return
-  root.style.marginRight = open ? `${String(RAIL_WIDTH_PX)}px` : ''
+const RAIL_WIDTH_PX = 276
+
+function RoomWorkbench({
+  title,
+  railOpen,
+  onClose,
+}: {
+  title: string
+  railOpen: boolean
+  onClose: () => void
+}): ReactNode {
+  const leaseRef = useRef<WorkbenchDockLease>()
+  const ownerId = 'dsh-chaos-workbench'
+  const dockWidth = WORKBENCH_DEFAULT_WIDTH + (railOpen ? RAIL_WIDTH_PX : 0)
+
+  useLayoutEffect(() => {
+    const root = document.getElementById('root')
+    if (root === null) return
+    const computed = Number.parseFloat(window.getComputedStyle(root).marginRight)
+    const lease = claimWorkbenchDock(root, ownerId, dockWidth, computed)
+    if (lease === undefined) return
+    leaseRef.current = lease
+    return () => {
+      if (leaseRef.current === lease) leaseRef.current = undefined
+      lease.release()
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    leaseRef.current?.update(dockWidth)
+  }, [dockWidth])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => { window.removeEventListener('keydown', onKeyDown) }
+  }, [onClose])
+
+  return (
+    <aside
+      className={css.workbench}
+      aria-label={title}
+      style={{ right: railOpen ? `${String(RAIL_WIDTH_PX)}px` : '0' }}
+    >
+      <header className={css.workbenchHead}>
+        <strong>{title}</strong>
+        <button type="button" className={css.iconButton} aria-label="关闭房间" onClick={onClose}>
+          {CloseIcon}
+        </button>
+      </header>
+      <div className={css.workbenchBody}>
+        <p className={css.empty}>房间时间线下一刀再铺。</p>
+      </div>
+    </aside>
+  )
 }
 
 /** Centered name-only create dialog. Path and Session stay off-screen. */
@@ -179,15 +232,12 @@ function chaosStateOf(props: ChaosPanelProps | ChaosPanelInjected): ChaosClientS
 }
 
 function useRosterActions(
-  props: Pick<ChaosPanelInjected, 'createChannel' | 'createAgent' | 'addMember'>,
+  props: Pick<ChaosPanelInjected, 'createChannel' | 'createAgent'>,
   state: ChaosClientState,
 ) {
   const [createKind, setCreateKind] = useState<'channel' | 'agent' | null>(null)
   const [createPending, setCreatePending] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [memberId, setMemberId] = useState('')
-  const [pending, setPending] = useState(false)
-  const [failure, setFailure] = useState<string | null>(null)
   const plusRef = useRef<HTMLButtonElement>(null)
   const agentPlusRef = useRef<HTMLButtonElement>(null)
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
@@ -212,56 +262,28 @@ function useRosterActions(
     }
   }
 
-  const submitMember = (event: FormEvent): void => {
-    event.preventDefault()
-    if (selected?.kind !== 'channel' || memberId === '') return
-    setPending(true)
-    setFailure(null)
-    void props.addMember(selected.id, memberId).then(
-      () => { setMemberId('') },
-      error => { setFailure(error instanceof Error ? error.message : String(error)) },
-    ).finally(() => { setPending(false) })
-  }
-
   return {
     createKind,
     setCreateKind,
     createPending,
     createError,
-    memberId,
-    setMemberId,
-    pending,
-    failure,
     plusRef,
     agentPlusRef,
     selected,
     submitCreate,
-    submitMember,
   }
 }
 
 function ChannelList({
   state,
-  selected,
-  pending,
-  failure,
-  memberId,
-  setMemberId,
   plusRef,
   onCreate,
   onSelect,
-  onInvite,
 }: {
   state: ChaosClientState
-  selected: NativeTarget | undefined
-  pending: boolean
-  failure: string | null
-  memberId: string
-  setMemberId: (value: string) => void
   plusRef: { current: HTMLButtonElement | null }
   onCreate: () => void
   onSelect: (targetId: string) => void
-  onInvite: (event: FormEvent) => void
 }): ReactNode {
   const channels = state.targets.filter(target => target.kind === 'channel')
   return (
@@ -279,7 +301,6 @@ function ChannelList({
           ＋
         </button>
       </div>
-      {failure !== null && <div className={css.error} role="alert">{failure}</div>}
       <nav className={css.targets} aria-label="Channels">
         {channels.map(channel => (
           <button
@@ -296,26 +317,6 @@ function ChannelList({
         ))}
         {channels.length === 0 && <p className={css.empty}>用 ＋ 新建一个 Channel。</p>}
       </nav>
-      {selected?.kind === 'channel' && selected.createdBy === state.actor?.id && (
-        <form onSubmit={onInvite} className={css.memberForm}>
-          <select
-            value={memberId}
-            onChange={event => { setMemberId(event.target.value) }}
-            aria-label="邀请成员或 agent"
-          >
-            <option value="">邀请进当前房间…</option>
-            {state.actors
-              .filter(actor =>
-                actor.id !== state.actor?.id
-                && !state.members.some(member => member.id === actor.id),
-              )
-              .map(actor => (
-                <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
-              ))}
-          </select>
-          <button className={css.secondaryButton} disabled={pending || memberId === ''}>加入</button>
-        </form>
-      )}
     </div>
   )
 }
@@ -377,17 +378,11 @@ export function ChannelsPage(props: ChaosPanelProps | ChaosPanelInjected): React
     <>
       <ChannelList
         state={state}
-        selected={roster.selected}
-        pending={roster.pending}
-        failure={roster.failure}
-        memberId={roster.memberId}
-        setMemberId={roster.setMemberId}
         plusRef={roster.plusRef}
         onCreate={() => {
           roster.setCreateKind('channel')
         }}
         onSelect={targetId => { void props.selectTarget(targetId) }}
-        onInvite={roster.submitMember}
       />
       {roster.createKind === 'channel' && (
         <NamedCreateDialog
@@ -595,23 +590,15 @@ export function ChaosPanel(props: ChaosPanelProps) {
     toggleRail,
     setRailTab,
     closeSurface,
+    closeWorkbench,
+    clearTarget,
   } = props
   const state = useChaos(value => value)
   const open = state.surface === 'rail'
+  const selected = state.targets.find(target => target.id === state.selectedTargetId)
+  const workbenchOpen = state.workbench === 'open' && selected !== undefined
 
   useEffect(() => { void ensure() }, [ensure])
-  useEffect(() => {
-    pushOfficialCenter(open)
-    return () => { pushOfficialCenter(false) }
-  }, [open])
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeSurface()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => { window.removeEventListener('keydown', onKeyDown) }
-  }, [open, closeSurface])
 
   const tab = state.threadPanelId !== undefined && state.railTab === 'thread'
     ? 'thread'
@@ -674,6 +661,16 @@ export function ChaosPanel(props: ChaosPanelProps) {
               : <ChannelsPage {...props} />}
         </div>
       </aside>
+      {workbenchOpen && selected !== undefined && (
+        <RoomWorkbench
+          title={`#${selected.name}`}
+          railOpen={open}
+          onClose={() => {
+            closeWorkbench()
+            clearTarget()
+          }}
+        />
+      )}
     </>
   )
 }

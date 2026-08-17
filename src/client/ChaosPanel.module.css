@@ -155,13 +155,21 @@
 .rosterPane .targets { margin-bottom: 16px; }
 .membersHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .membersHead h3 { color: var(--dsw-alias-label-tertiary); font-size: 11px; font-weight: 600; letter-spacing: .06em; }
-.memberForm { display: flex; gap: 6px; margin-top: auto; padding-top: 10px; }
-.memberForm select {
-  flex: 1; min-width: 0; height: 30px; padding: 0 8px;
-  border: 1px solid var(--dsw-alias-border-l2); border-radius: 6px;
-  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary);
-  font: inherit; font-size: 12px;
+
+.workbench {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 35;
+  display: flex; flex-direction: column; width: 640px;
+  background: var(--dsw-alias-bg-base);
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  pointer-events: auto;
 }
+.workbenchHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 40px; padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+.workbenchHead strong { font-size: 14px; font-weight: 600; }
+.workbenchBody { flex: 1; min-height: 0; padding: 16px; overflow: auto; }
 
 .threadPanel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .threadPanelHeader {
@@ -181,5 +189,6 @@
   .toggleCluster *, .toggleCluster *::before, .toggleCluster *::after,
   .panel *, .panel *::before, .panel *::after,
   .heroAnchor *, .heroAnchor *::before, .heroAnchor *::after,
+  .workbench *, .workbench *::before, .workbench *::after,
   .dialogOverlay *, .dialogOverlay *::before, .dialogOverlay *::after { transition: none !important; }
 }

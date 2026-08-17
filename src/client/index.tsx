@@ -92,6 +92,8 @@ export function apply(ctx: ClientContext): void {
     toggleRail: () => { controller.toggleRail() },
     openRail: () => { controller.openRail() },
     setRailTab: tab => { controller.setRailTab(tab) },
+    openWorkbench: () => { controller.openWorkbench() },
+    closeWorkbench: () => { controller.closeWorkbench() },
     setAsTask: asTask => { controller.setAsTask(asTask) },
     openDesk: agentId => { controller.openDesk(agentId) },
     closeSurface: () => { controller.closeSurface() },

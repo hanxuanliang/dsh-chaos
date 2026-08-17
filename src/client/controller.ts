@@ -35,6 +35,7 @@ export interface ChaosClientState {
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
   surface: 'closed' | 'rail'
   railTab: 'channels' | 'agents' | 'thread'
+  workbench: 'closed' | 'open'
   asTask: boolean
   cursor: string
   actor?: NativeActor
@@ -63,6 +64,7 @@ const INITIAL_STATE: ChaosClientState = {
   stream: 'idle',
   surface: 'closed',
   railTab: 'channels',
+  workbench: 'closed',
   asTask: false,
   cursor: '0',
   actors: [],
@@ -135,6 +137,16 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     this.publish({ ...this.state, surface: 'rail' })
   }
 
+  openWorkbench(): void {
+    if (this.state.workbench === 'open') return
+    this.publish({ ...this.state, workbench: 'open' })
+  }
+
+  closeWorkbench(): void {
+    if (this.state.workbench === 'closed') return
+    this.publish({ ...this.state, workbench: 'closed' })
+  }
+
   setAsTask(asTask: boolean): void {
     this.publish({ ...this.state, asTask })
   }
@@ -177,6 +189,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     const next: ChaosClientState = {
       ...this.state,
       railTab: 'channels',
+      workbench: 'open',
       selectedTargetId: targetId,
       messages: [],
       tasks: [],
