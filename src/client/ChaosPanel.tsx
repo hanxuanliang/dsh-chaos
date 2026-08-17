@@ -5,6 +5,7 @@ import type { ChaosClientState, ThreadPreview } from './controller.ts'
 import type { NativeActor, NativeMessage, NativeTask } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import { claimRoomLayout } from './room-layout.ts'
+import { draftKeyOf, swapDraft } from './draft-swap.ts'
 import css from './ChaosPanel.module.css'
 
 export interface ChaosPanelInjected {
@@ -679,10 +680,31 @@ export function ChaosDock({
   setAsTask,
   clearTarget,
   closeThreadPanel,
+  ...rest
 }: ChaosDockProps) {
+  const dock = rest as ChaosDockProps & {
+    input?: { draft: string }
+    useInput?: (select: (state: { draft: string }) => string) => string
+    inputActions?: { setDraft(text: string): void }
+  }
   const state = useChaos(value => value)
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
   const thread = state.targets.find(target => target.id === state.threadPanelId && target.kind === 'thread')
+  const liveDraft = dock.input?.draft ?? (dock.useInput === undefined ? '' : dock.useInput(input => input.draft))
+  const draftsRef = useRef<Record<string, string>>({})
+  const keyRef = useRef(draftKeyOf(state))
+
+  useEffect(() => {
+    const nextKey = draftKeyOf(state)
+    if (nextKey === keyRef.current) {
+      draftsRef.current[nextKey] = liveDraft
+      return
+    }
+    const swapped = swapDraft(draftsRef.current, keyRef.current, nextKey, liveDraft)
+    draftsRef.current = { ...swapped.drafts }
+    keyRef.current = nextKey
+    dock.inputActions?.setDraft(swapped.next)
+  }, [dock.inputActions, liveDraft, state.selectedTargetId, state.threadPanelId])
   const parent = thread === undefined
     ? undefined
     : state.targets.find(target => target.id === thread.parentTargetId)

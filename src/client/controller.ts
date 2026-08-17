@@ -201,8 +201,10 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       messages: [],
       tasks: [],
       members: [],
+      threadPanelMessages: [],
     }
     delete next.selectedAgentId
+    delete next.threadPanelId
     this.publish(next)
     await this.reloadTarget(targetId)
   }

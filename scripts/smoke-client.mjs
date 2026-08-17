@@ -520,6 +520,19 @@ const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${
   assert.deepEqual(applyHashPick('go #acc later', { query: 'acc', start: 3, end: 7 }), { draft: 'go  later', caret: 3 })
 }
 
+{
+  const { draftKeyOf, swapDraft } = await import(`../lib/client/draft-swap.js?smoke=${String(Date.now())}`)
+  assert.equal(draftKeyOf({}), 'session')
+  assert.equal(draftKeyOf({ selectedTargetId: 'c1' }), 'channel:c1')
+  assert.equal(draftKeyOf({ selectedTargetId: 'c1', threadPanelId: 't1' }), 'thread:t1')
+  const first = swapDraft({}, 'session', 'channel:c1', 'hello room')
+  assert.equal(first.drafts.session, 'hello room')
+  assert.equal(first.next, '')
+  const back = swapDraft(first.drafts, 'channel:c1', 'session', 'other room')
+  assert.equal(back.drafts['channel:c1'], 'other room')
+  assert.equal(back.next, 'hello room')
+}
+
 delete globalThis.EventSource
 delete globalThis.window
 
