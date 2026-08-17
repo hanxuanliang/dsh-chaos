@@ -1,0 +1,108 @@
+/* agents settings — recipe §3.5 卡片/行/按钮, tokens only */
+
+.page {
+  display: flex; flex-direction: column; gap: 16px;
+  max-width: 640px; padding: 4px 0 24px;
+  box-sizing: border-box;
+}
+.card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-sizing: border-box;
+}
+.cardTitle {
+  margin: 0;
+  font-size: 13px; font-weight: 600; line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+.form { display: flex; gap: 8px; flex-wrap: wrap; }
+.input {
+  flex: 1 1 180px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit; font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+}
+.input:focus { border-color: var(--dsw-alias-state-business-primary); }
+.select {
+  flex: 0 1 200px; height: 32px; padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit; font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+}
+.select:focus { border-color: var(--dsw-alias-state-business-primary); }
+.primaryButton {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 32px; padding: 0 14px;
+  border: none; border-radius: 8px;
+  background: var(--dsw-alias-state-business-primary);
+  color: #fff;
+  font: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.primaryButton:disabled { opacity: 0.5; cursor: default; }
+.hint { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+.error { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-state-error-primary); }
+
+.list { display: flex; flex-direction: column; gap: 2px; }
+.row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background-color 150ms ease;
+}
+.row:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 13px; font-weight: 600;
+}
+.meta { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.name {
+  font-size: 14px; font-weight: 500; line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.handle { color: var(--dsw-alias-label-tertiary); font-weight: 400; font-size: 12px; }
+.sub {
+  font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ghostButton {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 28px; padding: 0 12px; flex: none;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px; background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 12px;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.ghostButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.ghostButton:disabled { opacity: 0.5; cursor: default; }
+
+.input:focus-visible,
+.select:focus-visible,
+.primaryButton:focus-visible,
+.ghostButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}

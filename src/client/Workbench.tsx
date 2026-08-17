@@ -14,7 +14,10 @@ export interface ChaosInjected {
   openWorkbench: () => void
   closeWorkbench: () => void
   selectTarget: (targetId: string) => Promise<void>
-  createChannel: (name: string) => Promise<void>
+  createChannel: (name: string) => Promise<string>
+  inviteAgent: (targetId: string, channelName: string) => Promise<void>
+  createAgent: (name: string, presetId?: string) => Promise<void>
+  openAgentSession: (agentId: string) => void
   send: (text: string) => Promise<void>
   createThread: (rootMessageId: string) => Promise<void>
   openThreadPanel: (threadTargetId: string) => Promise<void>
@@ -35,7 +38,7 @@ function useChaosStore(observable: HostObservable<ChaosClientState>): ChaosClien
   return useSyncExternalStore(observable.subscribe, observable.getSnapshot)
 }
 
-function useChaos(props: WorkbenchProps): ChaosClientState {
+export function useChaos(props: InjectFace<ChaosInjected>): ChaosClientState {
   // The slot framework projects `hooks: { chaos }` into a `useChaos` hook prop;
   // fall back to direct subscription when rendering outside the framework.
   return 'useChaos' in props
@@ -663,20 +666,34 @@ function ThreadContextPanel(props: WorkbenchProps & { state: ChaosClientState })
   )
 }
 
-function CreateChannelCard(props: WorkbenchProps & { onDone: () => void }): React.JSX.Element {
+function CreateChannelCard(props: WorkbenchProps & { state: ChaosClientState, onDone: () => void }): React.JSX.Element {
+  const { state } = props
   const [name, setName] = useState('')
+  const [invite, setInvite] = useState(true)
   const [pending, setPending] = useState(false)
+  const [created, setCreated] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => { inputRef.current?.focus() }, [])
+  const presetAvailable = state.agentPresets.some(preset => preset.broken === undefined)
 
   const submit = async (): Promise<void> => {
     const trimmed = name.trim()
-    if (trimmed === '' || pending) return
+    if (trimmed === '' || pending || created) return
     setPending(true)
     setError(undefined)
     try {
-      await props.createChannel(trimmed)
+      const targetId = await props.createChannel(trimmed)
+      setCreated(true)
+      if (invite && presetAvailable) {
+        try {
+          await props.inviteAgent(targetId, trimmed)
+        } catch (cause) {
+          setError(`频道已创建，但邀请 Agent 失败：${cause instanceof Error ? cause.message : String(cause)}`)
+          setPending(false)
+          return
+        }
+      }
       props.onDone()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -692,7 +709,7 @@ function CreateChannelCard(props: WorkbenchProps & { onDone: () => void }): Reac
         value={name}
         placeholder="频道名称"
         aria-label="频道名称"
-        disabled={pending}
+        disabled={pending || created}
         onChange={event => {
           setName(event.target.value)
           if (error !== undefined) setError(undefined)
@@ -708,17 +725,36 @@ function CreateChannelCard(props: WorkbenchProps & { onDone: () => void }): Reac
           }
         }}
       />
+      {presetAvailable
+        ? (
+          <label className={css.createCheck}>
+            <input
+              type="checkbox"
+              checked={invite}
+              disabled={pending || created}
+              onChange={event => { setInvite(event.target.checked) }}
+            />
+            同时邀请一个 Agent 进频道
+          </label>
+        )
+        : null}
       {error !== undefined ? <div className={css.createError}>{error}</div> : null}
       <div className={css.createActions}>
-        <button type="button" className={css.ghostButton} disabled={pending} onClick={() => { props.onDone() }}>取消</button>
-        <button
-          type="button"
-          className={css.primaryButton}
-          disabled={pending || name.trim() === ''}
-          onClick={() => { void submit() }}
-        >
-          {pending ? '创建中…' : '创建'}
+        <button type="button" className={css.ghostButton} disabled={pending} onClick={() => { props.onDone() }}>
+          {created ? '关闭' : '取消'}
         </button>
+        {!created
+          ? (
+            <button
+              type="button"
+              className={css.primaryButton}
+              disabled={pending || name.trim() === ''}
+              onClick={() => { void submit() }}
+            >
+              {pending ? '创建中…' : '创建'}
+            </button>
+          )
+          : null}
       </div>
     </div>
   )
@@ -780,6 +816,7 @@ export function Workbench(props: WorkbenchProps): React.JSX.Element | null {
             ? (
               <CreateChannelCard
                 {...props}
+                state={state}
                 onDone={() => {
                   setCreating(false)
                   plusRef.current?.focus()
@@ -808,10 +845,28 @@ export function Workbench(props: WorkbenchProps): React.JSX.Element | null {
         <main className={css.stage}>
           {selected === undefined
             ? (
-              <div className={css.emptyFlow}>
-                <p className={css.emptyTitle}>选择一个频道开始协作</p>
-                <p className={css.emptyHint}>或者点左侧 ＋ 新建一个频道。</p>
-              </div>
+              channels.length === 0
+                ? (
+                  <div className={css.emptyFlow}>
+                    <p className={css.emptyTitle}>从第一个频道开始协作</p>
+                    <p className={css.emptyHint}>
+                      频道是和 Agent 一起干活的空间 · Thread 是消息下的分线讨论 · 工作项是消息转成可追踪的任务
+                    </p>
+                    <button
+                      type="button"
+                      className={css.primaryButton}
+                      onClick={() => { setCreating(true) }}
+                    >
+                      创建第一个 Channel
+                    </button>
+                  </div>
+                )
+                : (
+                  <div className={css.emptyFlow}>
+                    <p className={css.emptyTitle}>选择一个频道开始协作</p>
+                    <p className={css.emptyHint}>或者点左侧 ＋ 新建一个频道。</p>
+                  </div>
+                )
             )
             : (
               <>

@@ -251,10 +251,11 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     return await this.call<AgentWorkspaceFile>('agent.workspace.read', { agentId, path })
   }
 
-  async createChannel(name: string): Promise<void> {
+  async createChannel(name: string): Promise<string> {
     const target = await this.call<NativeTarget>('channel.create', { name })
     await this.reloadProjection()
     await this.selectTarget(target.id)
+    return target.id
   }
 
   async createDirect(peerId: string): Promise<void> {

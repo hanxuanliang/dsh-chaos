@@ -15,9 +15,10 @@ globalThis.window = {
 
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
-// The rebuilt client declares its required services and registers exactly two
-// official seats: a sidebar footer action entry and the shell.overlay workbench.
-assert.deepEqual(clientModule.inject, ['slots', 'connection'])
+// The rebuilt client declares its required services and registers official
+// seats only: sidebar footer entry, shell.overlay workbench + agent floater,
+// and the settings.section Agents management surface.
+assert.deepEqual(clientModule.inject, ['slots', 'connection', 'sessions', 'workspaces'])
 assert.equal(typeof clientModule.apply, 'function')
 
 const injected = []
@@ -47,8 +48,11 @@ const ctx = {
 }
 
 assert.doesNotThrow(() => { clientModule.apply(ctx) })
-assert.deepEqual(injected.sort(), ['shell.overlay', 'sidebar.footer.action'])
-assert.deepEqual(registered.map(entry => entry.id).sort(), ['dsh-chaos-entry', 'dsh-chaos-workbench'])
+assert.deepEqual(injected.sort(), ['settings.section', 'shell.overlay', 'shell.overlay', 'sidebar.footer.action'])
+assert.deepEqual(
+  registered.map(entry => entry.id).sort(),
+  ['dsh-chaos-agent-floater', 'dsh-chaos-agents', 'dsh-chaos-entry', 'dsh-chaos-workbench'],
+)
 assert.equal(effects.length, 1)
 
 console.log('smoke-client: workbench client loads and registers official slots only')

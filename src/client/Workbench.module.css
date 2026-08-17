@@ -136,6 +136,13 @@
 }
 .createInput:focus { border-color: var(--dsw-alias-state-business-primary); }
 .createError { font-size: 12px; line-height: 18px; color: var(--dsw-alias-state-error-primary); }
+.createCheck {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.createCheck input { accent-color: var(--dsw-alias-state-business-primary); margin: 0; }
 .createActions { display: flex; justify-content: flex-end; gap: 8px; }
 .primaryButton {
   display: inline-flex; align-items: center; justify-content: center;
@@ -238,7 +245,8 @@
   flex: 1; gap: 6px; padding: 40px;
 }
 .emptyTitle { margin: 0; font-size: 15px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
-.emptyHint { margin: 0; font-size: 13px; color: var(--dsw-alias-label-tertiary); }
+.emptyHint { margin: 0; font-size: 13px; color: var(--dsw-alias-label-tertiary); max-width: 420px; text-align: center; }
+.emptyFlow .primaryButton { margin-top: 8px; height: 32px; padding: 0 16px; }
 
 /* ---- composer (recipe §3.1 官方实测照抄) ---- */
 .composerZone { flex: none; padding: 8px 20px 4px; box-sizing: border-box; }
