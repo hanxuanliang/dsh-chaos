@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import CollabService from '../lib/index.js'
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-remote-'))
+process.env.DSH_HOME = root
 const ctx = new Context()
 let rpcRegistration
 let sseRoute
@@ -19,8 +20,26 @@ const runtimeAgent = {
 const dependencies = [
   ctx.provide('agentLoop', {}),
   ctx.provide('agents', {
-    create: async () => ({ agent: runtimeAgent, dispose: async () => {} }),
+    create: async (options) => {
+      runtimeAgent.id = String(options.sessionId)
+      await options.setup({
+        on: () => {},
+        tools: { register: () => {} },
+      })
+      return { agent: runtimeAgent, dispose: async () => {} }
+    },
     resume: async () => { throw new Error('unused') },
+  }),
+  ctx.provide('agentPresets', {
+    defaultId: 'standard',
+    async list() {
+      return [
+        { id: 'standard', trust: 'system', name: 'Standard' },
+        { id: 'minimal', trust: 'system', name: 'Minimal', description: 'Small tool set' },
+      ]
+    },
+    async resolve(id) { return { id: id ?? 'standard' } },
+    async mount(_agentCtx, id) { return { id } },
   }),
   ctx.provide('tools', {}),
   ctx.provide('llm', {}),
@@ -104,6 +123,66 @@ try {
   const firstSnapshot = await call('snapshot', {})
   assert.equal(firstSnapshot.ok, true)
   assert.equal(firstSnapshot.value.actor.handle, 'browser-owner')
+
+  const presets = await call('agent.presets', {})
+  assert.equal(presets.ok, true)
+  assert.equal(presets.value[0].isDefault, true)
+  const createdAgent = await call('agent.create', { name: 'Workspace Agent', presetId: 'minimal' })
+  assert.equal(createdAgent.ok, true)
+  assert.equal(createdAgent.value.binding.preset, 'minimal')
+  const profile = await call('agent.profile', { agentId: createdAgent.value.actor.id })
+  assert.equal(profile.ok, true)
+  assert.equal(profile.value.binding.sessionId, createdAgent.value.binding.sessionId)
+  assert.equal(profile.value.workspacePath, join(root, 'agents', createdAgent.value.actor.id))
+  await writeFile(join(profile.value.workspacePath, 'hello.txt'), 'hello workspace')
+  await writeFile(join(profile.value.workspacePath, 'binary.bin'), Buffer.from([0, 1, 2]))
+  await writeFile(join(profile.value.workspacePath, 'large.txt'), 'x'.repeat(512 * 1024 + 1))
+  await mkdir(join(profile.value.workspacePath, '.hidden'))
+  await symlink('/etc/passwd', join(profile.value.workspacePath, 'escape'))
+  const workspace = await call('agent.workspace.list', {
+    agentId: createdAgent.value.actor.id,
+    dirPath: '',
+    includeHidden: false,
+  })
+  assert.equal(workspace.ok, true)
+  assert.deepEqual(workspace.value.map(entry => entry.name), ['binary.bin', 'hello.txt', 'large.txt', 'escape'])
+  assert.equal(workspace.value[3].kind, 'symlink')
+  const hiddenWorkspace = await call('agent.workspace.list', {
+    agentId: createdAgent.value.actor.id,
+    dirPath: '',
+    includeHidden: true,
+  })
+  assert.equal(hiddenWorkspace.value[0].name, '.hidden')
+  const preview = await call('agent.workspace.read', {
+    agentId: createdAgent.value.actor.id,
+    path: 'hello.txt',
+  })
+  assert.equal(preview.ok, true)
+  assert.equal(preview.value.content, 'hello workspace')
+  const binaryPreview = await call('agent.workspace.read', {
+    agentId: createdAgent.value.actor.id,
+    path: 'binary.bin',
+  })
+  assert.equal(binaryPreview.value.binary, true)
+  assert.equal(binaryPreview.value.content, undefined)
+  const largePreview = await call('agent.workspace.read', {
+    agentId: createdAgent.value.actor.id,
+    path: 'large.txt',
+  })
+  assert.equal(largePreview.value.truncated, true)
+  assert.equal(largePreview.value.content.length, 512 * 1024)
+  const escapedPreview = await call('agent.workspace.read', {
+    agentId: createdAgent.value.actor.id,
+    path: '../outside.txt',
+  })
+  assert.equal(escapedPreview.ok, false)
+  assert.equal(escapedPreview.error.code, 'invalid_argument')
+  const symlinkPreview = await call('agent.workspace.read', {
+    agentId: createdAgent.value.actor.id,
+    path: 'escape',
+  })
+  assert.equal(symlinkPreview.ok, false)
+  assert.equal(symlinkPreview.error.code, 'invalid_argument')
 
   const created = await call('channel.create', {
     name: 'remote-channel',

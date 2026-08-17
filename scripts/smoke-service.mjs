@@ -6,6 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import CollabService from '../lib/index.js'
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-service-'))
+process.env.DSH_HOME = root
 const ctx = new Context()
 const scopedTools = new Map()
 const runtimeAgent = {
@@ -19,13 +20,19 @@ const dependencies = [
   ctx.provide('agents', {
     create: async (options) => {
       runtimeAgent.id = String(options.sessionId)
-      options.setup({
+      await options.setup({
         on: () => {},
         tools: { register: definition => { scopedTools.set(definition.name, definition) } },
       })
       return { agent: runtimeAgent, dispose: async () => {} }
     },
     resume: async () => { throw new Error('unused') },
+  }),
+  ctx.provide('agentPresets', {
+    defaultId: 'standard',
+    async list() { return [{ id: 'standard', trust: 'system', name: 'Standard' }] },
+    async resolve(id) { return { id: id === undefined || id === 'default' ? 'standard' : id } },
+    async mount(_agentCtx, id) { return { id } },
   }),
   ctx.provide('tools', {}),
   ctx.provide('llm', {}),
@@ -45,6 +52,7 @@ try {
     preset: 'default',
     sessionId: 'service-session',
   })
+  assert.equal(binding.preset, 'standard')
   const sent = await ctx.collab.sendMessage({
     targetId: channel.id,
     authorId: owner.id,

@@ -28,6 +28,14 @@ class FakeCollab {
   }
 
   async runtimeBinding(agentId) { return this.bindings.get(agentId) }
+  async updateRuntimePreset(agentId, generation, sessionId, preset) {
+    const binding = this.bindings.get(agentId)
+    assert.equal(binding.generation, generation)
+    assert.equal(binding.sessionId, sessionId)
+    const updated = { ...binding, preset }
+    this.bindings.set(agentId, updated)
+    return updated
+  }
   async runtimeBindingForSession(sessionId) {
     return [...this.bindings.values()].find(binding => binding.sessionId === sessionId)
   }
@@ -162,17 +170,21 @@ class FakeCollab {
 const tools = new Map()
 const notices = []
 const steers = []
+const sessionEvents = []
 let disposed = 0
+let createdOptions
 const collab = new FakeCollab()
 const fakeAgent = {
   id: 'session-1',
   status: 'idle',
   followup: message => notices.push(message),
   steer: message => steers.push(message),
+  session: { append: (type, data) => { sessionEvents.push({ type, data }) } },
 }
 const registry = {
   async create(options) {
-    options.setup({
+    createdOptions = options
+    await options.setup({
       on: () => {},
       tools: { register: definition => { tools.set(definition.name, definition) } },
     })
@@ -180,11 +192,29 @@ const registry = {
     fakeAgent.id = String(options.sessionId)
     return { agent: fakeAgent, dispose: async () => { disposed += 1 } }
   },
-  async resume() { throw new Error('unused') },
+  async resume(options) {
+    await options.setup({
+      on: () => {},
+      tools: { register: definition => { tools.set(definition.name, definition) } },
+    })
+    fakeAgent.id = String(options.resumeSessionId)
+    return { agent: fakeAgent, dispose: async () => { disposed += 1 } }
+  },
+}
+const mountedPresets = []
+const presets = {
+  async resolve(id) {
+    if (id === 'default') throw new Error('unknown legacy sentinel')
+    return { id: id ?? 'standard' }
+  },
+  async mount(_ctx, id) {
+    mountedPresets.push(id)
+    return { id }
+  },
 }
 const warningErrors = []
 const warnings = { warn: (message, error) => warningErrors.push({ message, error }) }
-const runtimes = new RuntimeManager(registry, collab, warnings)
+const runtimes = new RuntimeManager(registry, presets, collab, warnings)
 const binding = await runtimes.create({
   agentId: 'agent-1',
   workspacePath: '/tmp/dsh-chaos-agent-1',
@@ -193,6 +223,9 @@ const binding = await runtimes.create({
   preset: 'default',
   sessionId: 'session-1',
 })
+assert.equal(createdOptions.meta.agentPreset, 'standard')
+assert.equal(binding.preset, 'standard')
+assert.deepEqual(mountedPresets, ['standard'])
 assert.equal(runtimes.resolve(binding), fakeAgent)
 assert.deepEqual([...tools.keys()].sort(), [
   'message_check',
@@ -289,7 +322,15 @@ const reset = await runtimes.reset({
 assert.equal(reset.generation, '2')
 assert.equal(runtimes.resolve(binding), undefined)
 assert.equal(disposed, 1)
-await runtimes.close()
+await runtimes.stop('agent-1')
 assert.equal(disposed, 2)
+collab.bindings.set('agent-1', { ...reset, preset: 'default' })
+const resumed = await runtimes.resume('agent-1')
+assert.equal(resumed.preset, 'standard')
+assert.equal(runtimes.resolve(resumed), fakeAgent)
+assert.deepEqual(mountedPresets, ['standard', 'standard', 'standard'])
+assert.deepEqual(sessionEvents, [{ type: 'agent-preset/selected', data: { agentPreset: 'standard' } }])
+await runtimes.close()
+assert.equal(disposed, 3)
 assert.deepEqual(warningErrors, [])
 console.log('runtime/delivery/tools smoke ok')

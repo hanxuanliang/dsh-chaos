@@ -356,23 +356,111 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.settingsPage { display: flex; flex-direction: column; gap: 12px; padding: 8px 4px 16px; }
-.settingsLead { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; }
-.settingsCreate { display: flex; gap: 8px; }
-.settingsCreate input {
-  flex: 1; min-height: 32px; padding: 0 10px;
+.settingsPage {
+  display: flex; flex-direction: column; gap: 16px; min-height: min(620px, calc(100vh - 152px));
+  padding: 8px 4px 16px; color: var(--dsw-alias-label-primary);
+}
+:global(html[data-chaos-agent-settings="open"] [data-composer-seat]) {
+  visibility: hidden !important; pointer-events: none !important;
+}
+.agentSettingsIntro {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px;
+  border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px;
+  background: var(--dsw-alias-bg-base);
+}
+.agentSettingsIntro > div:first-child { display: flex; align-items: baseline; gap: 10px; }
+.agentSettingsIntro > div:first-child strong { font-size: 16px; font-weight: 650; }
+.agentSettingsIntro > div:first-child p,
+.agentPresetDescription { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; }
+.settingsCreate { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.25fr) auto; align-items: end; gap: 10px; }
+.settingsCreate label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.settingsCreate label > span { color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 600; }
+.settingsCreate input, .settingsCreate select {
+  width: 100%; min-height: 34px; padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px;
   background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font: inherit;
 }
-.settingsList { display: flex; flex-direction: column; gap: 6px; }
+.agentSettingsBody {
+  display: grid; grid-template-columns: 190px minmax(0, 1fr); flex: 1; min-height: 0;
+  overflow: hidden; border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px;
+  background: var(--dsw-alias-bg-base);
+}
+.settingsList {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px;
+  overflow-y: auto; border-right: 1px solid var(--dsw-alias-border-l1);
+}
 .settingsRow {
-  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left; cursor: pointer;
-  border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px;
-  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font: inherit;
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 9px 10px; text-align: left; cursor: pointer;
+  border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--dsw-alias-label-primary); font: inherit;
 }
 .settingsRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.settingsRow[data-selected] { border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-hover); }
 .settingsRow strong { font-size: 13px; font-weight: 600; }
-.settingsRow span { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.settingsRow span { overflow: hidden; color: var(--dsw-alias-label-tertiary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.agentSettingsDetail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.agentTabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.agentTabs button {
+  padding: 8px 10px 9px; border: none; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.agentTabs button[aria-selected="true"] { border-bottom-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary); }
+.agentProfileView { display: flex; flex-direction: column; gap: 14px; padding: 18px; overflow-y: auto; }
+.agentProfileHero { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.agentProfileHero > div { display: flex; flex-direction: column; min-width: 0; }
+.agentProfileHero strong { overflow: hidden; font-size: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.agentProfileHero span { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.agentProfileGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.agentProfileField {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l1); border-radius: 9px; background: var(--dsw-alias-bg-layer-1);
+}
+.agentProfileField:nth-child(4), .agentProfileField:nth-child(5) { grid-column: 1 / -1; }
+.agentProfileField > span { color: var(--dsw-alias-label-tertiary); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.agentProfileField > strong { overflow: hidden; font-size: 12px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.agentProfileField > strong[data-mono] { font-family: var(--dsw-font-mono); font-weight: 450; }
+.workspaceView { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.workspaceToolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 7px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1); color: var(--dsw-alias-label-tertiary); font-size: 11px;
+}
+.workspaceToolbar label { display: inline-flex; align-items: center; gap: 6px; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.workspaceSplit { display: grid; grid-template-columns: minmax(190px, 35%) minmax(0, 1fr); flex: 1; min-height: 0; }
+.workspaceTree { min-width: 0; overflow: auto; padding: 6px; border-right: 1px solid var(--dsw-alias-border-l1); }
+.workspaceEntry {
+  display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 5px;
+  width: 100%; min-height: 30px; padding-block: 4px; padding-inline-end: 8px;
+  border: none; border-radius: 7px; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; text-align: left; cursor: pointer;
+}
+.workspaceEntry:hover, .workspaceEntry[data-selected] { background: var(--dsw-alias-interactive-bg-hover); }
+.workspaceEntry:disabled { color: var(--dsw-alias-label-dimmed); cursor: not-allowed; }
+.workspaceEntry strong { overflow: hidden; font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.workspaceEntry small { color: var(--dsw-alias-label-tertiary); font-size: 10px; }
+.workspaceLoading { margin: 3px 0 3px 24px; color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.workspacePreview { min-width: 0; min-height: 0; overflow: auto; padding: 12px; }
+.workspacePreview header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.workspacePreview header strong { overflow: hidden; font-family: var(--dsw-font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.workspacePreview header span { flex: none; color: var(--dsw-alias-label-tertiary); font-size: 10px; }
+.workspacePreview pre {
+  margin: 0; min-width: 0; font-family: var(--dsw-font-mono); font-size: 11px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+}
+.workspaceNotice { margin: 0 0 8px; color: var(--dsw-alias-label-secondary); font-size: 11px; }
+
+@media (max-width: 700px) {
+  .settingsPage { min-height: calc(100vh - 124px); }
+  .settingsCreate { grid-template-columns: 1fr; }
+  .agentSettingsBody { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .settingsList {
+    flex-direction: row; max-height: 68px; overflow-x: auto; overflow-y: hidden;
+    border-right: none; border-bottom: 1px solid var(--dsw-alias-border-l1);
+  }
+  .settingsRow { flex: 0 0 150px; }
+  .agentProfileGrid { grid-template-columns: 1fr; }
+  .agentProfileField:nth-child(4), .agentProfileField:nth-child(5) { grid-column: auto; }
+  .workspaceSplit { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 38%) minmax(0, 1fr); }
+  .workspaceTree { border-right: none; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+}
 .threadPanel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .threadPanelHeader {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;

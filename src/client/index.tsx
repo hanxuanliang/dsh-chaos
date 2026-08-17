@@ -89,13 +89,17 @@ export function apply(ctx: ClientContext): void {
     if (binding !== undefined) openOfficialSession(binding.sessionId)
   }
 
-  const createAgent = async (name: string): Promise<void> => {
-    const created = await controller.createAgent(name)
+  const createAgent = async (name: string, presetId?: string, openSession = true) => {
+    const selectedPreset = presetId
+      ?? controller.getSnapshot().agentPresets.find(preset => preset.isDefault && preset.broken === undefined)?.id
+      ?? controller.getSnapshot().agentPresets.find(preset => preset.broken === undefined)?.id
+    if (selectedPreset === undefined) throw new Error('当前 DSH 没有可用的 Agent Preset')
+    const created = await controller.createAgent(name, selectedPreset)
     if (created.workspacePath !== '') {
       await registerHome(created.workspacePath, created.actor.displayName)
     }
-    if (created.binding !== undefined) openOfficialSession(created.binding.sessionId)
-    else controller.openDesk(created.actor.id)
+    if (openSession) openOfficialSession(created.binding.sessionId)
+    return created
   }
 
   const injectFace = (): ChaosPanelInjected => ({
@@ -115,6 +119,10 @@ export function apply(ctx: ClientContext): void {
     selectTarget: targetId => controller.selectTarget(targetId),
     createChannel: name => controller.createChannel(name),
     createAgent,
+    readAgentProfile: agentId => controller.readAgentProfile(agentId),
+    listAgentWorkspace: (agentId, dirPath, includeHidden) =>
+      controller.listAgentWorkspace(agentId, dirPath, includeHidden),
+    readAgentWorkspaceFile: (agentId, path) => controller.readAgentWorkspaceFile(agentId, path),
     openAgent,
     createDirect: peerId => controller.createDirect(peerId),
     addMember: (targetId, memberId) => controller.addMember(targetId, memberId),

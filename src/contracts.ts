@@ -17,6 +17,12 @@ export interface CollabRuntimeApi {
     preset: string,
   ): Promise<NativeRuntimeBinding>
   runtimeBinding(agentId: string): Promise<NativeRuntimeBinding | undefined>
+  updateRuntimePreset(
+    agentId: string,
+    generation: string,
+    sessionId: string,
+    preset: string,
+  ): Promise<NativeRuntimeBinding>
   runtimeBindingForSession(sessionId: string): Promise<NativeRuntimeBinding | undefined>
   listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
   listPendingWakes(limit: number): Promise<NativePendingWake[]>

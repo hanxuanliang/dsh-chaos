@@ -1,6 +1,12 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
+  AgentPresetSummary,
+  AgentProfile,
+  AgentWorkspaceEntry,
+  AgentWorkspaceFile,
+} from '../agent-settings-types.ts'
+import type {
   NativeActor,
   NativeCollabSnapshot,
   NativeMessage,
@@ -42,6 +48,7 @@ export interface ChaosClientState {
   actor?: NativeActor
   actors: readonly NativeActor[]
   bindings: readonly NativeRuntimeBinding[]
+  agentPresets: readonly AgentPresetSummary[]
   hostSessionId?: string
   selectedAgentId?: string
   targets: readonly NativeTarget[]
@@ -71,6 +78,7 @@ const INITIAL_STATE: ChaosClientState = {
   cursor: '0',
   actors: [],
   bindings: [],
+  agentPresets: [],
   targets: [],
   followedThreadIds: [],
   allTasks: [],
@@ -209,18 +217,38 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     await this.reloadTarget(targetId)
   }
 
-  async createAgent(name: string): Promise<{
+  async createAgent(name: string, presetId: string): Promise<{
     actor: NativeActor
-    binding?: NativeRuntimeBinding
+    binding: NativeRuntimeBinding
     workspacePath: string
   }> {
     const created = await this.call<{
       actor: NativeActor
-      binding?: NativeRuntimeBinding
+      binding: NativeRuntimeBinding
       workspacePath: string
-    }>('agent.create', { name })
+    }>('agent.create', { name, presetId })
     await this.reloadProjection()
     return created
+  }
+
+  async readAgentProfile(agentId: string): Promise<AgentProfile> {
+    return await this.call<AgentProfile>('agent.profile', { agentId })
+  }
+
+  async listAgentWorkspace(
+    agentId: string,
+    dirPath = '',
+    includeHidden = false,
+  ): Promise<AgentWorkspaceEntry[]> {
+    return await this.call<AgentWorkspaceEntry[]>('agent.workspace.list', {
+      agentId,
+      dirPath,
+      includeHidden,
+    })
+  }
+
+  async readAgentWorkspaceFile(agentId: string, path: string): Promise<AgentWorkspaceFile> {
+    return await this.call<AgentWorkspaceFile>('agent.workspace.read', { agentId, path })
   }
 
   async createChannel(name: string): Promise<void> {
@@ -402,10 +430,11 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   private async loadProjectionOnce(): Promise<NativeCollabSnapshot> {
-    const [snapshot, actors, bindings] = await Promise.all([
+    const [snapshot, actors, bindings, agentPresets] = await Promise.all([
       this.call<NativeCollabSnapshot>('snapshot', {}),
       this.call<NativeActor[]>('actors', {}),
       this.call<NativeRuntimeBinding[]>('runtime.bindings', {}).catch(() => [] as NativeRuntimeBinding[]),
+      this.call<AgentPresetSummary[]>('agent.presets', {}),
     ])
     if (this.disposed) throw new Error('dsh-chaos Client 已停止')
     const selectedTargetId = this.state.selectedTargetId !== undefined
@@ -424,6 +453,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       actor: snapshot.actor,
       actors,
       bindings,
+      agentPresets,
       targets: snapshot.targets,
       followedThreadIds: snapshot.followedThreadIds,
       allTasks: snapshot.tasks,

@@ -801,6 +801,68 @@ impl CollabCore {
         find_runtime_binding(&connection, "agent_id", agent_id).await
     }
 
+    /// Replace only the preset label of one exact runtime generation.
+    ///
+    /// Used to migrate the former chaos `default` sentinel after the official
+    /// DSH roster resolves it. Session identity, generation, and wake fencing
+    /// stay unchanged.
+    pub async fn update_runtime_preset(
+        &self,
+        agent_id: &str,
+        generation: i64,
+        session_id: &str,
+        preset: &str,
+    ) -> Result<RuntimeBinding> {
+        self.assert_open()?;
+        require_non_empty("agent_id", agent_id)?;
+        require_non_empty("session_id", session_id)?;
+        require_non_empty("preset", preset)?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let mut rows = transaction
+            .query(
+                "SELECT agent_id, session_id, generation, provider, model, preset, bound_at_ms
+                 FROM runtime_bindings WHERE agent_id = ?1",
+                [agent_id],
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(CollabError::NotFound {
+                entity: "runtime binding",
+                id: agent_id.to_owned(),
+            });
+        };
+        let current = RuntimeBinding {
+            agent_id: row.get(0)?,
+            session_id: row.get(1)?,
+            generation: row.get(2)?,
+            provider: row.get(3)?,
+            model: row.get(4)?,
+            preset: row.get(5)?,
+            bound_at_ms: row.get(6)?,
+        };
+        drop(rows);
+        if current.generation != generation || current.session_id != session_id {
+            return Err(CollabError::RuntimeGenerationMismatch {
+                agent_id: agent_id.to_owned(),
+            });
+        }
+        transaction
+            .execute(
+                "UPDATE runtime_bindings SET preset = ?1
+                 WHERE agent_id = ?2 AND generation = ?3 AND session_id = ?4",
+                (preset, agent_id, generation, session_id),
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(RuntimeBinding {
+            preset: preset.to_owned(),
+            ..current
+        })
+    }
+
     /// Resolve the stable Agent identity that owns one live DSH Session id.
     pub async fn runtime_binding_for_session(
         &self,
@@ -3129,6 +3191,41 @@ mod tests {
                 .is_err()
         );
         assert_eq!(core.list_runtime_bindings().await?.len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn runtime_preset_migration_preserves_session_generation() -> Result<()> {
+        let (core, _user, alpha, _beta, _channel) = fixture().await?;
+        let binding = core
+            .bind_runtime(&alpha.id, "session-legacy", "default", "default", "default")
+            .await?;
+        let migrated = core
+            .update_runtime_preset(
+                &alpha.id,
+                binding.generation,
+                &binding.session_id,
+                "standard",
+            )
+            .await?;
+        assert_eq!(migrated.session_id, binding.session_id);
+        assert_eq!(migrated.generation, binding.generation);
+        assert_eq!(migrated.bound_at_ms, binding.bound_at_ms);
+        assert_eq!(migrated.preset, "standard");
+        assert_eq!(core.runtime_binding(&alpha.id).await?, Some(migrated));
+
+        let stale = core
+            .update_runtime_preset(
+                &alpha.id,
+                binding.generation + 1,
+                "session-legacy",
+                "minimal",
+            )
+            .await;
+        assert!(matches!(
+            stale,
+            Err(CollabError::RuntimeGenerationMismatch { .. })
+        ));
         Ok(())
     }
 

@@ -8,8 +8,16 @@ import { homedir, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-agent-presets'
 import z from '@deepseek-ai/schemastery'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { listAgentWorkspace, readAgentWorkspaceFile } from './agent-workspace.ts'
+import type {
+  AgentPresetSummary,
+  AgentProfile,
+  AgentWorkspaceEntry,
+  AgentWorkspaceFile,
+} from './agent-settings-types.ts'
 import { DeliveryBridge } from './delivery.ts'
 import { installCollabRemote } from './remote.ts'
 import { RuntimeManager, type CreateRuntimeInput } from './runtime.ts'
@@ -19,6 +27,12 @@ export { DeliveryBridge } from './delivery.ts'
 export { RuntimeManager } from './runtime.ts'
 export type { CreateRuntimeInput } from './runtime.ts'
 export { installCollabTools } from './tools.ts'
+export type {
+  AgentPresetSummary,
+  AgentProfile,
+  AgentWorkspaceEntry,
+  AgentWorkspaceFile,
+} from './agent-settings-types.ts'
 export {
   COLLAB_EVENTS_PATH,
   COLLAB_RPC_CHANNEL,
@@ -103,7 +117,7 @@ declare module '@deepseek-ai/cordis' {
 /** Host-side stable collab service. DSH runtime wiring consumes this service;
  * only this class may call the native handle. */
 export class CollabService extends Service {
-  static inject = ['agentLoop', 'agents', 'tools', 'llm']
+  static inject = ['agentLoop', 'agentPresets', 'agents', 'tools', 'llm']
   static Config: z<Config> = Config
 
   private handle: NativeCollabHandle | undefined
@@ -168,7 +182,7 @@ export class CollabService extends Service {
     }
     retentionTimer = setInterval(pruneExpiredChanges, CHANGE_PRUNE_INTERVAL_MS)
     retentionTimer.unref()
-    const runtimes = new RuntimeManager(this.ctx.agents, this, warnings)
+    const runtimes = new RuntimeManager(this.ctx.agents, this.ctx.agentPresets, this, warnings)
     this.runtimes = runtimes
 
     if (this.config.remoteEnabled ?? true) {
@@ -222,9 +236,11 @@ export class CollabService extends Service {
   }
 
   /** Human types a name; home dir, Session, and binding stay off-screen. */
-  async createNamedAgent(name: string) {
+  async createNamedAgent(name: string, presetId = this.ctx.agentPresets.defaultId) {
     const displayName = name.trim()
     if (displayName === '') throw new Error('[invalid_argument] name must not be blank')
+    const preset = await this.ctx.agentPresets.resolve(presetId)
+    if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
     const base = slugifyHandle(displayName)
     const template = join(dshHome(), 'agents', '{id}')
     let actor
@@ -237,23 +253,23 @@ export class CollabService extends Service {
     }
     const workspacePath = join(dshHome(), 'agents', actor.id)
     await mkdir(workspacePath, { recursive: true })
-    let binding: NativeRuntimeBinding | undefined
+    let binding: NativeRuntimeBinding
     try {
       binding = await this.createRuntime({
         agentId: actor.id,
         workspacePath,
         provider: 'default',
         model: 'default',
-        preset: 'default',
+        preset: preset.id,
       })
     } catch (error) {
       this.ctx.logger.warn(`dsh-chaos: created Agent ${actor.id} without a Session`)
       this.ctx.logger.warn(error)
+      this.publishChange()
+      throw error
     }
     this.publishChange()
-    return binding === undefined
-      ? { actor, workspacePath }
-      : { actor, binding, workspacePath }
+    return { actor, binding, workspacePath }
   }
 
   async createChannel(name: string, creatorId: string) {
@@ -310,12 +326,53 @@ export class CollabService extends Service {
     return this.requireHandle().runtimeBinding(agentId)
   }
 
+  updateRuntimePreset(agentId: string, generation: string, sessionId: string, preset: string) {
+    return this.requireHandle().updateRuntimePreset(agentId, generation, sessionId, preset)
+  }
+
   runtimeBindingForSession(sessionId: string) {
     return this.requireHandle().runtimeBindingForSession(sessionId)
   }
 
   listRuntimeBindings() {
     return this.requireHandle().listRuntimeBindings()
+  }
+
+  async listAgentPresets(): Promise<AgentPresetSummary[]> {
+    const defaultId = this.ctx.agentPresets.defaultId
+    return (await this.ctx.agentPresets.list()).map(preset => ({
+      id: preset.id,
+      trust: preset.trust,
+      isDefault: preset.id === defaultId,
+      ...preset.name === undefined ? {} : { name: preset.name },
+      ...preset.description === undefined ? {} : { description: preset.description },
+      ...preset.broken === undefined ? {} : { broken: preset.broken },
+    }))
+  }
+
+  async agentProfile(viewerId: string, agentId: string): Promise<AgentProfile> {
+    const actor = await this.requireVisibleAgent(viewerId, agentId)
+    const binding = await this.requireHandle().runtimeBinding(agentId)
+    return {
+      actor,
+      workspacePath: join(dshHome(), 'agents', actor.id),
+      ...binding === undefined ? {} : { binding },
+    }
+  }
+
+  async agentWorkspace(
+    viewerId: string,
+    agentId: string,
+    dirPath: string,
+    includeHidden: boolean,
+  ): Promise<AgentWorkspaceEntry[]> {
+    const profile = await this.agentProfile(viewerId, agentId)
+    return await listAgentWorkspace(profile.workspacePath, dirPath, includeHidden)
+  }
+
+  async agentWorkspaceFile(viewerId: string, agentId: string, path: string): Promise<AgentWorkspaceFile> {
+    const profile = await this.agentProfile(viewerId, agentId)
+    return await readAgentWorkspaceFile(profile.workspacePath, path)
   }
 
   listPendingWakes(limit = 1000) {
@@ -437,6 +494,13 @@ export class CollabService extends Service {
   private requireRuntimes(): RuntimeManager {
     if (this.runtimes === undefined) throw new Error('dsh-chaos RuntimeManager is not active')
     return this.runtimes
+  }
+
+  private async requireVisibleAgent(viewerId: string, agentId: string) {
+    const actor = (await this.requireHandle().listActors(viewerId))
+      .find(candidate => candidate.id === agentId && candidate.kind === 'agent')
+    if (actor === undefined) throw new Error(`[not_found] Agent ${agentId} is not visible`)
+    return actor
   }
 
   private publishChange(): void {

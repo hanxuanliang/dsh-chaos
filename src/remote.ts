@@ -3,6 +3,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {
+  AgentPresetSummary,
+  AgentProfile,
+  AgentWorkspaceEntry,
+  AgentWorkspaceFile,
+} from './agent-settings-types.ts'
+import type {
   NativeActor,
   NativeChangeEvent,
   NativeCollabSnapshot,
@@ -25,9 +31,18 @@ export interface CollabRemoteApi {
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
-  createNamedAgent(name: string): Promise<{
+  listAgentPresets(): Promise<AgentPresetSummary[]>
+  agentProfile(viewerId: string, agentId: string): Promise<AgentProfile>
+  agentWorkspace(
+    viewerId: string,
+    agentId: string,
+    dirPath: string,
+    includeHidden: boolean,
+  ): Promise<AgentWorkspaceEntry[]>
+  agentWorkspaceFile(viewerId: string, agentId: string, path: string): Promise<AgentWorkspaceFile>
+  createNamedAgent(name: string, presetId: string): Promise<{
     actor: NativeActor
-    binding?: NativeRuntimeBinding
+    binding: NativeRuntimeBinding
     workspacePath: string
   }>
   listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
@@ -111,6 +126,18 @@ function optionalString(payload: Record<string, unknown>, name: string): string 
   return value
 }
 
+function pathString(payload: Record<string, unknown>, name: string): string {
+  const value = payload[name] ?? ''
+  if (typeof value !== 'string') throw new Error(`[invalid_argument] ${name} must be a string`)
+  return value
+}
+
+function booleanValue(payload: Record<string, unknown>, name: string, fallback: boolean): boolean {
+  const value = payload[name] ?? fallback
+  if (typeof value !== 'boolean') throw new Error(`[invalid_argument] ${name} must be a boolean`)
+  return value
+}
+
 function decimalString(payload: Record<string, unknown>, name: string, fallback?: string): string {
   const value = payload[name] ?? fallback
   if (typeof value !== 'string' || !DECIMAL.test(value)) {
@@ -175,8 +202,28 @@ async function dispatchRemote(
       )
     case 'tasks':
       return await api.listTasks(actorId, optionalString(input, 'targetId'))
+    case 'agent.presets':
+      return await api.listAgentPresets()
+    case 'agent.profile':
+      return await api.agentProfile(actorId, requiredString(input, 'agentId'))
+    case 'agent.workspace.list':
+      return await api.agentWorkspace(
+        actorId,
+        requiredString(input, 'agentId'),
+        pathString(input, 'dirPath'),
+        booleanValue(input, 'includeHidden', false),
+      )
+    case 'agent.workspace.read':
+      return await api.agentWorkspaceFile(
+        actorId,
+        requiredString(input, 'agentId'),
+        requiredString(input, 'path'),
+      )
     case 'agent.create':
-      return await api.createNamedAgent(requiredString(input, 'name'))
+      return await api.createNamedAgent(
+        requiredString(input, 'name'),
+        requiredString(input, 'presetId'),
+      )
     case 'runtime.bindings':
       return await api.listRuntimeBindings()
     case 'channel.create':

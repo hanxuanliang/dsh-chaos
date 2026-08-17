@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { AgentProfile, AgentWorkspaceEntry, AgentWorkspaceFile } from '../agent-settings-types.ts'
 import type { ChaosClientState, ThreadPreview } from './controller.ts'
 import type { NativeActor, NativeMessage, NativeTask } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
@@ -24,7 +25,14 @@ export interface ChaosPanelInjected {
   clearTarget: () => void
   selectTarget: (targetId: string) => Promise<void>
   createChannel: (name: string) => Promise<void>
-  createAgent: (name: string) => Promise<void>
+  createAgent: (name: string, presetId?: string, openSession?: boolean) => Promise<AgentProfile>
+  readAgentProfile: (agentId: string) => Promise<AgentProfile>
+  listAgentWorkspace: (
+    agentId: string,
+    dirPath?: string,
+    includeHidden?: boolean,
+  ) => Promise<AgentWorkspaceEntry[]>
+  readAgentWorkspaceFile: (agentId: string, path: string) => Promise<AgentWorkspaceFile>
   openAgent: (agentId: string) => void
   createDirect: (peerId: string) => Promise<void>
   addMember: (targetId: string, memberId: string) => Promise<void>

@@ -68,6 +68,13 @@ const actor = {
   displayName: 'Browser',
   createdAtMs: 1,
 }
+const preset = {
+  id: 'standard',
+  trust: 'system',
+  isDefault: true,
+  name: 'Standard',
+  description: 'Full coding Agent',
+}
 const target = {
   id: 'target-1',
   kind: 'channel',
@@ -96,6 +103,7 @@ const rpc = {
       'history.tail': { count: '0', messages: [] },
       tasks: [],
       'runtime.bindings': [],
+      'agent.presets': [preset],
     }
     return { ok: true, value: { ok: true, value: values[endpoint] ?? null } }
   },
@@ -152,6 +160,7 @@ assert.equal(state.workbench, 'closed')
 assert.equal(state.railTab, 'channels')
 assert.deepEqual(state.followedThreadIds, [])
 assert.deepEqual(state.allTasks, [globalTask])
+assert.deepEqual(state.agentPresets, [preset])
 assert.equal(source.url, '/dsh-chaos/events?cursor=7')
 assert(calls.every(call => call.endpoint !== 'history'))
 await injected.selectTarget(target.id)
@@ -223,6 +232,9 @@ const directRpc = {
     if (endpoint === 'runtime.bindings') {
       return { ok: true, value: { ok: true, value: [] } }
     }
+    if (endpoint === 'agent.presets') {
+      return { ok: true, value: { ok: true, value: [preset] } }
+    }
     if (endpoint === 'target.members') {
       return { ok: true, value: { ok: true, value: [actor] } }
     }
@@ -285,6 +297,7 @@ const pendingRpc = {
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'agent.presets') return { ok: true, value: { ok: true, value: [preset] } }
     throw new Error(`unexpected endpoint ${endpoint}`)
   },
 }
@@ -329,6 +342,7 @@ const threadRpc = {
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'agent.presets') return { ok: true, value: { ok: true, value: [preset] } }
     if (endpoint === 'target.members') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
     if (endpoint === 'history.tail') {
@@ -374,6 +388,7 @@ const asTaskRpc = {
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'agent.presets') return { ok: true, value: { ok: true, value: [preset] } }
     if (endpoint === 'target.members') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
     if (endpoint === 'history.tail') return { ok: true, value: { ok: true, value: { count: '0', messages: [] } } }

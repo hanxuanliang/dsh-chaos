@@ -15,6 +15,12 @@ const dependencies = [
     create: async () => { throw new Error('unused') },
     resume: async () => { throw new Error('unused') },
   }),
+  ctx.provide('agentPresets', {
+    defaultId: 'standard',
+    async list() { return [{ id: 'standard', trust: 'system' }] },
+    async resolve(id) { return { id: id ?? 'standard' } },
+    async mount(_agentCtx, id) { return { id } },
+  }),
   ctx.provide('tools', {}),
   ctx.provide('llm', {}),
 ]

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentRegistry } from '@deepseek-ai/dsh-agent'
+import type { AgentPreset, AgentPresets } from '@deepseek-ai/dsh-agent-presets'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { CollabRuntimeApi, WarningSink } from './contracts.ts'
 import type { NativeRuntimeBinding } from './native.ts'
@@ -26,6 +27,8 @@ interface PendingReceipt {
   binding: NativeRuntimeBinding
 }
 
+export type AgentPresetRoster = Pick<AgentPresets, 'mount' | 'resolve'>
+
 const sameBinding = (left: NativeRuntimeBinding, right: NativeRuntimeBinding): boolean =>
   left.agentId === right.agentId
   && left.sessionId === right.sessionId
@@ -44,6 +47,7 @@ export class RuntimeManager {
 
   constructor(
     private readonly registry: Pick<AgentRegistry, 'create' | 'resume'>,
+    private readonly presets: AgentPresetRoster,
     private readonly collab: CollabRuntimeApi,
     private readonly warnings: WarningSink,
   ) {}
@@ -61,16 +65,20 @@ export class RuntimeManager {
       ] as const) requireText(name, value)
       if (!isAbsolute(input.workspacePath)) throw new Error('workspacePath must be absolute')
 
+      const preset = await this.resolvePreset(input.preset)
       await this.disposeLease(input.agentId)
       const sessionId = input.sessionId ?? randomUUID()
       requireText('sessionId', sessionId)
       const handle = await this.registry.create({
         sessionId: SessionId(sessionId),
-        meta: { cwd: input.workspacePath, agentPreset: input.preset },
+        meta: { cwd: input.workspacePath, agentPreset: preset.id },
         ...(input.provider === 'default'
           ? {}
           : { agentOptions: { provider: input.provider, model: input.model } }),
-        setup: (agentCtx: Context) => installCollabTools(agentCtx, this.collab, this),
+        setup: async (agentCtx: Context) => {
+          await this.presets.mount(agentCtx, preset.id)
+          installCollabTools(agentCtx, this.collab, this)
+        },
       })
       try {
         const binding = await this.collab.bindRuntime(
@@ -78,7 +86,7 @@ export class RuntimeManager {
           sessionId,
           input.provider,
           input.model,
-          input.preset,
+          preset.id,
         )
         this.active.set(input.agentId, { binding, handle })
         return binding
@@ -114,15 +122,28 @@ export class RuntimeManager {
   resume(agentId: string): Promise<NativeRuntimeBinding> {
     return this.withAgentLock(agentId, async () => {
       this.assertActive()
-      const binding = await this.collab.runtimeBinding(agentId)
+      let binding = await this.collab.runtimeBinding(agentId)
       if (binding === undefined) throw new Error(`no runtime binding for Agent ${agentId}`)
+      const preset = await this.resolvePreset(binding.preset)
       await this.disposeLease(agentId)
       const handle = await this.registry.resume({
         resumeSessionId: SessionId(binding.sessionId),
         agentOptions: { provider: binding.provider, model: binding.model },
-        setup: (agentCtx: Context) => installCollabTools(agentCtx, this.collab, this),
+        setup: async (agentCtx: Context) => {
+          await this.presets.mount(agentCtx, preset.id)
+          installCollabTools(agentCtx, this.collab, this)
+        },
       })
       try {
+        if (preset.id !== binding.preset) {
+          handle.agent.session.append('agent-preset/selected', { agentPreset: preset.id })
+          binding = await this.collab.updateRuntimePreset(
+            binding.agentId,
+            binding.generation,
+            binding.sessionId,
+            preset.id,
+          )
+        }
         const current = await this.collab.runtimeBinding(agentId)
         if (current === undefined || !sameBinding(current, binding)) {
           throw new Error(`runtime binding changed while resuming Agent ${agentId}`)
@@ -264,5 +285,15 @@ export class RuntimeManager {
 
   private assertActive(): void {
     if (this.closing) throw new Error('dsh-chaos RuntimeManager is closing')
+  }
+
+  /** Resolve an official preset before publishing a Session; migrate the old chaos sentinel only when absent. */
+  private async resolvePreset(requested: string): Promise<AgentPreset> {
+    try {
+      return await this.presets.resolve(requested)
+    } catch (error) {
+      if (requested !== 'default') throw error
+      return await this.presets.resolve()
+    }
   }
 }

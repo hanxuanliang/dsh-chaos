@@ -280,6 +280,24 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn update_runtime_preset(
+        &self,
+        agent_id: String,
+        generation: String,
+        session_id: String,
+        preset: String,
+    ) -> Result<JsRuntimeBinding> {
+        let generation = generation
+            .parse::<i64>()
+            .map_err(|_| napi::Error::from_reason("generation must be a decimal integer"))?;
+        self.core
+            .update_runtime_preset(&agent_id, generation, &session_id, &preset)
+            .await
+            .map(JsRuntimeBinding::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn runtime_binding_for_session(
         &self,
         session_id: String,

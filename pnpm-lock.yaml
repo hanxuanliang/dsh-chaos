@@ -21,6 +21,9 @@ importers:
       '@deepseek-ai/dsh-agent-loop':
         specifier: 0.1.0-rc.6
         version: 0.1.0-rc.6(aaowfiifi3tciswpagpe6nrjyu)
+      '@deepseek-ai/dsh-agent-presets':
+        specifier: 0.1.0-rc.6
+        version: 0.1.0-rc.6(6wngyfrexoeq2r3dmwhrmrcc7m)
       '@deepseek-ai/dsh-client-connection':
         specifier: 0.1.0-rc.6
         version: 0.1.0-rc.6(7maypwljlwjca5wcw2uddl46bm)
