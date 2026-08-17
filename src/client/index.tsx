@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { ChaosClientController } from './controller.ts'
 import { ChaosEntry, Workbench, type ChaosInjected } from './Workbench.tsx'
+import type { NativeTask } from '../native.ts'
 
 export const inject = ['slots', 'connection'] as const
 
@@ -34,6 +35,9 @@ export function apply(ctx: ClientContext): void {
     followThread: threadTargetId => controller.followThread(threadTargetId),
     unfollowThread: threadTargetId => controller.unfollowThread(threadTargetId),
     createTask: messageId => controller.createTask(messageId),
+    claimTask: messageId => controller.claimTask(messageId),
+    unclaimTask: (task: NativeTask) => controller.unclaimTask(task),
+    updateTask: (task: NativeTask, status: NativeTask['status']) => controller.updateTask(task, status),
   })
 
   ctx.effect(() => () => { controller.dispose() }, 'dsh-chaos: controller')

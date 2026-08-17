@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ChaosClientState } from './controller.ts'
 import { resolveSentDraft } from './controller.ts'
-import type { NativeMessage } from '../native.ts'
+import type { NativeMessage, NativeTask } from '../native.ts'
 import css from './Workbench.module.css'
 
 export interface ChaosInjected {
@@ -22,6 +23,9 @@ export interface ChaosInjected {
   followThread: (threadTargetId: string) => Promise<void>
   unfollowThread: (threadTargetId: string) => Promise<void>
   createTask: (messageId: string) => Promise<void>
+  claimTask: (messageId: string) => Promise<void>
+  unclaimTask: (task: NativeTask) => Promise<void>
+  updateTask: (task: NativeTask, status: NativeTask['status']) => Promise<void>
 }
 
 type EntryProps = PropsRuntime<'sidebar.footer.action'> & InjectFace<ChaosInjected>
@@ -99,6 +103,235 @@ const TASK_STATUS_TEXT: Record<string, string> = {
   in_progress: '进行中',
   in_review: '验收中',
   done: '完成',
+}
+
+const TASK_STATUSES = ['todo', 'in_progress', 'in_review', 'done'] as const
+type TaskStatus = (typeof TASK_STATUSES)[number]
+
+/** Mirrors task_transition_allowed in crates/collab-core/src/lib.rs exactly. */
+const TASK_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
+  todo: ['in_progress'],
+  in_progress: ['todo', 'in_review'],
+  in_review: ['in_progress', 'done'],
+  done: ['in_progress'],
+}
+
+/**
+ * Task status chip + portal dropdown: full status set, current ✓, transitions
+ * the core would deny are disabled, Arrow/Home/End/Enter/Escape keyboard
+ * contract, focus returns to the trigger on close.
+ */
+function TaskStatusMenu(props: {
+  task: NativeTask
+  onSelect: (status: TaskStatus) => Promise<void>
+}): React.JSX.Element {
+  const { task } = props
+  const [open, setOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
+  const [active, setActive] = useState(0)
+  const [pos, setPos] = useState<{ top: number, left: number }>({ top: 0, left: 0 })
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const close = (refocus: boolean): void => {
+    setOpen(false)
+    if (refocus) triggerRef.current?.focus()
+  }
+
+  const openMenu = (): void => {
+    const rect = triggerRef.current?.getBoundingClientRect()
+    if (rect !== undefined) {
+      setPos({ top: Math.round(rect.bottom + 4), left: Math.round(rect.left) })
+    }
+    setActive(TASK_STATUSES.indexOf(task.status))
+    setError(undefined)
+    setOpen(true)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    menuRef.current?.focus()
+    const onPointerDown = (event: PointerEvent): void => {
+      const menu = menuRef.current
+      if (menu !== null && event.target instanceof Node && !menu.contains(event.target)) close(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => { document.removeEventListener('pointerdown', onPointerDown) }
+  }, [open])
+
+  const move = (next: number): void => {
+    setActive(((next % TASK_STATUSES.length) + TASK_STATUSES.length) % TASK_STATUSES.length)
+  }
+
+  const choose = async (status: TaskStatus): Promise<void> => {
+    if (pending || status === task.status) { close(true); return }
+    if (!TASK_TRANSITIONS[task.status].includes(status)) return
+    setPending(true)
+    setError(undefined)
+    try {
+      await props.onSelect(status)
+      close(true)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const onMenuKeyDown = (event: React.KeyboardEvent): void => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); move(active + 1) }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); move(active - 1) }
+    else if (event.key === 'Home') { event.preventDefault(); setActive(0) }
+    else if (event.key === 'End') { event.preventDefault(); setActive(TASK_STATUSES.length - 1) }
+    else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      const status = TASK_STATUSES[active]
+      if (status !== undefined) void choose(status)
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      close(true)
+    } else if (event.key === 'Tab') {
+      close(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={css.taskChipButton}
+        data-status={task.status}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`工作项 #${task.number} 状态：${TASK_STATUS_TEXT[task.status] ?? task.status}`}
+        disabled={pending}
+        onClick={() => { if (open) close(true); else openMenu() }}
+      >
+        <span className={css.taskChipDot} />
+        {TASK_STATUS_TEXT[task.status] ?? task.status}
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {error !== undefined ? <span className={css.taskError}>{error}</span> : null}
+      {open
+        ? createPortal(
+          <div
+            className={css.taskMenu}
+            role="menu"
+            aria-label="工作项状态"
+            style={{ top: pos.top, left: pos.left }}
+            tabIndex={-1}
+            ref={menuRef}
+            onKeyDown={onMenuKeyDown}
+          >
+            {TASK_STATUSES.map((status, index) => {
+              const current = status === task.status
+              const legal = current || TASK_TRANSITIONS[task.status].includes(status)
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  role="menuitem"
+                  className={css.taskMenuItem}
+                  data-active={index === active || undefined}
+                  data-status={status}
+                  disabled={!legal || pending}
+                  tabIndex={-1}
+                  onMouseEnter={() => { setActive(index) }}
+                  onClick={() => { void choose(status) }}
+                >
+                  <span className={css.taskMenuCheck}>{current ? '✓' : ''}</span>
+                  <span className={css.taskChipDot} />
+                  {TASK_STATUS_TEXT[status]}
+                </button>
+              )
+            })}
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
+  )
+}
+
+/** One kanban card: number, anchor snippet, assignee/claim, status menu. */
+function TaskCard(props: WorkbenchProps & { state: ChaosClientState, task: NativeTask }): React.JSX.Element {
+  const { state, task } = props
+  const [pending, setPending] = useState(false)
+  const mine = task.assigneeId !== undefined && task.assigneeId === state.actor?.id
+
+  const claim = async (): Promise<void> => {
+    if (pending) return
+    setPending(true)
+    try {
+      if (task.assigneeId === undefined) await props.claimTask(task.messageId)
+      else if (mine) await props.unclaimTask(task)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className={css.taskCard}>
+      <div className={css.taskCardHead}>
+        <span className={css.taskNum}>#{task.number}</span>
+        <TaskStatusMenu task={task} onSelect={async status => { await props.updateTask(task, status) }} />
+      </div>
+      {task.anchorText !== undefined && task.anchorText !== ''
+        ? <div className={css.taskSnippet}>{task.anchorText}</div>
+        : null}
+      <div className={css.taskCardFoot}>
+        {task.assigneeId === undefined || mine
+          ? (
+            <button
+              type="button"
+              className={css.claimButton}
+              disabled={pending}
+              onClick={() => { void claim() }}
+            >
+              {task.assigneeId === undefined ? '认领' : '取消认领'}
+            </button>
+          )
+          : <span className={css.taskAssignee}>{authorNameOf(state, task.assigneeId)}</span>}
+      </div>
+    </div>
+  )
+}
+
+/** 工作项 tab: four status columns fed by the authoritative per-target task list. */
+function TasksBoard(props: WorkbenchProps & { state: ChaosClientState }): React.JSX.Element {
+  const { state } = props
+  if (state.tasks.length === 0) {
+    return (
+      <div className={css.emptyFlow}>
+        <p className={css.emptyTitle}>还没有工作项</p>
+        <p className={css.emptyHint}>回到「消息」tab，在消息上点「转为工作项」。</p>
+      </div>
+    )
+  }
+  return (
+    <div className={css.board}>
+      {TASK_STATUSES.map(status => {
+        const tasks = state.tasks.filter(task => task.status === status)
+        return (
+          <section key={status} className={css.boardCol} aria-label={TASK_STATUS_TEXT[status]}>
+            <header className={css.boardColHead}>
+              <span className={css.taskChipDot} data-status={status} />
+              {TASK_STATUS_TEXT[status]}
+              <span className={css.boardCount}>{tasks.length}</span>
+            </header>
+            <div className={css.boardColBody}>
+              {tasks.map(task => <TaskCard key={task.messageId} {...props} task={task} />)}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
 }
 
 /** Message row hover actions: reply-in-thread and convert-to-task, revealed on hover/focus. */
@@ -494,6 +727,7 @@ function CreateChannelCard(props: WorkbenchProps & { onDone: () => void }): Reac
 export function Workbench(props: WorkbenchProps): React.JSX.Element | null {
   const state = useChaos(props)
   const [creating, setCreating] = useState(false)
+  const [stageTab, setStageTab] = useState<'messages' | 'tasks'>('messages')
   const plusRef = useRef<HTMLButtonElement | null>(null)
   const open = state.workbench === 'open'
 
@@ -585,15 +819,43 @@ export function Workbench(props: WorkbenchProps): React.JSX.Element | null {
                   <header className={css.stageHead}>
                     <span className={css.stageHash}>#</span>
                     <span className={css.stageTitle}>{selected.name}</span>
+                    <nav className={css.stageTabs} role="tablist" aria-label="频道视图">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={stageTab === 'messages'}
+                        className={css.stageTab}
+                        data-active={stageTab === 'messages' || undefined}
+                        onClick={() => { setStageTab('messages') }}
+                      >
+                        消息
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={stageTab === 'tasks'}
+                        className={css.stageTab}
+                        data-active={stageTab === 'tasks' || undefined}
+                        onClick={() => { setStageTab('tasks') }}
+                      >
+                        工作项{state.tasks.length > 0 ? ` ${String(state.tasks.length)}` : ''}
+                      </button>
+                    </nav>
                   </header>
-                  <MessageList {...props} state={state} />
-                  <Composer
-                    {...props}
-                    state={state}
-                    draftKey={selected.id}
-                    onSend={props.send}
-                    placeholder="发消息，@ 可以唤起频道里的 Agent"
-                  />
+                  {stageTab === 'messages'
+                    ? (
+                      <>
+                        <MessageList {...props} state={state} />
+                        <Composer
+                          {...props}
+                          state={state}
+                          draftKey={selected.id}
+                          onSend={props.send}
+                          placeholder="发消息，@ 可以唤起频道里的 Agent"
+                        />
+                      </>
+                    )
+                    : <TasksBoard {...props} state={state} />}
                 </div>
                 <ThreadContextPanel {...props} state={state} />
               </>
