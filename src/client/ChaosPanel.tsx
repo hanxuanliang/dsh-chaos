@@ -93,6 +93,13 @@ const PanelIcon = (
 )
 
 const COMPACT_GAP_MS = 5 * 60 * 1000
+const TASK_LANES = ['todo', 'in_progress', 'in_review', 'done'] as const
+const TASK_LANE_LABEL: Record<(typeof TASK_LANES)[number], string> = {
+  todo: 'todo',
+  in_progress: 'in progress',
+  in_review: 'in review',
+  done: 'done',
+}
 
 function dayKey(ms: number): string {
   const date = new Date(ms)
@@ -188,6 +195,46 @@ function RoomTimeline({
   )
 }
 
+function RoomTaskBoard({
+  tasks,
+  names,
+  onOpenTask,
+}: {
+  tasks: readonly NativeTask[]
+  names: ReadonlyMap<string, string>
+  onOpenTask: (task: NativeTask) => void
+}): ReactNode {
+  return (
+    <div className={css.taskBoard} aria-label="Task">
+      {TASK_LANES.map(lane => {
+        const cards = tasks.filter(task => task.status === lane)
+        return (
+          <section key={lane} className={css.taskColumn} data-status={lane}>
+            <header className={css.taskColumnHead}>
+              <span className={css.taskDot} data-status={lane} />
+              <strong>{TASK_LANE_LABEL[lane]}</strong>
+            </header>
+            <div className={css.taskCards}>
+              {cards.length === 0 && <p className={css.taskEmpty}>空</p>}
+              {cards.map(task => (
+                <button
+                  key={task.messageId}
+                  type="button"
+                  className={css.taskCard}
+                  onClick={() => { onOpenTask(task) }}
+                >
+                  <strong>{task.anchorText?.trim() || `Task ${task.number}`}</strong>
+                  <span>{names.get(task.assigneeId ?? '') ?? '未认领'}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
 function RoomWorkbench({
   title,
   railOpen,
@@ -203,6 +250,7 @@ function RoomWorkbench({
   onClose,
   onBack,
   onOpenThread,
+  onOpenTask,
 }: {
   title: string
   railOpen: boolean
@@ -218,18 +266,21 @@ function RoomWorkbench({
   onClose: () => void
   onBack: () => void
   onOpenThread: (rootMessageId: string, threadId?: string) => void
+  onOpenTask: (task: NativeTask) => void
 }): ReactNode {
+  const [face, setFace] = useState<'chat' | 'tasks'>('chat')
   useLayoutEffect(() => claimRoomLayout(), [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       if (thread !== undefined) onBack()
+      else if (face === 'tasks') setFace('chat')
       else onClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => { window.removeEventListener('keydown', onKeyDown) }
-  }, [onBack, onClose, thread])
+  }, [face, onBack, onClose, thread])
 
   return (
     <aside
@@ -239,7 +290,17 @@ function RoomWorkbench({
     >
       <header className={css.workbenchHead}>
         {thread === undefined ? (
-          <strong>{title}</strong>
+          <>
+            <strong>{title}</strong>
+            <button
+              type="button"
+              className={css.headTab}
+              data-active={face === 'tasks' || undefined}
+              onClick={() => { setFace(current => current === 'tasks' ? 'chat' : 'tasks') }}
+            >
+              Task
+            </button>
+          </>
         ) : (
           <button type="button" className={css.backButton} onClick={onBack}>
             ← {threadParent ?? title}
@@ -250,7 +311,17 @@ function RoomWorkbench({
         </button>
       </header>
       <div className={css.workbenchBody}>
-        {thread === undefined ? (
+        {thread !== undefined ? (
+          <ThreadPanel
+            thread={thread as never}
+            parentName={threadParent ?? title}
+            messages={threadMessages}
+            names={names}
+            kinds={kinds}
+          />
+        ) : face === 'tasks' ? (
+          <RoomTaskBoard tasks={tasks} names={names} onOpenTask={onOpenTask} />
+        ) : (
           <RoomTimeline
             messages={messages}
             names={names}
@@ -259,14 +330,6 @@ function RoomWorkbench({
             threadByRoot={threadByRoot}
             previews={previews}
             onOpenThread={onOpenThread}
-          />
-        ) : (
-          <ThreadPanel
-            thread={thread as never}
-            parentName={threadParent ?? title}
-            messages={threadMessages}
-            names={names}
-            kinds={kinds}
           />
         )}
       </div>
@@ -820,6 +883,11 @@ export function ChaosPanel(props: ChaosPanelProps) {
           onOpenThread={(rootMessageId, threadId) => {
             if (threadId !== undefined) void openThreadPanel(threadId)
             else void createThread(rootMessageId)
+          }}
+          onOpenTask={task => {
+            const threadId = threadByRoot.get(task.messageId)
+            if (threadId !== undefined) void openThreadPanel(threadId)
+            else void createThread(task.messageId)
           }}
         />
       )}
