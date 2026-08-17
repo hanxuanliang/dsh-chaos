@@ -123,7 +123,7 @@ const ctx = {
   },
   slots: {
     inject(name, factory) {
-      assert(['shell.overlay', 'conversation.input.dock', 'conversation.input.overlay', 'tool.call.toolview'].includes(name))
+      assert(['shell.overlay', 'conversation.input.dock', 'conversation.input.overlay', 'tool.call.toolview', 'settings.section'].includes(name))
       slotCleanups.set(name, factory())
     },
     register(options, component) {
@@ -141,6 +141,7 @@ assert.equal(registrations.get('dsh-chaos-room-preview').options.id, 'dsh-chaos-
 assert.equal(registrations.get('dsh-chaos-hash').options.id, 'dsh-chaos-hash')
 assert.equal(registrations.get('message_send').options.key, 'message_send')
 assert.equal(registrations.has('sidebar.footer.action'), false)
+assert.equal(registrations.get('dsh-chaos-agents').options.id, 'dsh-chaos-agents')
 const injected = registrations.get('dsh-chaos-workspace').options.inject()
 await injected.ensure()
 const state = injected.hooks.chaos.getSnapshot()

@@ -11,6 +11,7 @@ import {
   ThreadPage,
   type ChaosPanelInjected,
 } from './ChaosPanel.tsx'
+import { AgentsSettings } from './AgentsSettings.tsx'
 import { HashPicker } from './HashPicker.tsx'
 import { RoomCard } from './RoomCard.tsx'
 import { ChaosClientController } from './controller.ts'
@@ -27,6 +28,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.input.overlay': {
       kind: 'list'
       scope: 'session'
+    }
+    'settings.section': {
+      kind: 'list'
+      scope: 'root'
     }
   }
 }
@@ -183,6 +188,14 @@ export function apply(ctx: ClientContext): void {
     order: 30,
     inject: injectFace,
   }, HashPicker))
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'dsh-chaos-agents',
+    order: 70,
+    label: () => 'Agents',
+    inject: injectFace,
+  }, AgentsSettings))
 
   const sidecar = betterSidebarOf(ctx as unknown as { betterSidebar?: BetterSidebarLite })
 

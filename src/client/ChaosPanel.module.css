@@ -301,6 +301,23 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
+.settingsPage { display: flex; flex-direction: column; gap: 12px; padding: 8px 4px 16px; }
+.settingsLead { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; }
+.settingsCreate { display: flex; gap: 8px; }
+.settingsCreate input {
+  flex: 1; min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px;
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font: inherit;
+}
+.settingsList { display: flex; flex-direction: column; gap: 6px; }
+.settingsRow {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; text-align: left; cursor: pointer;
+  border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px;
+  background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font: inherit;
+}
+.settingsRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.settingsRow strong { font-size: 13px; font-weight: 600; }
+.settingsRow span { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
 .threadPanel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .threadPanelHeader {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
