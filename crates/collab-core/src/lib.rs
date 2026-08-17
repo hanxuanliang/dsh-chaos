@@ -1732,12 +1732,13 @@ impl CollabCore {
             )
             .await?;
         if let Some(workspace_path) = workspace_path {
+            let resolved_path = workspace_path.replace("{id}", actor.id.as_str());
             transaction
                 .execute(
                     "INSERT INTO agents
                      (actor_id, workspace_path, lifecycle, created_at_ms, updated_at_ms)
                      VALUES (?1, ?2, 'active', ?3, ?3)",
-                    (actor.id.as_str(), workspace_path, now),
+                    (actor.id.as_str(), resolved_path.as_str(), now),
                 )
                 .await?;
         }

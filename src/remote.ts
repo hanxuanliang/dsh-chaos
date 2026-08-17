@@ -8,6 +8,7 @@ import type {
   NativeCollabSnapshot,
   NativeMessage,
   NativeMessageTail,
+  NativeRuntimeBinding,
   NativeSendResult,
   NativeTarget,
   NativeTask,
@@ -24,6 +25,12 @@ export interface CollabRemoteApi {
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
+  createNamedAgent(name: string): Promise<{
+    actor: NativeActor
+    binding?: NativeRuntimeBinding
+    workspacePath: string
+  }>
+  listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
@@ -168,6 +175,10 @@ async function dispatchRemote(
       )
     case 'tasks':
       return await api.listTasks(actorId, optionalString(input, 'targetId'))
+    case 'agent.create':
+      return await api.createNamedAgent(requiredString(input, 'name'))
+    case 'runtime.bindings':
+      return await api.listRuntimeBindings()
     case 'channel.create':
       return await api.createChannel(requiredString(input, 'name'), actorId)
     case 'direct.create':

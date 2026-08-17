@@ -59,7 +59,7 @@ globalThis.window = {
 }
 
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
-assert.deepEqual(clientModule.inject, ['slots', 'connection'])
+assert.deepEqual(clientModule.inject, ['slots', 'connection', 'sessions', 'workspaces'])
 
 const actor = {
   id: 'browser-1',
@@ -95,11 +95,25 @@ const rpc = {
       'target.members': [actor],
       'history.tail': { count: '0', messages: [] },
       tasks: [],
+      'runtime.bindings': [],
     }
     return { ok: true, value: { ok: true, value: values[endpoint] ?? null } }
   },
 }
+const sessions = {
+  list: {
+    getSnapshot: () => ({ current: undefined, byId: {}, ids: [] }),
+    subscribe: () => () => {},
+  },
+  open() {},
+}
+const workspaces = {
+  create: async ({ path }) => ({ id: 'ws-1', path, title: 'ws' }),
+  rename: async () => ({ id: 'ws-1', path: '/tmp', title: 'ws' }),
+}
 const ctx = {
+  sessions,
+  workspaces,
   get(name) {
     assert.equal(name, 'connection')
     return { rpc }
@@ -109,7 +123,7 @@ const ctx = {
   },
   slots: {
     inject(name, factory) {
-      assert(['shell.overlay', 'sidebar.footer.action'].includes(name))
+      assert(['shell.overlay', 'conversation.input.dock'].includes(name))
       slotCleanups.set(name, factory())
     },
     register(options, component) {
@@ -121,34 +135,39 @@ const ctx = {
 
 clientModule.apply(ctx)
 assert.equal(registrations.get('shell.overlay').options.id, 'dsh-chaos-workspace')
-assert.equal(registrations.get('sidebar.footer.action').options.id, 'dsh-chaos-entry')
+assert.equal(registrations.get('conversation.input.dock').options.id, 'dsh-chaos-dock')
+assert.equal(registrations.has('sidebar.footer.action'), false)
 const injected = registrations.get('shell.overlay').options.inject()
 await injected.ensure()
 const state = injected.hooks.chaos.getSnapshot()
 assert.equal(state.status, 'ready')
-assert.equal(state.selectedTargetId, target.id)
+assert.equal(state.selectedTargetId, undefined)
+assert.equal(state.surface, 'closed')
+assert.equal(state.railTab, 'channels')
 assert.deepEqual(state.followedThreadIds, [])
 assert.deepEqual(state.allTasks, [globalTask])
 assert.equal(source.url, '/dsh-chaos/events?cursor=7')
-assert(calls.some(call => call.endpoint === 'history.tail'))
 assert(calls.every(call => call.endpoint !== 'history'))
+await injected.selectTarget(target.id)
+assert.equal(injected.hooks.chaos.getSnapshot().selectedTargetId, target.id)
+assert(calls.some(call => call.endpoint === 'history.tail'))
 assert(calls.some(call => call.endpoint === 'target.members'))
-assert.deepEqual(state.members, [actor], 'members pane reads the membership projection, not the actor directory')
+assert.deepEqual(injected.hooks.chaos.getSnapshot().members, [actor], 'members pane reads the membership projection, not the actor directory')
 await injected.followThread('thread-1')
 await injected.unfollowThread('thread-1')
 assert(calls.some(call => call.endpoint === 'thread.follow'))
 assert(calls.some(call => call.endpoint === 'thread.unfollow'))
-injected.togglePeek()
-assert.equal(injected.hooks.chaos.getSnapshot().surface, 'peek')
-injected.openWorkspace()
-assert.equal(injected.hooks.chaos.getSnapshot().surface, 'workspace')
+injected.toggleRail()
+assert.equal(injected.hooks.chaos.getSnapshot().surface, 'rail')
+injected.setRailTab('agents')
+assert.equal(injected.hooks.chaos.getSnapshot().railTab, 'agents')
 injected.closeSurface()
 assert.equal(injected.hooks.chaos.getSnapshot().surface, 'closed')
 source.emit('change')
 await new Promise(resolve => setTimeout(resolve, 0))
 assert(calls.filter(call => call.endpoint === 'snapshot').length >= 2)
 slotCleanups.get('shell.overlay')()
-slotCleanups.get('sidebar.footer.action')()
+slotCleanups.get('conversation.input.dock')()
 controllerCleanup()
 assert.equal(source.closed, true)
 
@@ -187,6 +206,9 @@ const directRpc = {
     }
     if (endpoint === 'actors') {
       return { ok: true, value: { ok: true, value: [actor] } }
+    }
+    if (endpoint === 'runtime.bindings') {
+      return { ok: true, value: { ok: true, value: [] } }
     }
     if (endpoint === 'target.members') {
       return { ok: true, value: { ok: true, value: [actor] } }
@@ -249,6 +271,7 @@ const pendingRpc = {
       }
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
     throw new Error(`unexpected endpoint ${endpoint}`)
   },
 }
@@ -291,6 +314,7 @@ const threadRpc = {
       }
     }
     if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
     if (endpoint === 'target.members') return { ok: true, value: { ok: true, value: [actor] } }
     if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
     if (endpoint === 'history.tail') {
@@ -306,6 +330,7 @@ const threadRpc = {
 }
 const threadController = new ChaosClientController(threadRpc)
 await threadController.ensure()
+await threadController.selectTarget(target.id)
 assert.equal(threadController.getSnapshot().selectedTargetId, target.id)
 await threadController.openThreadPanel(threadTarget.id)
 assert.equal(threadController.getSnapshot().threadPanelId, threadTarget.id)
@@ -322,6 +347,78 @@ assert.equal(sendCalls.at(-1).targetId, threadTarget.id)
 threadController.closeThreadPanel()
 assert.equal(threadController.getSnapshot().threadPanelId, undefined)
 threadController.dispose()
+
+// As Task: one Channel send, then promote that exact message. Thread sends
+// must refuse instead of creating a Task on a reply.
+const asTaskCalls = []
+const asTaskRpc = {
+  async call(_channel, endpoint, payload) {
+    asTaskCalls.push({ endpoint, payload })
+    if (endpoint === 'snapshot') {
+      return {
+        ok: true,
+        value: { ok: true, value: { actor, cursor: '12', targets: [target, threadTarget], followedThreadIds: [], tasks: [] } },
+      }
+    }
+    if (endpoint === 'actors') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'runtime.bindings') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'target.members') return { ok: true, value: { ok: true, value: [actor] } }
+    if (endpoint === 'tasks') return { ok: true, value: { ok: true, value: [] } }
+    if (endpoint === 'history.tail') return { ok: true, value: { ok: true, value: { count: '0', messages: [] } } }
+    if (endpoint === 'message.send') {
+      return {
+        ok: true,
+        value: {
+          ok: true,
+          value: {
+            message: {
+              seq: '13',
+              id: 'as-task-message',
+              targetId: payload.targetId,
+              authorId: actor.id,
+              clientRequestId: payload.requestId,
+              text: payload.text,
+              createdAtMs: 6,
+            },
+            recipientIds: [],
+            wakeAgentIds: [],
+            replayed: false,
+          },
+        },
+      }
+    }
+    if (endpoint === 'task.create') {
+      return {
+        ok: true,
+        value: {
+          ok: true,
+          value: {
+            messageId: payload.messageId,
+            targetId: target.id,
+            number: '9',
+            status: 'todo',
+            version: '1',
+            createdAtMs: 7,
+            updatedAtMs: 7,
+          },
+        },
+      }
+    }
+    throw new Error(`unexpected endpoint ${endpoint}`)
+  },
+}
+const asTaskController = new ChaosClientController(asTaskRpc)
+await asTaskController.ensure()
+await asTaskController.selectTarget(target.id)
+await asTaskController.sendAsTask('write the rust article')
+assert.equal(asTaskCalls.some(call => call.endpoint === 'message.send' && call.payload.text === 'write the rust article'), true)
+assert.equal(asTaskCalls.some(call => call.endpoint === 'task.create' && call.payload.messageId === 'as-task-message'), true)
+await asTaskController.selectTarget(threadTarget.id)
+await assert.rejects(
+  asTaskController.sendAsTask('not a task'),
+  /Thread 回复不能立为 Task/,
+)
+asTaskController.dispose()
 
 // In-flight draft guard: a send that resolves late must not wipe text the
 // user typed after the request started (component-level guard, unit-tested
@@ -362,6 +459,41 @@ const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${
   )
 }
 
+{
+  const { installChannelSendHook } = await import(`../lib/client/send-hook.js?smoke=${String(Date.now())}`)
+  const prompted = []
+  const ledger = []
+  const conversation = {
+    async sendSession(_session, text, imageIds, mode) {
+      prompted.push({ text, imageIds, mode })
+    },
+  }
+  const hookController = {
+    snapshot: { asTask: false, railTab: 'channels', selectedTargetId: target.id },
+    getSnapshot() { return this.snapshot },
+    async send(text) { ledger.push({ kind: 'send', text }) },
+    async sendAsTask(text) { ledger.push({ kind: 'as-task', text }) },
+    async sendToThread(text) { ledger.push({ kind: 'thread', text }) },
+    setAsTask(asTask) { this.snapshot = { ...this.snapshot, asTask } },
+  }
+  const uninstall = installChannelSendHook(conversation, hookController)
+  await conversation.sendSession({}, 'room hello', [], 'default')
+  assert.deepEqual(ledger, [{ kind: 'send', text: 'room hello' }])
+  assert.deepEqual(prompted, [])
+  hookController.snapshot = { asTask: true, railTab: 'channels', selectedTargetId: target.id }
+  await conversation.sendSession({}, 'make it a task', [], 'default')
+  assert.equal(ledger.at(-1).kind, 'as-task')
+  assert.equal(hookController.snapshot.asTask, false)
+  hookController.snapshot = { asTask: false, railTab: 'thread', selectedTargetId: target.id, threadPanelId: 'thread-1' }
+  await conversation.sendSession({}, 'thread reply', [], 'default')
+  assert.equal(ledger.at(-1).kind, 'thread')
+  await conversation.sendSession({}, 'keep images on the host', ['img-1'], 'default')
+  assert.deepEqual(prompted.at(-1), { text: 'keep images on the host', imageIds: ['img-1'], mode: 'default' })
+  uninstall()
+  await conversation.sendSession({}, 'after uninstall', [], 'default')
+  assert.equal(prompted.at(-1).text, 'after uninstall')
+}
+
 delete globalThis.EventSource
 delete globalThis.window
 
@@ -371,6 +503,6 @@ delete globalThis.window
   const cssSource = readFileSync(new URL('../src/client/ChaosPanel.module.css', import.meta.url), 'utf8')
   const motionBlock = cssSource.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/)
   assert(motionBlock !== null, 'reduced-motion block exists')
-  assert(motionBlock[0].includes('.backdrop'), 'reduced-motion is scoped under plugin roots')
+  assert(motionBlock[0].includes('.panel'), 'reduced-motion is scoped under plugin roots')
   assert(!/(^|\n)\s*\*\s*[{},]/.test(motionBlock[0]), 'no bare universal selector leaks globally')
 }

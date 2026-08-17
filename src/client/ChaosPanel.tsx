@@ -1,13 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import type { HostObservable, InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ChaosClientState, ThreadPreview } from './controller.ts'
-import { resolveSentDraft } from './controller.ts'
-import type { NativeMessage, NativeTarget, NativeTask } from '../native.ts'
-import { Avatar } from './Avatar.tsx'
-import { Composer } from './Composer.tsx'
-import { TaskStatusChip } from './TaskStatusChip.tsx'
+import type { ChaosClientState } from './controller.ts'
+import type { NativeActor, NativeTarget } from '../native.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './ChaosPanel.module.css'
 
@@ -15,11 +10,17 @@ export interface ChaosPanelInjected {
   hooks: { chaos: HostObservable<ChaosClientState> }
   ensure: () => Promise<void>
   refresh: () => Promise<void>
-  togglePeek: () => void
-  openWorkspace: () => void
+  toggleRail: () => void
+  openRail: () => void
+  setRailTab: (tab: ChaosClientState['railTab']) => void
+  setAsTask: (asTask: boolean) => void
+  openDesk: (agentId?: string) => void
   closeSurface: () => void
+  clearTarget: () => void
   selectTarget: (targetId: string) => Promise<void>
   createChannel: (name: string) => Promise<void>
+  createAgent: (name: string) => Promise<void>
+  openAgent: (agentId: string) => void
   createDirect: (peerId: string) => Promise<void>
   addMember: (targetId: string, memberId: string) => Promise<void>
   createThread: (rootMessageId: string) => Promise<void>
@@ -29,32 +30,14 @@ export interface ChaosPanelInjected {
   closeThreadPanel: () => void
   sendToThread: (text: string) => Promise<void>
   send: (text: string) => Promise<void>
+  sendAsTask: (text: string) => Promise<void>
   createTask: (messageId: string) => Promise<void>
-  claimTask: (messageId: string) => Promise<void>
-  unclaimTask: (task: NativeTask) => Promise<void>
-  updateTask: (task: NativeTask, status: NativeTask['status']) => Promise<void>
 }
 
 export type ChaosPanelProps = PropsRuntime<'shell.overlay'> & InjectFace<ChaosPanelInjected>
-export type ChaosEntryProps = PropsRuntime<'sidebar.footer.action'> & InjectFace<ChaosPanelInjected>
+export type ChaosDockProps = PropsRuntime<'conversation.input.dock'> & InjectFace<ChaosPanelInjected>
 
-const taskTransitions: Record<NativeTask['status'], readonly NativeTask['status'][]> = {
-  todo: ['in_progress'],
-  in_progress: ['todo', 'in_review'],
-  in_review: ['in_progress', 'done'],
-  done: ['in_progress'],
-}
-
-const LANES: ReadonlyArray<{ status: NativeTask['status']; label: string }> = [
-  { status: 'todo', label: 'TODO' },
-  { status: 'in_progress', label: 'IN PROGRESS' },
-  { status: 'in_review', label: 'IN REVIEW' },
-  { status: 'done', label: 'DONE' },
-]
-
-function timeOf(createdAtMs: number): string {
-  return new Date(createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
+const RAIL_WIDTH_PX = 276
 
 /**
  * Modal dialog keyboard contract: Escape cancels, and Tab/Shift+Tab cycle
@@ -94,12 +77,6 @@ function useDialogKeys(
   }, [containerRef, onCancel])
 }
 
-const ReplyIcon = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-)
-
 const CloseIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
     <path d="M18 6 6 18" />
@@ -107,87 +84,31 @@ const CloseIcon = (
   </svg>
 )
 
-/** Native Sidebar footer entry. The badge is authoritative pending Task count, not inferred unread state. */
-export function ChaosEntry({ wide, useChaos, ensure, togglePeek }: ChaosEntryProps) {
-  const state = useChaos(value => value)
-  const pendingTasks = state.allTasks.filter(task => task.status !== 'done').length
+const PanelIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+    <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" />
+    <path d="M10.5 3v10" />
+  </svg>
+)
 
-  useEffect(() => { void ensure() }, [ensure])
-
-  return (
-    <div className={wide ? css.entry : `${css.entry} ${css.entryRail}`}>
-      <button
-        type="button"
-        className={css.entryButton}
-        data-active={state.surface !== 'closed' || undefined}
-        aria-label="协作"
-        aria-expanded={state.surface !== 'closed'}
-        onClick={togglePeek}
-      >
-        <span className={css.entryIcon} aria-hidden>◎</span>
-        {wide && <span className={css.entryLabel}>协作</span>}
-        {pendingTasks > 0 && <span className={css.entryCount}>{pendingTasks}</span>}
-      </button>
-    </div>
-  )
+function pushOfficialCenter(open: boolean): void {
+  if (typeof document === 'undefined') return
+  const root = document.getElementById('root')
+  if (root === null) return
+  root.style.marginRight = open ? `${String(RAIL_WIDTH_PX)}px` : ''
 }
 
-function QuickPeek({
-  state,
-  closeSurface,
-  openWorkspace,
-  selectTarget,
-}: Pick<ChaosPanelProps, 'closeSurface' | 'openWorkspace' | 'selectTarget'> & { state: ChaosClientState }) {
-  const channels = state.targets.filter(target => target.kind === 'channel').slice(0, 8)
-  const pendingTasks = state.allTasks.filter(task => task.status !== 'done').length
-  const openTarget = (targetId: string): void => {
-    void selectTarget(targetId).then(openWorkspace)
-  }
-
-  return (
-    <aside className={css.peek} aria-label="协作速览">
-      <header className={css.peekHeader}>
-        <div>
-          <strong>协作</strong>
-          <small>{state.stream === 'connected' ? '实时连接' : state.stream === 'reconnecting' ? '重连中…' : state.stream}</small>
-        </div>
-        <button type="button" className={css.iconButton} aria-label="关闭协作速览" onClick={closeSurface}>
-          {CloseIcon}
-        </button>
-      </header>
-      <div className={css.peekSummary}>
-        <span>{channels.length} 个 Channel</span>
-        <span>{pendingTasks} 个待处理 Task</span>
-      </div>
-      <div className={css.peekTargets}>
-        {channels.length === 0 && <p className={css.empty}>还没有 Channel。</p>}
-        {channels.map(target => (
-          <button
-            type="button"
-            key={target.id}
-            className={css.peekTarget}
-            aria-label={`打开 Channel ${target.name}`}
-            onClick={() => { openTarget(target.id) }}
-          >
-            <span className={css.targetGlyph} aria-hidden>#</span>
-            <span>{target.name}</span>
-          </button>
-        ))}
-      </div>
-      <button type="button" className={css.primaryButton} aria-label="打开协作工作台" onClick={openWorkspace}>
-        打开协作工作台
-      </button>
-    </aside>
-  )
-}
-
-/** Centered lightweight Channel creation dialog (replaces the inline nav form). */
-function CreateChannelDialog({
+/** Centered name-only create dialog. Path and Session stay off-screen. */
+function NamedCreateDialog({
+  title,
+  fieldLabel,
   pending,
   error,
   onCancel,
   onCreate,
 }: {
+  title: string
+  fieldLabel: string
   pending: boolean
   error: string | null
   onCancel: () => void
@@ -222,18 +143,18 @@ function CreateChannelDialog({
         className={css.dialog}
         role="dialog"
         aria-modal="true"
-        aria-label="新建 Channel"
+        aria-label={title}
         onSubmit={submit}
       >
-        <strong className={css.dialogTitle}>新建 Channel</strong>
+        <strong className={css.dialogTitle}>{title}</strong>
         <input
           ref={inputRef}
           value={name}
           onChange={event => { setName(event.target.value) }}
-          placeholder="Channel 名称"
-          aria-label="Channel 名称"
+          placeholder={fieldLabel}
+          aria-label={fieldLabel}
         />
-        {error !== null && <div className={css.composerError} role="alert">{error}</div>}
+        {error !== null && <div className={css.dialogError} role="alert">{error}</div>}
         <div className={css.dialogActions}>
           <button type="button" className={css.secondaryButton} onClick={onCancel}>取消</button>
           <button className={css.primaryButton} disabled={pending || name.trim() === ''}>
@@ -245,275 +166,277 @@ function CreateChannelDialog({
   )
 }
 
-/**
- * Board-side Task creation: pick a top-level Channel message as the Task
- * anchor (Tasks are anchored to Messages by contract). Candidates exclude
- * messages that already carry a Task.
- */
-function NewTaskDialog({
-  candidates,
-  names,
-  pending,
-  error,
-  onCancel,
-  onCreate,
-}: {
-  candidates: readonly NativeMessage[]
-  names: ReadonlyMap<string, string>
-  pending: boolean
-  error: string | null
-  onCancel: () => void
-  onCreate: (messageId: string) => void
-}) {
-  const dialogRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>('button:not([disabled])')?.focus()
-  }, [])
-  useDialogKeys(dialogRef, onCancel)
-
-  return (
-    <div
-      className={css.dialogOverlay}
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onCancel()
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className={css.dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-label="新建 Task"
-      >
-        <strong className={css.dialogTitle}>新建 Task</strong>
-        <p className={css.dialogHint}>选择一条消息作为 Task 锚点：</p>
-        <div ref={listRef} className={css.anchorList}>
-          {candidates.length === 0 && <p className={css.empty}>没有可锚定的消息。</p>}
-          {candidates.map(message => (
-            <button
-              type="button"
-              key={message.id}
-              className={css.anchorOption}
-              disabled={pending}
-              onClick={() => { onCreate(message.id) }}
-            >
-              <b>{names.get(message.authorId) ?? message.authorId}</b>
-              <span className={css.anchorSnippet}>{message.text}</span>
-              <time>{timeOf(message.createdAtMs)}</time>
-            </button>
-          ))}
-        </div>
-        {error !== null && <div className={css.composerError} role="alert">{error}</div>}
-        <div className={css.dialogActions}>
-          <button type="button" className={css.secondaryButton} onClick={onCancel}>取消</button>
-        </div>
-      </div>
-    </div>
+function useChaosStore(store: HostObservable<ChaosClientState>): ChaosClientState {
+  return useSyncExternalStore(
+    listener => store.subscribe(listener),
+    () => store.getSnapshot(),
+    () => store.getSnapshot(),
   )
 }
 
-/** One chat-timeline row: no card chrome; the reply action appears on hover/focus. */
-function MessageRow({
-  message,
-  showHeader,
-  names,
-  kinds,
-  thread,
-  preview,
-  pending,
-  onReply,
-  onOpenThread,
-  registerTrigger,
-}: {
-  message: NativeMessage
-  showHeader: boolean
-  names: ReadonlyMap<string, string>
-  kinds: ReadonlyMap<string, string>
-  thread: NativeTarget | undefined
-  preview: ThreadPreview | undefined
-  pending: boolean
-  onReply: (message: NativeMessage, trigger: HTMLElement) => void
-  onOpenThread: (threadTargetId: string, trigger: HTMLElement) => void
-  registerTrigger: (trigger: HTMLElement) => void
-}) {
-  return (
-    <div className={css.messageRow} data-has-header={showHeader || undefined}>
-      {showHeader && (
-        <div className={css.messageRowHeader}>
-          <Avatar seed={message.authorId} size={22} />
-          <strong>{names.get(message.authorId) ?? message.authorId}</strong>
-          {kinds.get(message.authorId) === 'agent' && <span className={css.badge}>agent</span>}
-          <time>{timeOf(message.createdAtMs)}</time>
-        </div>
-      )}
-      <p className={css.messageText}>{message.text}</p>
-      {thread !== undefined && (
-        <button
-          type="button"
-          className={css.threadPreview}
-          disabled={pending}
-          onClick={event => {
-            registerTrigger(event.currentTarget)
-            onOpenThread(thread.id, event.currentTarget)
-          }}
-        >
-          <span className={css.threadPreviewHead}>
-            <b>{preview === undefined ? '…' : preview.count === 0 ? '回复' : `${String(preview.count)} 条回复`}</b> ›
-          </span>
-          {preview?.latest.map(reply => (
-            <span key={reply.id} className={css.threadPreviewRow}>
-              <b>{names.get(reply.authorId) ?? reply.authorId}</b>
-              {kinds.get(reply.authorId) === 'agent' && <span className={css.badge}>agent</span>}
-              <span className={css.threadPreviewSnippet}>{reply.text}</span>
-              <time>{timeOf(reply.createdAtMs)}</time>
-            </span>
-          ))}
-        </button>
-      )}
-      <div className={css.hoverActions}>
-        <button
-          type="button"
-          aria-label="回复"
-          title="回复"
-          disabled={pending}
-          onClick={event => {
-            registerTrigger(event.currentTarget)
-            onReply(message, event.currentTarget)
-          }}
-        >
-          {ReplyIcon}
-        </button>
-      </div>
-    </div>
-  )
+function chaosStateOf(props: ChaosPanelProps | ChaosPanelInjected): ChaosClientState {
+  return 'useChaos' in props ? props.useChaos(value => value) : useChaosStore(props.hooks.chaos)
 }
 
-/** Channel-top task board: four swim lanes; status moves via the chip menu. */
-function TaskBoard({
-  tasks,
-  textByMessage,
-  names,
-  actorId,
-  channelCreatorId,
-  pending,
-  onUpdate,
-  onClaim,
-  onUnclaim,
-}: {
-  tasks: readonly NativeTask[]
-  textByMessage: ReadonlyMap<string, string>
-  names: ReadonlyMap<string, string>
-  actorId: string | undefined
-  channelCreatorId: string | undefined
-  pending: boolean
-  onUpdate: (task: NativeTask, status: NativeTask['status']) => void
-  onClaim: (task: NativeTask) => void
-  onUnclaim: (task: NativeTask) => void
-}) {
-  return (
-    <div className={css.board}>
-      {LANES.map(lane => {
-        const laneTasks = tasks.filter(task => task.status === lane.status)
-        return (
-          <section key={lane.status} className={css.lane} aria-label={lane.label}>
-            <h4>
-              <span className={css.laneTitle}>
-                <span className={css.laneDot} data-status={lane.status} aria-hidden />
-                {lane.label}
-              </span>
-              <span className={css.laneCount}>{laneTasks.length}</span>
-            </h4>
-            {laneTasks.map(task => {
-              // Prefer the live message; fall back to the store-resolved
-              // anchor snippet so old Tasks keep a real title.
-              const title = textByMessage.get(task.messageId) ?? task.anchorText
-              return (
-                <article key={task.messageId} className={css.taskCard}>
-                  <header>
-                    <strong>#{task.number}</strong>
-                    <TaskStatusChip
-                      task={task}
-                      transitions={taskTransitions[task.status]}
-                      canUpdate={
-                        task.assigneeId === undefined
-                        || task.assigneeId === actorId
-                        || channelCreatorId === actorId
-                      }
-                      pending={pending}
-                      onUpdate={status => { onUpdate(task, status) }}
-                    />
-                  </header>
-                  {title !== undefined && <p className={css.taskCardTitle}>{title}</p>}
-                  <div className={css.taskCardWho}>
-                    {task.assigneeId === undefined
-                      ? '未认领'
-                      : (
-                        <>
-                          <Avatar seed={task.assigneeId} size={16} />
-                          {names.get(task.assigneeId) ?? task.assigneeId}
-                        </>
-                      )}
-                  </div>
-                  <div className={css.taskCardActions}>
-                    {task.assigneeId === undefined && task.status !== 'done' && (
-                      <button type="button" disabled={pending} onClick={() => { onClaim(task) }}>认领</button>
-                    )}
-                    {task.assigneeId === actorId && task.status !== 'done' && (
-                      <button type="button" disabled={pending} onClick={() => { onUnclaim(task) }}>取消认领</button>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </section>
-        )
-      })}
-    </div>
-  )
-}
-
-/** Frame-wide collaboration workspace and its lighter Quick Peek state. */
-export function ChaosPanel({
-  useChaos,
-  ensure,
-  openWorkspace,
-  closeSurface,
-  selectTarget,
-  createChannel,
-  addMember,
-  createThread,
-  openThreadPanel,
-  closeThreadPanel,
-  sendToThread,
-  send,
-  createTask,
-  claimTask,
-  unclaimTask,
-  updateTask,
-}: ChaosPanelProps) {
-  const state = useChaos(value => value)
-  const [createOpen, setCreateOpen] = useState(false)
+function useRosterActions(
+  props: Pick<ChaosPanelInjected, 'createChannel' | 'createAgent' | 'addMember'>,
+  state: ChaosClientState,
+) {
+  const [createKind, setCreateKind] = useState<'channel' | 'agent' | null>(null)
   const [createPending, setCreatePending] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [newTaskOpen, setNewTaskOpen] = useState(false)
-  const [newTaskPending, setNewTaskPending] = useState(false)
-  const [newTaskError, setNewTaskError] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({})
-  const [sendPending, setSendPending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
-  const [threadSendPending, setThreadSendPending] = useState(false)
-  const [threadSendError, setThreadSendError] = useState<string | null>(null)
   const [memberId, setMemberId] = useState('')
   const [pending, setPending] = useState(false)
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const [view, setView] = useState<'messages' | 'tasks'>('messages')
   const [failure, setFailure] = useState<string | null>(null)
   const plusRef = useRef<HTMLButtonElement>(null)
-  const newTaskButtonRef = useRef<HTMLButtonElement>(null)
-  const threadTriggerRef = useRef<HTMLElement | null>(null)
+  const agentPlusRef = useRef<HTMLButtonElement>(null)
+  const selected = state.targets.find(target => target.id === state.selectedTargetId)
 
+  const submitCreate = async (name: string): Promise<boolean> => {
+    if (createPending || createKind === null) return false
+    setCreatePending(true)
+    setCreateError(null)
+    try {
+      if (createKind === 'channel') await props.createChannel(name)
+      else await props.createAgent(name)
+      const kind = createKind
+      setCreateKind(null)
+      if (kind === 'channel') plusRef.current?.focus()
+      else agentPlusRef.current?.focus()
+      return true
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : String(error))
+      return false
+    } finally {
+      setCreatePending(false)
+    }
+  }
+
+  const submitMember = (event: FormEvent): void => {
+    event.preventDefault()
+    if (selected?.kind !== 'channel' || memberId === '') return
+    setPending(true)
+    setFailure(null)
+    void props.addMember(selected.id, memberId).then(
+      () => { setMemberId('') },
+      error => { setFailure(error instanceof Error ? error.message : String(error)) },
+    ).finally(() => { setPending(false) })
+  }
+
+  return {
+    createKind,
+    setCreateKind,
+    createPending,
+    createError,
+    memberId,
+    setMemberId,
+    pending,
+    failure,
+    plusRef,
+    agentPlusRef,
+    selected,
+    submitCreate,
+    submitMember,
+  }
+}
+
+function ChannelList({
+  state,
+  selected,
+  pending,
+  failure,
+  memberId,
+  setMemberId,
+  plusRef,
+  onCreate,
+  onSelect,
+  onInvite,
+}: {
+  state: ChaosClientState
+  selected: NativeTarget | undefined
+  pending: boolean
+  failure: string | null
+  memberId: string
+  setMemberId: (value: string) => void
+  plusRef: { current: HTMLButtonElement | null }
+  onCreate: () => void
+  onSelect: (targetId: string) => void
+  onInvite: (event: FormEvent) => void
+}): ReactNode {
+  const channels = state.targets.filter(target => target.kind === 'channel')
+  return (
+    <div className={css.rosterPane}>
+      <div className={css.membersHead}>
+        <h3>CHANNELS</h3>
+        <button
+          ref={plusRef}
+          type="button"
+          className={css.plusButton}
+          aria-label="新建 Channel"
+          title="新建 Channel"
+          onClick={onCreate}
+        >
+          ＋
+        </button>
+      </div>
+      {failure !== null && <div className={css.error} role="alert">{failure}</div>}
+      <nav className={css.targets} aria-label="Channels">
+        {channels.map(channel => (
+          <button
+            type="button"
+            key={channel.id}
+            className={css.targetButton}
+            data-selected={channel.id === state.selectedTargetId || undefined}
+            aria-label={`选择 Channel ${channel.name}`}
+            onClick={() => { onSelect(channel.id) }}
+          >
+            <span className={css.targetGlyph} aria-hidden>#</span>
+            <span>{channel.name}</span>
+          </button>
+        ))}
+        {channels.length === 0 && <p className={css.empty}>用 ＋ 新建一个 Channel。</p>}
+      </nav>
+      {selected?.kind === 'channel' && selected.createdBy === state.actor?.id && (
+        <form onSubmit={onInvite} className={css.memberForm}>
+          <select
+            value={memberId}
+            onChange={event => { setMemberId(event.target.value) }}
+            aria-label="邀请成员或 agent"
+          >
+            <option value="">邀请进当前房间…</option>
+            {state.actors
+              .filter(actor =>
+                actor.id !== state.actor?.id
+                && !state.members.some(member => member.id === actor.id),
+              )
+              .map(actor => (
+                <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
+              ))}
+          </select>
+          <button className={css.secondaryButton} disabled={pending || memberId === ''}>加入</button>
+        </form>
+      )}
+    </div>
+  )
+}
+
+function AgentList({
+  state,
+  plusRef,
+  onCreate,
+  onOpen,
+}: {
+  state: ChaosClientState
+  plusRef: { current: HTMLButtonElement | null }
+  onCreate: () => void
+  onOpen: (agentId: string) => void
+}): ReactNode {
+  const agents = state.actors.filter(actor => actor.kind === 'agent')
+  const hostSessionBound = (actor: NativeActor): boolean =>
+    state.bindings.some(binding => binding.agentId === actor.id && binding.sessionId === state.hostSessionId)
+  return (
+    <div className={css.rosterPane}>
+      <div className={css.membersHead}>
+        <h3>AGENTS</h3>
+        <button
+          ref={plusRef}
+          type="button"
+          className={css.plusButton}
+          aria-label="新建 Agent"
+          title="新建 Agent"
+          onClick={onCreate}
+        >
+          ＋
+        </button>
+      </div>
+      <nav className={css.targets} aria-label="Agents">
+        {agents.map(actor => (
+          <button
+            type="button"
+            key={actor.id}
+            className={css.targetButton}
+            data-selected={state.selectedAgentId === actor.id || hostSessionBound(actor) || undefined}
+            aria-label={`打开 Agent ${actor.displayName}`}
+            onClick={() => { onOpen(actor.id) }}
+          >
+            <span>{actor.displayName}</span>
+            {hostSessionBound(actor) && <span className={css.badge}>当前</span>}
+          </button>
+        ))}
+        {agents.length === 0 && <p className={css.empty}>用 ＋ 只填一个名字。</p>}
+      </nav>
+    </div>
+  )
+}
+
+export function ChannelsPage(props: ChaosPanelProps | ChaosPanelInjected): ReactNode {
+  const state = chaosStateOf(props)
+  const roster = useRosterActions(props, state)
+  useEffect(() => { void props.ensure() }, [props.ensure])
+  return (
+    <>
+      <ChannelList
+        state={state}
+        selected={roster.selected}
+        pending={roster.pending}
+        failure={roster.failure}
+        memberId={roster.memberId}
+        setMemberId={roster.setMemberId}
+        plusRef={roster.plusRef}
+        onCreate={() => {
+          roster.setCreateKind('channel')
+        }}
+        onSelect={targetId => { void props.selectTarget(targetId) }}
+        onInvite={roster.submitMember}
+      />
+      {roster.createKind === 'channel' && (
+        <NamedCreateDialog
+          title="新建 Channel"
+          fieldLabel="Channel 名称"
+          pending={roster.createPending}
+          error={roster.createError}
+          onCancel={() => {
+            roster.setCreateKind(null)
+            roster.plusRef.current?.focus()
+          }}
+          onCreate={roster.submitCreate}
+        />
+      )}
+    </>
+  )
+}
+
+export function AgentsPage(props: ChaosPanelProps | ChaosPanelInjected): ReactNode {
+  const state = chaosStateOf(props)
+  const roster = useRosterActions(props, state)
+  useEffect(() => { void props.ensure() }, [props.ensure])
+  return (
+    <>
+      <AgentList
+        state={state}
+        plusRef={roster.agentPlusRef}
+        onCreate={() => { roster.setCreateKind('agent') }}
+        onOpen={props.openAgent}
+      />
+      {roster.createKind === 'agent' && (
+        <NamedCreateDialog
+          title="新建 Agent"
+          fieldLabel="Agent 名称"
+          pending={roster.createPending}
+          error={roster.createError}
+          onCancel={() => {
+            roster.setCreateKind(null)
+            roster.agentPlusRef.current?.focus()
+          }}
+          onCreate={roster.submitCreate}
+        />
+      )}
+    </>
+  )
+}
+
+export function ThreadPage(props: ChaosPanelProps | ChaosPanelInjected): ReactNode {
+  const state = chaosStateOf(props)
   const names = useMemo(
     () => new Map(state.actors.map(actor => [actor.id, actor.displayName])),
     [state.actors],
@@ -522,430 +445,235 @@ export function ChaosPanel({
     () => new Map(state.actors.map(actor => [actor.id, actor.kind])),
     [state.actors],
   )
-  const selected = state.targets.find(target => target.id === state.selectedTargetId)
-  const textByMessage = useMemo(
-    () => new Map(state.messages.map(message => [message.id, message.text])),
-    [state.messages],
-  )
-  const threadByRoot = useMemo(
-    () => new Map(
-      state.targets
-        .filter(target => target.kind === 'thread' && target.rootMessageId !== undefined)
-        .map(target => [target.rootMessageId as string, target]),
-    ),
-    [state.targets],
-  )
-  const channels = state.targets.filter(target => target.kind === 'channel')
   const panelThread = state.targets.find(target => target.id === state.threadPanelId)
   const panelParent = panelThread === undefined
     ? undefined
     : state.targets.find(target => target.id === panelThread.parentTargetId)
+  useEffect(() => { void props.ensure() }, [props.ensure])
+  if (panelThread === undefined) {
+    return <p className={css.empty}>点一条回复，这里打开 Thread。</p>
+  }
+  return (
+    <ThreadPanel
+      thread={panelThread}
+      parentName={panelParent?.name ?? 'Thread'}
+      messages={state.threadPanelMessages}
+      names={names}
+      kinds={kinds}
+      onClose={() => {
+        props.closeThreadPanel()
+        props.setRailTab('channels')
+      }}
+    />
+  )
+}
+
+const HERO_CHIP_GAP = 2
+
+function paintedRight(root: Element): number | null {
+  let right: number | null = null
+  const visit = (node: Element): void => {
+    if (node !== root) {
+      const rect = node.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        right = right === null ? rect.right : Math.max(right, rect.right)
+      }
+    }
+    for (const child of Array.from(node.children)) visit(child)
+  }
+  visit(root)
+  return right
+}
+
+/** Official composer chips: sit on the Standard mode row, same 28px pill. */
+export function ChaosDock({
+  useChaos,
+  ensure,
+  setAsTask,
+  clearTarget,
+  closeThreadPanel,
+}: ChaosDockProps) {
+  const state = useChaos(value => value)
+  const selected = state.targets.find(target => target.id === state.selectedTargetId)
+  const thread = state.railTab === 'thread'
+    ? state.targets.find(target => target.id === state.threadPanelId)
+    : undefined
+  const parent = thread === undefined
+    ? undefined
+    : state.targets.find(target => target.id === thread.parentTargetId)
+  const [heroPlacement, setHeroPlacement] = useState<{ left: number; top: number } | null>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { void ensure() }, [ensure])
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current
+    const outlet = anchor?.parentElement ?? null
+    const stack = outlet?.parentElement ?? null
+    const heroRow = outlet?.previousElementSibling ?? null
+    if (anchor === null || outlet === null || stack === null || heroRow === null) return
+    const measure = (): void => {
+      const stackRect = stack.getBoundingClientRect()
+      const rowRect = heroRow.getBoundingClientRect()
+      const anchorRect = anchor.getBoundingClientRect()
+      if (stackRect.width <= 0 || rowRect.width <= 0 || anchorRect.width <= 0) return
+      const right = paintedRight(heroRow)
+      if (right === null) return
+      const left = Math.max(0, right - stackRect.left + HERO_CHIP_GAP)
+      const top = Math.max(0, rowRect.top - stackRect.top + (rowRect.height - anchorRect.height) / 2)
+      setHeroPlacement(previous => {
+        if (previous !== null && Math.abs(previous.left - left) < 0.5 && Math.abs(previous.top - top) < 0.5) {
+          return previous
+        }
+        return { left, top }
+      })
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    for (const target of [anchor, outlet, stack, heroRow]) observer?.observe(target)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [selected?.id, thread?.id, state.asTask])
+
+  if (thread === undefined && selected === undefined) return null
+
+  return (
+    <div
+      ref={anchorRef}
+      className={css.heroAnchor}
+      data-chaos-dock={thread === undefined ? 'channel' : 'thread'}
+      style={heroPlacement === null ? undefined : { left: `${String(heroPlacement.left)}px`, top: `${String(heroPlacement.top)}px` }}
+    >
+      {thread !== undefined ? (
+        <button
+          type="button"
+          className={css.heroChip}
+          aria-label="Clear thread target"
+          onClick={closeThreadPanel}
+        >
+          <span>#{parent?.name ?? 'thread'}</span>
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            className={css.heroChip}
+            aria-label={`Clear #${selected?.name ?? 'channel'}`}
+            onClick={clearTarget}
+          >
+            <span>#{selected?.name}</span>
+          </button>
+          {selected?.kind === 'channel' && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={state.asTask}
+              aria-label="As Task"
+              className={css.heroChip}
+              data-checked={state.asTask || undefined}
+              onClick={() => { setAsTask(!state.asTask) }}
+            >
+              As Task
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Fallback when better-sidebar is not installed: same seating as sidecar —
+ * a top-right toggle opens a right workbench. Center stays official DSH.
+ */
+export function ChaosPanel(props: ChaosPanelProps) {
+  const {
+    useChaos,
+    ensure,
+    toggleRail,
+    setRailTab,
+    closeSurface,
+  } = props
+  const state = useChaos(value => value)
+  const open = state.surface === 'rail'
 
   useEffect(() => { void ensure() }, [ensure])
   useEffect(() => {
-    if (state.surface !== 'workspace') setDetailsOpen(false)
-  }, [state.surface])
-  // An open Thread panel owns the right rail; on narrow screens the rail is a
-  // drawer, so opening a thread must open the drawer too.
+    pushOfficialCenter(open)
+    return () => { pushOfficialCenter(false) }
+  }, [open])
   useEffect(() => {
-    if (state.threadPanelId !== undefined) setDetailsOpen(true)
-  }, [state.threadPanelId])
-  // Reset the channel view when switching targets.
-  useEffect(() => { setView('messages') }, [state.selectedTargetId])
-  useEffect(() => { setNewTaskOpen(false) }, [state.selectedTargetId])
-  useEffect(() => {
-    if (state.surface === 'closed') return
+    if (!open) return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      if (createOpen || newTaskOpen) return // Dialogs handle their own Escape.
-      if (detailsOpen) closeDetails()
-      else closeSurface()
+      if (event.key === 'Escape') closeSurface()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => { window.removeEventListener('keydown', onKeyDown) }
-  })
+  }, [open, closeSurface])
 
-  const run = async (operation: () => Promise<void>): Promise<void> => {
-    setPending(true)
-    setFailure(null)
-    try {
-      await operation()
-    } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error))
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const closeDetails = (): void => {
-    setDetailsOpen(false)
-    threadTriggerRef.current?.focus()
-  }
-
-  const draftKey = state.selectedTargetId ?? ''
-  const draft = drafts[draftKey] ?? ''
-  const setDraft = (value: string): void => {
-    setDrafts(previous => ({ ...previous, [draftKey]: value }))
-  }
-  const threadDraftKey = state.threadPanelId ?? ''
-  const threadDraft = drafts[threadDraftKey] ?? ''
-  const setThreadDraft = (value: string): void => {
-    setDrafts(previous => ({ ...previous, [threadDraftKey]: value }))
-  }
-
-  const submitMessage = async (): Promise<void> => {
-    const snapshot = draft
-    const text = snapshot.trim()
-    if (text === '' || sendPending) return
-    setSendPending(true)
-    setSendError(null)
-    try {
-      await send(text)
-      // Clear only when the raw draft is still the submit snapshot.
-      setDrafts(previous => resolveSentDraft(previous, draftKey, snapshot))
-    } catch (error) {
-      setSendError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setSendPending(false)
-    }
-  }
-
-  const submitThreadMessage = async (): Promise<void> => {
-    const snapshot = threadDraft
-    const text = snapshot.trim()
-    if (text === '' || threadSendPending) return
-    setThreadSendPending(true)
-    setThreadSendError(null)
-    try {
-      await sendToThread(text)
-      setDrafts(previous => resolveSentDraft(previous, threadDraftKey, snapshot))
-    } catch (error) {
-      setThreadSendError(error instanceof Error ? error.message : String(error))
-    } finally {
-      setThreadSendPending(false)
-    }
-  }
-
-  const submitCreateChannel = async (name: string): Promise<boolean> => {
-    if (createPending) return false
-    setCreatePending(true)
-    setCreateError(null)
-    try {
-      await createChannel(name)
-      setCreateOpen(false)
-      plusRef.current?.focus()
-      return true
-    } catch (error) {
-      // Failure keeps the input so the name is not lost.
-      setCreateError(error instanceof Error ? error.message : String(error))
-      return false
-    } finally {
-      setCreatePending(false)
-    }
-  }
-
-  const anchorCandidates = useMemo(() => {
-    const anchored = new Set(state.tasks.map(task => task.messageId))
-    return state.messages.filter(message => !anchored.has(message.id))
-  }, [state.messages, state.tasks])
-
-  const submitNewTask = (messageId: string): void => {
-    if (newTaskPending) return
-    setNewTaskPending(true)
-    setNewTaskError(null)
-    void (async () => {
-      try {
-        await createTask(messageId)
-        setNewTaskOpen(false)
-        newTaskButtonRef.current?.focus()
-      } catch (error) {
-        setNewTaskError(error instanceof Error ? error.message : String(error))
-      } finally {
-        setNewTaskPending(false)
-      }
-    })()
-  }
-
-  const submitMember = (event: FormEvent): void => {
-    event.preventDefault()
-    if (selected?.kind !== 'channel' || memberId === '') return
-    void run(async () => {
-      await addMember(selected.id, memberId)
-      setMemberId('')
-    })
-  }
-
-  const openThreadFrom = (threadTargetId: string): void => {
-    void run(() => openThreadPanel(threadTargetId))
-  }
-
-  const moveTask = (task: NativeTask, status: NativeTask['status']): void => {
-    void (async () => {
-      await run(() => updateTask(task, status))
-      // The card changes lanes on success, which remounts the chip; restore
-      // keyboard focus to the same Task's chip once the board has settled.
-      document
-        .querySelector<HTMLButtonElement>(`button[aria-label^="Task #${task.number} 状态"]`)
-        ?.focus()
-    })()
-  }
-
-  const replyTo = (message: NativeMessage): void => {
-    const thread = threadByRoot.get(message.id)
-    if (thread !== undefined) openThreadFrom(thread.id)
-    else void run(() => createThread(message.id))
-  }
-
-  if (state.surface === 'closed') return null
-  if (state.surface === 'peek') {
-    return (
-      <QuickPeek
-        state={state}
-        closeSurface={closeSurface}
-        openWorkspace={openWorkspace}
-        selectTarget={selectTarget}
-      />
-    )
-  }
+  const tab = state.threadPanelId !== undefined && state.railTab === 'thread'
+    ? 'thread'
+    : state.railTab === 'agents' ? 'agents' : 'channels'
 
   return (
-    <div className={css.backdrop}>
-      <section className={css.workspace} aria-label="协作工作台">
-        <header className={css.workspaceHeader} data-stream={state.stream}>
-          <div className={css.workspaceTitle}>
-            <strong>协作</strong>
-            {state.stream !== 'connected' && (
-              <small>重连中…</small>
-            )}
-          </div>
-          <button type="button" className={css.iconButton} aria-label="关闭协作工作台" onClick={closeSurface}>
+    <>
+      <div className={css.toggleCluster}>
+        <button
+          type="button"
+          className={css.toggleButton}
+          aria-label={open ? '收起协作面板' : '打开协作面板'}
+          aria-expanded={open}
+          onClick={toggleRail}
+        >
+          {PanelIcon}
+        </button>
+      </div>
+      <aside
+        className={`${css.panel} ${open ? '' : css.panelHidden}`}
+        aria-label="协作面板"
+        data-stream={state.stream}
+      >
+        <div className={css.tabBar}>
+          <button
+            type="button"
+            className={css.tab}
+            data-active={tab === 'channels' || undefined}
+            onClick={() => { setRailTab('channels') }}
+          >
+            Channels
+          </button>
+          <button
+            type="button"
+            className={css.tab}
+            data-active={tab === 'agents' || undefined}
+            onClick={() => { setRailTab('agents') }}
+          >
+            Agents
+          </button>
+          {state.threadPanelId !== undefined && (
+            <button
+              type="button"
+              className={css.tab}
+              data-active={tab === 'thread' || undefined}
+              onClick={() => { setRailTab('thread') }}
+            >
+              Thread
+            </button>
+          )}
+          <button type="button" className={css.iconButton} aria-label="关闭协作面板" onClick={closeSurface}>
             {CloseIcon}
           </button>
-        </header>
-
-        <div className={css.workspaceBody}>
-          <aside className={css.targetNav}>
-            <div className={css.navHead}>
-              <h3>CHANNELS</h3>
-              <button
-                ref={plusRef}
-                type="button"
-                className={css.plusButton}
-                aria-label="新建 Channel"
-                title="新建 Channel"
-                onClick={() => {
-                  setCreateError(null)
-                  setCreateOpen(true)
-                }}
-              >
-                ＋
-              </button>
-            </div>
-            <nav className={css.targets} aria-label="Channels">
-              {channels.map(channel => (
-                <button
-                  type="button"
-                  key={channel.id}
-                  className={css.targetButton}
-                  data-selected={channel.id === state.selectedTargetId || undefined}
-                  aria-label={`打开 Channel ${channel.name}`}
-                  onClick={() => { void selectTarget(channel.id) }}
-                >
-                  <span className={css.targetGlyph} aria-hidden>#</span>
-                  <span>{channel.name}</span>
-                </button>
-              ))}
-              {channels.length === 0 && <p className={css.empty}>用 ＋ 新建一个 Channel 开始协作。</p>}
-            </nav>
-          </aside>
-
-          <main className={css.conversation}>
-            <header className={css.conversationHeader}>
-              <h2>{selected === undefined ? '请选择 Channel' : selected.name}</h2>
-              <div className={css.viewTabs} role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === 'messages'}
-                data-active={view === 'messages' || undefined}
-                onClick={() => { setView('messages') }}
-              >
-                消息
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={view === 'tasks'}
-                data-active={view === 'tasks' || undefined}
-                onClick={() => { setView('tasks') }}
-              >
-                任务{state.tasks.length > 0 ? ` ${String(state.tasks.length)}` : ''}
-              </button>
-              </div>
-              {view === 'tasks' && (
-                <button
-                  ref={newTaskButtonRef}
-                  type="button"
-                  className={css.secondaryButton}
-                  disabled={pending || anchorCandidates.length === 0}
-                  onClick={() => {
-                    setNewTaskError(null)
-                    setNewTaskOpen(true)
-                  }}
-                >
-                  新建 Task
-                </button>
-              )}
-              <button type="button" className={css.mobileDetailsButton} aria-label="打开面板" onClick={() => { setDetailsOpen(true) }}>
-                成员
-              </button>
-            </header>
-            {(state.error !== undefined || failure !== null) && (
-              <div className={css.error} role="alert">{failure ?? state.error}</div>
-            )}
-            {view === 'tasks' ? (
-              <div className={css.boardPane}>
-                <TaskBoard
-                  tasks={state.tasks}
-                  textByMessage={textByMessage}
-                  names={names}
-                  actorId={state.actor?.id}
-                  channelCreatorId={selected?.createdBy}
-                  pending={pending}
-                  onUpdate={(task, status) => { moveTask(task, status) }}
-                  onClaim={task => { void run(() => claimTask(task.messageId)) }}
-                  onUnclaim={task => { void run(() => unclaimTask(task)) }}
-                />
-              </div>
-            ) : (
-              <>
-                <div className={css.messages}>
-                  {state.status === 'loading' && <p className={css.empty}>正在加载……</p>}
-                  {selected !== undefined && state.messages.length === 0 && state.status === 'ready' && (
-                    <p className={css.empty}>这里还没有消息。</p>
-                  )}
-                  {state.messages.map((message, index) => {
-                    const previous = index > 0 ? state.messages[index - 1] : undefined
-                    const thread = threadByRoot.get(message.id)
-                    return (
-                      <MessageRow
-                        key={message.id}
-                        message={message}
-                        showHeader={previous === undefined || previous.authorId !== message.authorId}
-                        names={names}
-                        kinds={kinds}
-                        thread={thread}
-                        preview={thread === undefined ? undefined : state.threadPreviews[thread.id]}
-                        pending={pending}
-                        onReply={replyTo}
-                        onOpenThread={openThreadFrom}
-                        registerTrigger={trigger => { threadTriggerRef.current = trigger }}
-                      />
-                    )
-                  })}
-                </div>
-                <Composer
-                  value={draft}
-                  onChange={setDraft}
-                  onSend={submitMessage}
-                  pending={sendPending}
-                  error={sendError}
-                  placeholder={selected === undefined ? '发送消息' : `发送到 #${selected.name}`}
-                  ariaLabel="发送消息"
-                />
-              </>
-            )}
-          </main>
-
-          <aside className={css.details} data-open={detailsOpen || undefined}>
-            {panelThread !== undefined ? (
-              <ThreadPanel
-                thread={panelThread}
-                parentName={panelParent?.name ?? 'Thread'}
-                messages={state.threadPanelMessages}
-                names={names}
-                kinds={kinds}
-                draft={threadDraft}
-                onDraftChange={setThreadDraft}
-                pending={threadSendPending}
-                error={threadSendError}
-                onClose={() => {
-                  closeThreadPanel()
-                  closeDetails()
-                }}
-                onSend={submitThreadMessage}
-              />
-            ) : (
-              <div className={css.membersPane}>
-                <div className={css.membersHead}>
-                  <h3>成员 {state.members.length}</h3>
-                  <button
-                    type="button"
-                    className={`${css.iconButton} ${css.railClose}`}
-                    aria-label="关闭面板"
-                    onClick={closeDetails}
-                  >
-                    {CloseIcon}
-                  </button>
-                </div>
-                {state.members.map(actor => (
-                  <div key={actor.id} className={css.memberRow}>
-                    <Avatar seed={actor.id} size={18} />
-                    <span className={css.memberName}>
-                      {actor.displayName}{actor.id === state.actor?.id ? '（你）' : ''}
-                    </span>
-                    <span className={css.badge} data-kind={actor.kind}>{actor.kind}</span>
-                  </div>
-                ))}
-                {selected?.kind === 'channel' && selected.createdBy === state.actor?.id && (
-                  <form onSubmit={submitMember} className={css.memberForm}>
-                    <select
-                      value={memberId}
-                      onChange={event => { setMemberId(event.target.value) }}
-                      aria-label="邀请成员或 agent"
-                    >
-                      <option value="">邀请成员或 agent…</option>
-                      {state.actors
-                        .filter(actor =>
-                          actor.id !== state.actor?.id
-                          && !state.members.some(member => member.id === actor.id),
-                        )
-                        .map(actor => (
-                          <option key={actor.id} value={actor.id}>{actor.displayName} (@{actor.handle})</option>
-                        ))}
-                    </select>
-                    <button className={css.secondaryButton} disabled={pending || memberId === ''}>加入</button>
-                  </form>
-                )}
-              </div>
-            )}
-          </aside>
         </div>
-      </section>
-      {createOpen && (
-        <CreateChannelDialog
-          pending={createPending}
-          error={createError}
-          onCancel={() => {
-            setCreateOpen(false)
-            plusRef.current?.focus()
-          }}
-          onCreate={submitCreateChannel}
-        />
-      )}
-      {newTaskOpen && (
-        <NewTaskDialog
-          candidates={anchorCandidates}
-          names={names}
-          pending={newTaskPending}
-          error={newTaskError}
-          onCancel={() => {
-            setNewTaskOpen(false)
-            newTaskButtonRef.current?.focus()
-          }}
-          onCreate={submitNewTask}
-        />
-      )}
-    </div>
+        <div className={css.panelBody}>
+          {tab === 'agents'
+            ? <AgentsPage {...props} />
+            : tab === 'thread'
+              ? <ThreadPage {...props} />
+              : <ChannelsPage {...props} />}
+        </div>
+      </aside>
+    </>
   )
 }

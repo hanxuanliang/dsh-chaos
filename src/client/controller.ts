@@ -5,6 +5,8 @@ import type {
   NativeCollabSnapshot,
   NativeMessage,
   NativeMessageTail,
+  NativeRuntimeBinding,
+  NativeSendResult,
   NativeTask,
   NativeTarget,
 } from '../native.ts'
@@ -31,10 +33,15 @@ export interface ThreadPreview {
 export interface ChaosClientState {
   status: 'cold' | 'loading' | 'ready' | 'error'
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
-  surface: 'closed' | 'peek' | 'workspace'
+  surface: 'closed' | 'rail'
+  railTab: 'channels' | 'agents' | 'thread'
+  asTask: boolean
   cursor: string
   actor?: NativeActor
   actors: readonly NativeActor[]
+  bindings: readonly NativeRuntimeBinding[]
+  hostSessionId?: string
+  selectedAgentId?: string
   targets: readonly NativeTarget[]
   followedThreadIds: readonly string[]
   allTasks: readonly NativeTask[]
@@ -55,8 +62,11 @@ const INITIAL_STATE: ChaosClientState = {
   status: 'cold',
   stream: 'idle',
   surface: 'closed',
+  railTab: 'channels',
+  asTask: false,
   cursor: '0',
   actors: [],
+  bindings: [],
   targets: [],
   followedThreadIds: [],
   allTasks: [],
@@ -115,23 +125,80 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     }
   }
 
-  togglePeek(): void {
-    const surface = this.state.surface === 'peek' ? 'closed' : 'peek'
+  toggleRail(): void {
+    const surface = this.state.surface === 'rail' ? 'closed' : 'rail'
     this.publish({ ...this.state, surface })
   }
 
-  openWorkspace(): void {
-    this.publish({ ...this.state, surface: 'workspace' })
+  openRail(): void {
+    if (this.state.surface === 'rail') return
+    this.publish({ ...this.state, surface: 'rail' })
+  }
+
+  setAsTask(asTask: boolean): void {
+    this.publish({ ...this.state, asTask })
+  }
+
+  setRailTab(tab: ChaosClientState['railTab']): void {
+    this.publish({ ...this.state, railTab: tab })
+  }
+
+  openDesk(agentId?: string): void {
+    const next: ChaosClientState = { ...this.state }
+    if (agentId !== undefined) next.selectedAgentId = agentId
+    this.publish(next)
+  }
+
+  setHostSession(sessionId: string | undefined): void {
+    const next: ChaosClientState = { ...this.state }
+    if (sessionId === undefined) delete next.hostSessionId
+    else next.hostSessionId = sessionId
+    this.publish(next)
   }
 
   closeSurface(): void {
     this.publish({ ...this.state, surface: 'closed' })
   }
 
+  clearTarget(): void {
+    const next: ChaosClientState = {
+      ...this.state,
+      messages: [],
+      tasks: [],
+      members: [],
+      threadPreviews: {},
+    }
+    delete next.selectedTargetId
+    this.publish(next)
+  }
+
   async selectTarget(targetId: string): Promise<void> {
     if (!this.state.targets.some(target => target.id === targetId)) return
-    this.publish({ ...this.state, selectedTargetId: targetId, messages: [], tasks: [], members: [] })
+    const next: ChaosClientState = {
+      ...this.state,
+      railTab: 'channels',
+      selectedTargetId: targetId,
+      messages: [],
+      tasks: [],
+      members: [],
+    }
+    delete next.selectedAgentId
+    this.publish(next)
     await this.reloadTarget(targetId)
+  }
+
+  async createAgent(name: string): Promise<{
+    actor: NativeActor
+    binding?: NativeRuntimeBinding
+    workspacePath: string
+  }> {
+    const created = await this.call<{
+      actor: NativeActor
+      binding?: NativeRuntimeBinding
+      workspacePath: string
+    }>('agent.create', { name })
+    await this.reloadProjection()
+    return created
   }
 
   async createChannel(name: string): Promise<void> {
@@ -168,10 +235,33 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     await this.reloadProjection()
   }
 
-  async send(text: string): Promise<void> {
+  async send(text: string): Promise<NativeSendResult> {
+    return await this.sendTo(this.requireSelectedTargetId(), text)
+  }
+
+  /**
+   * Official composer As Task: send the Channel message, then promote that exact
+   * message to a Task. Core still stores Tasks as message-anchored rows;
+   * the UI must not ask the human to pick an anchor first.
+   */
+  async sendAsTask(text: string): Promise<void> {
+    const targetId = this.requireSelectedTargetId()
+    const target = this.state.targets.find(candidate => candidate.id === targetId)
+    if (target?.kind === 'thread') {
+      throw new Error('Thread 回复不能立为 Task')
+    }
+    const sent = await this.sendTo(targetId, text)
+    await this.createTask(sent.message.id)
+  }
+
+  private requireSelectedTargetId(): string {
     const targetId = this.state.selectedTargetId
     if (targetId === undefined) throw new Error('请先选择一个协作目标')
-    await this.call('message.send', {
+    return targetId
+  }
+
+  private async sendTo(targetId: string, text: string): Promise<NativeSendResult> {
+    const sent = await this.call<NativeSendResult>('message.send', {
       targetId,
       requestId: crypto.randomUUID(),
       text,
@@ -179,6 +269,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     const target = this.state.targets.find(candidate => candidate.id === targetId)
     if (target?.kind === 'thread') await this.reloadProjection()
     else await this.reloadTarget(targetId)
+    return sent
   }
 
   async openThreadPanel(threadTargetId: string): Promise<void> {
@@ -186,14 +277,24 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       target => target.id === threadTargetId && target.kind === 'thread',
     )
     if (thread === undefined) return
-    this.publish({ ...this.state, threadPanelId: thread.id, threadPanelMessages: [] })
+    this.publish({
+      ...this.state,
+      surface: 'rail',
+      railTab: 'thread',
+      threadPanelId: thread.id,
+      threadPanelMessages: [],
+    })
     await this.reloadThreadPanel()
   }
 
   closeThreadPanel(): void {
     if (this.state.threadPanelId === undefined) return
     this.panelEpoch += 1
-    const next: ChaosClientState = { ...this.state, threadPanelMessages: [] }
+    const next: ChaosClientState = {
+      ...this.state,
+      railTab: this.state.railTab === 'thread' ? 'channels' : this.state.railTab,
+      threadPanelMessages: [],
+    }
     delete next.threadPanelId
     this.publish(next)
   }
@@ -273,15 +374,16 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   private async loadProjectionOnce(): Promise<NativeCollabSnapshot> {
-    const [snapshot, actors] = await Promise.all([
+    const [snapshot, actors, bindings] = await Promise.all([
       this.call<NativeCollabSnapshot>('snapshot', {}),
       this.call<NativeActor[]>('actors', {}),
+      this.call<NativeRuntimeBinding[]>('runtime.bindings', {}).catch(() => [] as NativeRuntimeBinding[]),
     ])
     if (this.disposed) throw new Error('dsh-chaos Client 已停止')
     const selectedTargetId = this.state.selectedTargetId !== undefined
       && snapshot.targets.some(target => target.id === this.state.selectedTargetId)
       ? this.state.selectedTargetId
-      : snapshot.targets[0]?.id
+      : undefined
     const selectionChanged = selectedTargetId !== this.state.selectedTargetId
     const threadPanelId = this.state.threadPanelId !== undefined
       && snapshot.targets.some(target => target.id === this.state.threadPanelId)
@@ -293,6 +395,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       cursor: snapshot.cursor,
       actor: snapshot.actor,
       actors,
+      bindings,
       targets: snapshot.targets,
       followedThreadIds: snapshot.followedThreadIds,
       allTasks: snapshot.tasks,

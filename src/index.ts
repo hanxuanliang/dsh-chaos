@@ -3,15 +3,17 @@
  * @module dsh-chaos
  */
 
+import { mkdir } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
+import { randomBytes } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { DeliveryBridge } from './delivery.ts'
 import { installCollabRemote } from './remote.ts'
 import { RuntimeManager, type CreateRuntimeInput } from './runtime.ts'
-import { loadNativeModule, type NativeCollabHandle } from './native.ts'
+import { loadNativeModule, type NativeCollabHandle, type NativeRuntimeBinding } from './native.ts'
 
 export { DeliveryBridge } from './delivery.ts'
 export { RuntimeManager } from './runtime.ts'
@@ -59,11 +61,20 @@ export interface Config {
   sseHeartbeatMs?: number
 }
 
-const DEFAULT_DATABASE_PATH = join(
-  resolve(process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')),
-  'collab',
-  'state.db',
-)
+function dshHome(): string {
+  return resolve(process.env.DSH_HOME?.trim() || join(homedir(), '.dsh'))
+}
+
+const DEFAULT_DATABASE_PATH = join(dshHome(), 'collab', 'state.db')
+
+function slugifyHandle(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug === '' ? 'agent' : slug.slice(0, 40)
+}
 
 function defaultWebUserDisplayName(): string {
   try {
@@ -208,6 +219,41 @@ export class CollabService extends Service {
     const actor = await this.requireHandle().createAgent(handle, displayName, workspacePath)
     this.publishChange()
     return actor
+  }
+
+  /** Human types a name; home dir, Session, and binding stay off-screen. */
+  async createNamedAgent(name: string) {
+    const displayName = name.trim()
+    if (displayName === '') throw new Error('[invalid_argument] name must not be blank')
+    const base = slugifyHandle(displayName)
+    const template = join(dshHome(), 'agents', '{id}')
+    let actor
+    try {
+      actor = await this.requireHandle().createAgent(base, displayName, template)
+    } catch (error) {
+      const suffix = randomBytes(2).toString('hex')
+      actor = await this.requireHandle().createAgent(`${base}-${suffix}`, displayName, template)
+      void error
+    }
+    const workspacePath = join(dshHome(), 'agents', actor.id)
+    await mkdir(workspacePath, { recursive: true })
+    let binding: NativeRuntimeBinding | undefined
+    try {
+      binding = await this.createRuntime({
+        agentId: actor.id,
+        workspacePath,
+        provider: 'default',
+        model: 'default',
+        preset: 'default',
+      })
+    } catch (error) {
+      this.ctx.logger.warn(`dsh-chaos: created Agent ${actor.id} without a Session`)
+      this.ctx.logger.warn(error)
+    }
+    this.publishChange()
+    return binding === undefined
+      ? { actor, workspacePath }
+      : { actor, binding, workspacePath }
   }
 
   async createChannel(name: string, creatorId: string) {

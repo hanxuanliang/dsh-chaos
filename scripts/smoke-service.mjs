@@ -100,6 +100,12 @@ try {
   for await (const _chunk of stream) {}
   const empty = await ctx.collab.checkInbox(alpha.id, binding.generation, binding.sessionId, 20)
   assert.equal(empty.messages.length, 0)
+
+  const named = await ctx.collab.createNamedAgent('Alpha Two')
+  assert.equal(named.actor.displayName, 'Alpha Two')
+  assert.match(named.workspacePath, /\/agents\/[0-9a-f-]{36}$/)
+  const { stat } = await import('node:fs/promises')
+  assert.equal((await stat(named.workspacePath)).isDirectory(), true)
   await fiber.dispose()
 } finally {
   for (const dispose of dependencies.reverse()) dispose()

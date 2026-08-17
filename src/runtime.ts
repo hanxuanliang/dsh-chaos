@@ -67,7 +67,9 @@ export class RuntimeManager {
       const handle = await this.registry.create({
         sessionId: SessionId(sessionId),
         meta: { cwd: input.workspacePath, agentPreset: input.preset },
-        agentOptions: { provider: input.provider, model: input.model },
+        ...(input.provider === 'default'
+          ? {}
+          : { agentOptions: { provider: input.provider, model: input.model } }),
         setup: (agentCtx: Context) => installCollabTools(agentCtx, this.collab, this),
       })
       try {
