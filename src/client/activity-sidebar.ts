@@ -8,6 +8,14 @@ export interface ActivitySidebarActions {
   selectTarget: (targetId: string) => Promise<void>
   openThreadPanel: (threadTargetId: string) => Promise<void>
   ensure: () => Promise<void>
+  closeActivity: () => void
+}
+
+interface ActivityRow {
+  id: string
+  kind: 'channel' | 'thread'
+  label: string
+  detail?: string
 }
 
 function sidebarRoot(): HTMLElement | undefined {
@@ -30,7 +38,16 @@ function regionArea(root: HTMLElement): HTMLElement | undefined {
   return root.querySelector<HTMLElement>('[class*="regionArea"]') ?? undefined
 }
 
-function inboxRows(state: ChaosClientState): readonly { id: string; kind: 'channel' | 'thread'; label: string }[] {
+function threadDetail(state: ChaosClientState, rootMessageId: string | undefined, createdAtMs: number): string {
+  const root = rootMessageId === undefined
+    ? undefined
+    : state.messages.find(message => message.id === rootMessageId)
+  const text = root?.text.trim()
+  if (text !== undefined && text !== '') return text
+  return `Thread · ${new Date(createdAtMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+}
+
+export function inboxRows(state: ChaosClientState): readonly ActivityRow[] {
   const followed = new Set(state.followedThreadIds)
   const channels = state.targets
     .filter(target => target.kind === 'channel')
@@ -42,10 +59,40 @@ function inboxRows(state: ChaosClientState): readonly { id: string; kind: 'chann
       return {
         id: target.id,
         kind: 'thread' as const,
-        label: parent === undefined ? 'Thread' : `#${parent.name} · thread`,
+        label: parent === undefined ? 'Thread' : `#${parent.name}`,
+        detail: threadDetail(state, target.rootMessageId, target.createdAtMs),
       }
     })
   return [...channels, ...threads]
+}
+
+function sidebarCollapsed(): boolean {
+  return document.querySelector('[data-sidebar-collapsed]') !== null
+}
+
+function icon(path: string): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('width', '15')
+  svg.setAttribute('height', '15')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '1.4')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('aria-hidden', 'true')
+  const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  shape.setAttribute('d', path)
+  svg.append(shape)
+  return svg
+}
+
+function tabContent(label: string, path: string): readonly Node[] {
+  const iconNode = icon(path)
+  iconNode.setAttribute('class', css.activityTabIcon ?? '')
+  const text = document.createElement('span')
+  text.className = css.activityTabLabel ?? ''
+  text.textContent = label
+  return [iconNode, text]
 }
 
 function paintInbox(
@@ -66,13 +113,34 @@ function paintInbox(
     const button = document.createElement('button')
     button.type = 'button'
     button.className = css.activityRow ?? ''
-    button.textContent = row.label
+    button.setAttribute(
+      'aria-label',
+      row.kind === 'channel' ? row.label : `${row.label} Thread ${row.detail ?? ''}`,
+    )
+    const glyph = document.createElement('span')
+    glyph.className = css.activityGlyph ?? ''
+    glyph.textContent = row.kind === 'channel' ? '#' : '↳'
+    glyph.setAttribute('aria-hidden', 'true')
+    const copy = document.createElement('span')
+    copy.className = css.activityCopy ?? ''
+    const label = document.createElement('span')
+    label.className = css.activityLabel ?? ''
+    label.textContent = row.label.replace(/^#/, '')
+    copy.append(label)
+    if (row.detail !== undefined) {
+      const detail = document.createElement('span')
+      detail.className = css.activityDetail ?? ''
+      detail.textContent = row.detail
+      copy.append(detail)
+    }
+    button.append(glyph, copy)
     if (row.id === state.selectedTargetId || row.id === state.threadPanelId) {
       button.dataset.active = 'true'
     }
     button.addEventListener('click', () => {
       if (row.kind === 'thread') void actions.openThreadPanel(row.id)
       else void actions.selectTarget(row.id)
+      if (sidebarCollapsed()) actions.closeActivity()
     })
     inbox.append(button)
   }
@@ -106,11 +174,13 @@ export function mountActivitySidebar(
   const sessions = document.createElement('button')
   sessions.type = 'button'
   sessions.className = css.activityTab ?? ''
-  sessions.textContent = '会话'
+  sessions.setAttribute('aria-label', '会话')
+  sessions.append(...tabContent('会话', 'M3 4h10M3 8h10M3 12h10'))
   const activity = document.createElement('button')
   activity.type = 'button'
   activity.className = css.activityTab ?? ''
-  activity.textContent = 'Activity'
+  activity.setAttribute('aria-label', 'Activity')
+  activity.append(...tabContent('Activity', 'M6 2 4.5 14M11.5 2 10 14M2.5 6h11M2 10h11'))
   tabs.append(sessions, activity)
 
   const inbox = document.createElement('div')
@@ -129,6 +199,8 @@ export function mountActivitySidebar(
     const active = state.leftPane === 'activity'
     sessions.toggleAttribute('data-active', !active)
     activity.toggleAttribute('data-active', active)
+    sessions.setAttribute('aria-pressed', String(!active))
+    activity.setAttribute('aria-pressed', String(active))
     inbox.hidden = !active
     document.documentElement.toggleAttribute('data-dsh-chaos-activity', active)
     if (active) paintInbox(inbox, state, actions)

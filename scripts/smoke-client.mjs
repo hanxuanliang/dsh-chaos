@@ -297,8 +297,9 @@ pendingGate.resolve()
 await pendingEnsure
 assert.equal(sources.length, sourceCount, 'dispose must prevent a late EventSource')
 
-// Thread panel and send routing: opening a thread panel must not move the
-// main selection, and sends must land on the right target.
+// Thread panel and send routing: a Thread opened from Activity first restores
+// its parent room, then keeps that room as the main selection while replies
+// route to the Thread.
 const threadTarget = {
   id: 'thread-1',
   kind: 'thread',
@@ -343,14 +344,12 @@ const threadRpc = {
 }
 const threadController = new ChaosClientController(threadRpc)
 await threadController.ensure()
-await threadController.selectTarget(target.id)
-assert.equal(threadController.getSnapshot().selectedTargetId, target.id)
 await threadController.openThreadPanel(threadTarget.id)
 assert.equal(threadController.getSnapshot().threadPanelId, threadTarget.id)
 assert.equal(
   threadController.getSnapshot().selectedTargetId,
   target.id,
-  'opening a Thread panel must not change the main selection',
+  'opening a Thread from Activity restores its parent room',
 )
 assert.deepEqual(threadController.getSnapshot().threadPanelMessages, [threadMessage])
 await threadController.send('main hello')
@@ -532,6 +531,13 @@ const { resolveSentDraft } = await import(`../lib/client/controller.js?smoke2=${
   const back = swapDraft(first.drafts, 'channel:c1', 'session', 'other room')
   assert.equal(back.drafts['channel:c1'], 'other room')
   assert.equal(back.next, 'hello room')
+}
+
+{
+  const { viewportInsets } = await import(`../lib/client/room-layout.js?smoke=${String(Date.now())}`)
+  assert.deepEqual(viewportInsets(1440, { left: 280.2, right: 1180.4 }), { left: 280, right: 260 })
+  assert.deepEqual(viewportInsets(650, { left: 55.6, right: 415.8 }), { left: 56, right: 234 })
+  assert.deepEqual(viewportInsets(320, { left: -4, right: 324 }), { left: 0, right: 0 })
 }
 
 delete globalThis.EventSource

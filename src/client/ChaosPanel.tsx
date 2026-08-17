@@ -94,6 +94,12 @@ const PanelIcon = (
   </svg>
 )
 
+const ReplyIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+  </svg>
+)
+
 const COMPACT_GAP_MS = 5 * 60 * 1000
 const TASK_LANES = ['todo', 'in_progress', 'in_review', 'done'] as const
 const TASK_LANE_LABEL: Record<(typeof TASK_LANES)[number], string> = {
@@ -146,53 +152,65 @@ function RoomTimeline({
 
   return (
     <div ref={scrollRef} className={css.timeline} aria-label="房间消息">
-      {messages.map((message, index) => {
-        const previous = index > 0 ? messages[index - 1] : undefined
-        const showDay = previous === undefined || dayKey(previous.createdAtMs) !== dayKey(message.createdAtMs)
-        const compact = previous !== undefined
-          && !showDay
-          && previous.authorId === message.authorId
-          && message.createdAtMs - previous.createdAtMs <= COMPACT_GAP_MS
-        const threadId = threadByRoot.get(message.id)
-        const preview = threadId === undefined ? undefined : previews[threadId]
-        const task = taskByMessage.get(message.id)
-        return (
-          <div key={message.id}>
-            {showDay && <div className={css.dayDivider}>{dayLabel(message.createdAtMs)}</div>}
-            <article className={css.timelineRow} data-compact={compact || undefined}>
-              {compact ? null : (
-                <div className={css.timelineHead}>
-                  <strong>{names.get(message.authorId) ?? message.authorId}</strong>
-                  {kinds.get(message.authorId) === 'agent' && <span className={css.badge}>agent</span>}
-                  <time>{clock(message.createdAtMs)}</time>
-                </div>
-              )}
-              <p className={css.messageText}>{message.text}</p>
-              {task !== undefined && (
-                <span className={css.taskChip} data-status={task.status}>Task {task.status}</span>
-              )}
-              {preview !== undefined && preview.count > 0 && (
-                <button
-                  type="button"
-                  className={css.replyCard}
-                  onClick={() => { onOpenThread(message.id, threadId) }}
-                >
-                  {preview.count} {preview.count === 1 ? 'reply' : 'replies'}
-                </button>
-              )}
-              {preview === undefined && (
-                <button
-                  type="button"
-                  className={css.replyGhost}
-                  onClick={() => { onOpenThread(message.id) }}
-                >
-                  回复
-                </button>
-              )}
-            </article>
-          </div>
-        )
-      })}
+      <div className={css.timelineContent}>
+        {messages.map((message, index) => {
+          const previous = index > 0 ? messages[index - 1] : undefined
+          const showDay = previous === undefined || dayKey(previous.createdAtMs) !== dayKey(message.createdAtMs)
+          const compact = previous !== undefined
+            && !showDay
+            && previous.authorId === message.authorId
+            && message.createdAtMs - previous.createdAtMs <= COMPACT_GAP_MS
+          const threadId = threadByRoot.get(message.id)
+          const preview = threadId === undefined ? undefined : previews[threadId]
+          const latestReply = preview?.latest[preview.latest.length - 1]
+          const task = taskByMessage.get(message.id)
+          return (
+            <div key={message.id}>
+              {showDay && <div className={css.dayDivider}>{dayLabel(message.createdAtMs)}</div>}
+              <article className={css.timelineRow} data-compact={compact || undefined}>
+                {compact ? null : (
+                  <div className={css.timelineHead}>
+                    <strong>{names.get(message.authorId) ?? message.authorId}</strong>
+                    {kinds.get(message.authorId) === 'agent' && <span className={css.badge}>agent</span>}
+                    <time>{clock(message.createdAtMs)}</time>
+                  </div>
+                )}
+                <p className={css.messageText}>{message.text}</p>
+                {task !== undefined && (
+                  <span className={css.taskChip} data-status={task.status}>Task {task.status}</span>
+                )}
+                {preview !== undefined && preview.count > 0 && (
+                  <button
+                    type="button"
+                    className={css.replyCard}
+                    onClick={() => { onOpenThread(message.id, threadId) }}
+                  >
+                    <span className={css.replyIcon}>{ReplyIcon}</span>
+                    <span className={css.replyCopy}>
+                      <strong>{preview.count} {preview.count === 1 ? 'reply' : 'replies'}</strong>
+                      {latestReply !== undefined && (
+                        <span>
+                          {names.get(latestReply.authorId) ?? latestReply.authorId}: {latestReply.text}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )}
+                {preview === undefined && (
+                  <button
+                    type="button"
+                    className={css.replyGhost}
+                    onClick={() => { onOpenThread(message.id) }}
+                  >
+                    <span className={css.replyIcon}>{ReplyIcon}</span>
+                    <span>回复</span>
+                  </button>
+                )}
+              </article>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -215,6 +233,7 @@ function RoomTaskBoard({
             <header className={css.taskColumnHead}>
               <span className={css.taskDot} data-status={lane} />
               <strong>{TASK_LANE_LABEL[lane]}</strong>
+              <span className={css.taskColumnCount}>{cards.length}</span>
             </header>
             <div className={css.taskCards}>
               {cards.length === 0 && <p className={css.taskEmpty}>空</p>}
@@ -249,10 +268,12 @@ function RoomWorkbench({
   thread,
   threadParent,
   threadMessages,
+  asTask,
   onClose,
   onBack,
   onOpenThread,
   onOpenTask,
+  onToggleAsTask,
 }: {
   title: string
   railOpen: boolean
@@ -265,13 +286,19 @@ function RoomWorkbench({
   thread: { id: string; name: string; rootMessageId?: string } | undefined
   threadParent: string | undefined
   threadMessages: readonly NativeMessage[]
+  asTask: boolean
   onClose: () => void
   onBack: () => void
   onOpenThread: (rootMessageId: string, threadId?: string) => void
   onOpenTask: (task: NativeTask) => void
+  onToggleAsTask: () => void
 }): ReactNode {
   const [face, setFace] = useState<'chat' | 'tasks'>('chat')
   useLayoutEffect(() => claimRoomLayout(), [])
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--dsh-chaos-rail-inset', railOpen ? '276px' : '0px')
+    return () => { document.documentElement.style.removeProperty('--dsh-chaos-rail-inset') }
+  }, [railOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -293,14 +320,38 @@ function RoomWorkbench({
       <header className={css.workbenchHead}>
         {thread === undefined ? (
           <>
-            <strong>{title}</strong>
+            <strong className={css.workbenchTitle}>{title}</strong>
+            <div className={css.workbenchTabs} role="tablist" aria-label={`${title} 视图`}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={face === 'chat'}
+                className={css.headTab}
+                data-active={face === 'chat' || undefined}
+                onClick={() => { setFace('chat') }}
+              >
+                消息
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={face === 'tasks'}
+                className={css.headTab}
+                data-active={face === 'tasks' || undefined}
+                onClick={() => { setFace('tasks') }}
+              >
+                Task
+              </button>
+            </div>
             <button
               type="button"
-              className={css.headTab}
-              data-active={face === 'tasks' || undefined}
-              onClick={() => { setFace(current => current === 'tasks' ? 'chat' : 'tasks') }}
+              className={css.taskModeButton}
+              data-active={asTask || undefined}
+              aria-pressed={asTask}
+              title="下一条消息作为 Task"
+              onClick={onToggleAsTask}
             >
-              Task
+              + Task
             </button>
           </>
         ) : (
@@ -805,6 +856,7 @@ export function ChaosPanel(props: ChaosPanelProps) {
     closeWorkbench,
     closeThreadPanel,
     clearTarget,
+    setAsTask,
     createThread,
     openThreadPanel,
   } = props
@@ -897,6 +949,7 @@ export function ChaosPanel(props: ChaosPanelProps) {
           thread={thread}
           threadParent={threadParent === undefined ? undefined : `#${threadParent}`}
           threadMessages={state.threadPanelMessages}
+          asTask={state.asTask}
           onClose={() => {
             closeThreadPanel()
             closeWorkbench()
@@ -912,6 +965,7 @@ export function ChaosPanel(props: ChaosPanelProps) {
             if (threadId !== undefined) void openThreadPanel(threadId)
             else void createThread(task.messageId)
           }}
+          onToggleAsTask={() => { setAsTask(!state.asTask) }}
         />
       )}
     </>

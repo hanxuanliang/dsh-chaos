@@ -10,8 +10,8 @@ function ensureStyle(): void {
   style.textContent = `
     [data-chaos-room="open"] [data-composer-seat] {
       position: fixed !important;
-      left: var(--dsh-official-sidebar-width, 260px);
-      right: 0;
+      left: var(--dsh-chaos-pane-left, var(--dsh-official-sidebar-width, 260px));
+      right: max(var(--dsh-chaos-pane-right, 0px), var(--dsh-chaos-rail-inset, 0px));
       bottom: 0;
       z-index: 37;
       background: var(--dsw-alias-bg-base);
@@ -23,6 +23,26 @@ function ensureStyle(): void {
 
 function composerSeat(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-composer-seat]')
+}
+
+function conversationPane(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-pane="conversation"], [class*="centerCol"]')
+}
+
+export interface ViewportInsets {
+  left: number
+  right: number
+}
+
+/** Convert the live host conversation rectangle into fixed-position insets. */
+export function viewportInsets(
+  viewportWidth: number,
+  bounds: Pick<DOMRectReadOnly, 'left' | 'right'>,
+): ViewportInsets {
+  return {
+    left: Math.max(0, Math.round(bounds.left)),
+    right: Math.max(0, Math.round(viewportWidth - bounds.right)),
+  }
 }
 
 function isKeep(node: HTMLElement): boolean {
@@ -62,17 +82,32 @@ export function claimRoomLayout(): () => void {
   const root = document.querySelector<HTMLElement>('[data-phase="hero"], [data-phase="active"], [data-phase="settling"]')
     ?? document.getElementById('root')
   const seat = composerSeat()
+  const pane = conversationPane()
   const previousPhase = root?.dataset.phase
   const hidden = seat === null ? [] : hideTree(seat.parentElement ?? seat)
+  const syncGeometry = (): void => {
+    if (pane !== null) {
+      const insets = viewportInsets(window.innerWidth, pane.getBoundingClientRect())
+      document.documentElement.style.setProperty('--dsh-chaos-pane-left', `${String(insets.left)}px`)
+      document.documentElement.style.setProperty('--dsh-chaos-pane-right', `${String(insets.right)}px`)
+    }
+    if (seat !== null) {
+      document.documentElement.style.setProperty('--dsh-composer-height', `${String(seat.offsetHeight)}px`)
+    }
+  }
   if (root !== null) {
     root.dataset.phase = 'active'
     root.dataset.chaosRoom = 'open'
   }
-  if (seat !== null) {
-    document.documentElement.style.setProperty('--dsh-composer-height', `${String(seat.offsetHeight)}px`)
-  }
+  syncGeometry()
+  const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(syncGeometry)
+  if (pane !== null) observer?.observe(pane)
+  if (seat !== null) observer?.observe(seat)
+  window.addEventListener('resize', syncGeometry)
 
   return () => {
+    observer?.disconnect()
+    window.removeEventListener('resize', syncGeometry)
     for (const node of hidden) node.removeAttribute(HIDDEN)
     if (root?.dataset.chaosRoom === 'open') {
       if (previousPhase === undefined) delete root.dataset.phase
@@ -80,5 +115,7 @@ export function claimRoomLayout(): () => void {
       delete root.dataset.chaosRoom
     }
     document.documentElement.style.removeProperty('--dsh-composer-height')
+    document.documentElement.style.removeProperty('--dsh-chaos-pane-left')
+    document.documentElement.style.removeProperty('--dsh-chaos-pane-right')
   }
 }

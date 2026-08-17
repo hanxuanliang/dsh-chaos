@@ -295,10 +295,17 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   async openThreadPanel(threadTargetId: string): Promise<void> {
-    const thread = this.state.targets.find(
+    let thread = this.state.targets.find(
       target => target.id === threadTargetId && target.kind === 'thread',
     )
     if (thread === undefined) return
+    if (thread.parentTargetId !== undefined && this.state.selectedTargetId !== thread.parentTargetId) {
+      await this.selectTarget(thread.parentTargetId)
+      thread = this.state.targets.find(
+        target => target.id === threadTargetId && target.kind === 'thread',
+      )
+      if (thread === undefined) return
+    }
     this.publish({
       ...this.state,
       workbench: 'open',

@@ -149,6 +149,7 @@ export function apply(ctx: ClientContext): void {
       selectTarget: targetId => controller.selectTarget(targetId),
       openThreadPanel: threadTargetId => controller.openThreadPanel(threadTargetId),
       ensure: () => controller.ensure(),
+      closeActivity: () => { controller.setLeftPane('sessions') },
     })
     return () => {
       stopActivity()
