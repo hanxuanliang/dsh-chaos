@@ -160,9 +160,9 @@
 }
 .ghostButton:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
 
-/* ---- stage (channel view) ---- */
+/* ---- stage (channel view): row so the context panel can dock right ---- */
 .stage {
-  display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0;
+  display: flex; flex-direction: row; flex: 1; min-width: 0; min-height: 0;
 }
 .stageHead {
   display: flex; align-items: center; gap: 6px;
@@ -281,6 +281,135 @@
   50% { opacity: 0.35; }
 }
 
+/* ---- message hover actions (recipe §3.3 动作钮 28 正圆 hover 浮现) ---- */
+.msgWrap { position: relative; display: flex; flex-direction: column; }
+.msgActions {
+  position: absolute; top: -12px; right: 8px; z-index: 3;
+  display: flex; gap: 2px; padding: 2px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+  opacity: 0; pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.msgWrap:hover .msgActions,
+.msgWrap:focus-within .msgActions { opacity: 1; pointer-events: auto; }
+.msgActionBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 6px;
+  border: none; border-radius: 999px; background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+  box-sizing: border-box;
+}
+.msgActionBtn:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.msgActionBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- thread inline preview (recipe §3.3: 13/500 count + 12px 摘要, hover wash) ---- */
+.threadPreview {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  margin: 2px 0 4px; padding: 6px 10px;
+  max-width: 78%;
+  border: none; border-left: 2px solid var(--dsw-alias-border-l2);
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  font: inherit; text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.threadPreview:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.threadPreview[data-open] { border-left-color: var(--dsw-alias-state-business-primary); }
+.threadPreviewCount {
+  font-size: 13px; font-weight: 500; line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+.threadPreviewLatest { display: flex; flex-direction: column; gap: 1px; max-width: 100%; }
+.threadPreviewLine {
+  font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%;
+}
+.threadPreviewLine b { font-weight: 500; color: var(--dsw-alias-label-secondary); }
+
+/* ---- task chip anchored on a message (recipe §3.4 状态点着色) ---- */
+.taskChip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; margin-top: 4px; padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-base);
+  font-size: 12px; line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  box-sizing: border-box;
+}
+.taskChipDot { width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-label-tertiary); }
+.taskChip[data-status='in_progress'] .taskChipDot { background: var(--dsw-alias-state-business-primary); }
+.taskChip[data-status='in_review'] .taskChipDot { background: var(--dsw-alias-state-warning-primary); }
+.taskChip[data-status='done'] .taskChipDot { background: var(--dsw-alias-state-success-primary); }
+
+/* ---- right context panel (Thread); drawer on narrow viewports ---- */
+.stageMain {
+  display: flex; flex-direction: column;
+  flex: 1; min-width: 0; min-height: 0;
+}
+.contextPanel {
+  display: flex; flex-direction: column; flex: none;
+  width: 360px; min-height: 0;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+  box-sizing: border-box;
+}
+.contextHead {
+  display: flex; align-items: center; gap: 6px;
+  flex: none; height: 48px; padding: 0 44px 0 16px; /* right space for the workbench ✕ */
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  box-sizing: border-box;
+}
+.contextTitle {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 600; line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.followButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 26px; padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.followButton:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.followButton[data-following] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+}
+.contextClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border: none; border-radius: 999px; background: transparent;
+  color: var(--dsw-alias-label-tertiary); font-size: 12px;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.contextClose:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.contextFlow {
+  display: flex; flex-direction: column; gap: 2px;
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 12px 16px 8px;
+  box-sizing: border-box;
+}
+
 /* ---- focus contract (recipe §5) ---- */
 .entryRow:focus-visible,
 .entryIcon:focus-visible,
@@ -290,16 +419,28 @@
 .primaryButton:focus-visible,
 .ghostButton:focus-visible,
 .sendButton:focus-visible,
-.createInput:focus-visible {
+.createInput:focus-visible,
+.msgActionBtn:focus-visible,
+.threadPreview:focus-visible,
+.followButton:focus-visible,
+.contextClose:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 2px;
 }
 
-/* ---- narrow viewport: rail over stage is a Part② concern; keep a usable floor ---- */
+/* ---- narrow viewport: rail slimmer; context panel becomes a drawer ---- */
 @media (max-width: 720px) {
   .backdrop { padding: 0; }
   .panel { border-radius: 0; border: none; }
   .rail { width: 180px; }
+}
+@media (max-width: 980px) {
+  .contextPanel {
+    position: absolute; top: 0; right: 0; bottom: 0; z-index: 4;
+    width: min(360px, 88%);
+    border-left: 1px solid var(--dsw-alias-border-l2);
+    box-shadow: -12px 0 32px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

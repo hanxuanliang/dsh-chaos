@@ -27,6 +27,13 @@ export function apply(ctx: ClientContext): void {
     selectTarget: targetId => controller.selectTarget(targetId),
     createChannel: name => controller.createChannel(name),
     send: text => controller.send(text).then(() => undefined),
+    createThread: rootMessageId => controller.createThread(rootMessageId),
+    openThreadPanel: threadTargetId => controller.openThreadPanel(threadTargetId),
+    closeThreadPanel: () => { controller.closeThreadPanel() },
+    sendToThread: text => controller.sendToThread(text),
+    followThread: threadTargetId => controller.followThread(threadTargetId),
+    unfollowThread: threadTargetId => controller.unfollowThread(threadTargetId),
+    createTask: messageId => controller.createTask(messageId),
   })
 
   ctx.effect(() => () => { controller.dispose() }, 'dsh-chaos: controller')
