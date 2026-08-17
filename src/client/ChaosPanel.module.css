@@ -1,4 +1,7 @@
-/* Official seating only. Tokens: --dsw-alias-* / --dsw-font-*. No IM room, no self-built composer. */
+/* Official seating only. Tokens: --dsw-alias-* / --dsw-font-*. No IM room, no self-built composer.
+   Scale: nav rows 34px / tree rows 30px / compact controls 28px; radius 6-8 controls, 10 cards, 12 panels.
+   Motion: fast .12s ease (color/background/border/shadow/transform/opacity); panel slide .18s; stripped under prefers-reduced-motion.
+   z-index budget: room canvas 36 / drawers+panel 38-40 / floating cluster 45 / dialog 50 / menus 100 — always below host overlays. */
 
 html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; }
 .activityTabs {
@@ -51,7 +54,7 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   width: 28px; height: 28px; padding: 0;
   border: none; border-radius: 50%; background: transparent;
   color: var(--dsw-alias-label-secondary); cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
 }
 .toggleButton:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .toggleButton:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
@@ -107,7 +110,7 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   width: 28px; height: 28px; padding: 0;
   border: none; border-radius: 50%; background: transparent;
   color: var(--dsw-alias-label-secondary); font-size: 15px; cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
 }
 .iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .iconButton:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
@@ -125,7 +128,7 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px;
   background: transparent; color: var(--dsw-alias-label-secondary);
   font: inherit; font-size: 12px; cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
 }
 .secondaryButton:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .secondaryButton:disabled { opacity: .55; cursor: default; }
@@ -151,17 +154,17 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   width: 22px; height: 22px;
   border: none; border-radius: 50%; background: transparent;
   color: var(--dsw-alias-label-tertiary); font-size: 15px; line-height: 1; cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
 }
 .plusButton:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .plusButton:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
 .targets { display: flex; flex-direction: column; gap: 2px; }
 .targetButton {
   display: flex; align-items: center; gap: 8px;
-  width: 100%; height: 32px; padding: 0 10px;
+  width: 100%; height: 34px; padding: 0 10px;
   border: none; border-radius: 8px; background: transparent;
   color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
-  transition: background .12s ease, color .12s ease;
+  transition: background .12s ease, color .12s ease, transform .12s ease;
 }
 .targetButton:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .targetButton[data-selected] {
@@ -228,7 +231,7 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
 }
 .backButton:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .headTab {
-  min-height: 26px; padding: 0 10px;
+  min-height: 26px; padding: 0 10px; white-space: nowrap;
   border: none; border-radius: 6px; background: transparent;
   color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; cursor: pointer;
 }
@@ -503,10 +506,30 @@ html[data-dsh-chaos-activity] [class*="regionArea"] { display: none !important; 
   .taskBoard { padding: 10px; grid-auto-columns: minmax(220px, 82%); }
 }
 
+/* Unified interaction states: one transition recipe, one focus ring, one press feedback. */
+.activityRow, .activityTab, .targetButton, .tab, .headTab, .backButton, .taskModeButton,
+.taskCard, .replyCard, .replyGhost, .hashItem, .roomCard, .settingsRow, .workspaceEntry, .heroChip {
+  transition: background .12s ease, color .12s ease, border-color .12s ease,
+    box-shadow .12s ease, transform .12s ease, opacity .12s ease;
+}
+.activityRow:focus-visible, .activityTab:focus-visible, .targetButton:focus-visible,
+.tab:focus-visible, .headTab:focus-visible, .backButton:focus-visible, .taskModeButton:focus-visible,
+.taskCard:focus-visible, .replyCard:focus-visible, .replyGhost:focus-visible, .hashItem:focus-visible,
+.roomCard:focus-visible, .settingsRow:focus-visible, .workspaceEntry:focus-visible, .heroChip:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px;
+}
+.targetButton:active, .activityRow:active, .tab:active, .headTab:active,
+.settingsRow:active, .workspaceEntry:active, .hashItem:active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+.taskCard:active { transform: none; box-shadow: none; }
+.toggleButton:active, .iconButton:active, .plusButton:active { transform: scale(.94); }
+
 @media (prefers-reduced-motion: reduce) {
   .toggleCluster *, .toggleCluster *::before, .toggleCluster *::after,
   .panel *, .panel *::before, .panel *::after,
   .heroAnchor *, .heroAnchor *::before, .heroAnchor *::after,
   .workbench *, .workbench *::before, .workbench *::after,
   .dialogOverlay *, .dialogOverlay *::before, .dialogOverlay *::after { transition: none !important; }
+  .toggleButton:active, .iconButton:active, .plusButton:active { transform: none; }
 }
