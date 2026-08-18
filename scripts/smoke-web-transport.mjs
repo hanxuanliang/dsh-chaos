@@ -90,6 +90,23 @@ try {
   abort.abort()
   await reader.cancel().catch(() => {})
 
+  const sent = await call('message.send', {
+    targetId: created.body.result.value.value.id,
+    requestId: 'transport-activity',
+    text: 'transport Activity',
+  })
+  assert.equal(sent.body.result.value.ok, true)
+  const activity = await call('inbox.list', {})
+  assert.equal(activity.body.result.value.ok, true)
+  assert.equal(activity.body.result.value.value.activeCount, '1')
+  assert.equal(activity.body.result.value.value.items[0].title, 'transport Activity')
+  const done = await call('inbox.done', {
+    targetId: created.body.result.value.value.id,
+    throughSeq: activity.body.result.value.value.items[0].lastActivitySeq,
+  })
+  assert.equal(done.body.result.value.ok, true)
+  assert.equal((await call('inbox.list', {})).body.result.value.value.activeCount, '0')
+
   const retentionFloor = await ctx.collab.pruneChangesBefore(Date.now() + 1)
   const resync = await fetch(`${base}/dsh-chaos/events?cursor=0`, {
     headers: { 'last-event-id': '0' },

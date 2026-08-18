@@ -10,6 +10,7 @@ import type {
 } from './agent-settings-types.ts'
 import type {
   NativeActor,
+  NativeActivityInboxPage,
   NativeChangeEvent,
   NativeCollabSnapshot,
   NativeMessage,
@@ -30,6 +31,8 @@ export interface CollabRemoteApi {
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
+  inboxList(actorId: string, limit: number, cursor?: string): Promise<NativeActivityInboxPage>
+  inboxDone(actorId: string, targetId: string, throughSeq: string): Promise<void>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
   listAgentPresets(): Promise<AgentPresetSummary[]>
   agentProfile(viewerId: string, agentId: string): Promise<AgentProfile>
@@ -200,6 +203,19 @@ async function dispatchRemote(
         requiredString(input, 'targetId'),
         integer(input, 'limit', 10, 100),
       )
+    case 'inbox.list':
+      return await api.inboxList(
+        actorId,
+        integer(input, 'limit', 20, 50),
+        optionalString(input, 'cursor'),
+      )
+    case 'inbox.done':
+      await api.inboxDone(
+        actorId,
+        requiredString(input, 'targetId'),
+        decimalString(input, 'throughSeq'),
+      )
+      return null
     case 'tasks':
       return await api.listTasks(actorId, optionalString(input, 'targetId'))
     case 'agent.presets':

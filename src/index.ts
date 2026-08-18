@@ -50,6 +50,10 @@ export type {
 
 export type {
   NativeActor as Actor,
+  NativeActivityInboxItem as ActivityInboxItem,
+  NativeActivityInboxPage as ActivityInboxPage,
+  NativeActivityInboxReply as ActivityInboxReply,
+  NativeActivityInboxTask as ActivityInboxTask,
   NativeChangeEvent as ChangeEvent,
   NativeCollabSnapshot as CollabSnapshot,
   NativeInboxBatch as InboxBatch,
@@ -405,6 +409,15 @@ export class CollabService extends Service {
 
   readMessagesTail(actorId: string, targetId: string, limit = 10) {
     return this.requireHandle().readMessagesTail(actorId, targetId, limit)
+  }
+
+  inboxList(actorId: string, limit = 20, cursor?: string) {
+    return this.requireHandle().inboxList(actorId, limit, cursor)
+  }
+
+  async inboxDone(actorId: string, targetId: string, throughSeq: string) {
+    await this.requireHandle().inboxDone(actorId, targetId, throughSeq)
+    this.publishChange()
   }
 
   listActors(actorId: string) {

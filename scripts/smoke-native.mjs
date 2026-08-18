@@ -110,6 +110,29 @@ try {
   assert.equal(unclaimed.status, 'in_review')
   assert.equal(unclaimed.assigneeId, undefined)
   assert.equal((await core.listTasks(owner.id, channel.id)).length, 1)
+
+  const activity = await core.inboxList(owner.id, 20)
+  assert.equal(activity.activeCount, '2')
+  const channelActivity = activity.items.find(item => item.conversationId === channel.id)
+  const threadActivity = activity.items.find(item => item.conversationId === thread.id)
+  assert.equal(channelActivity.task.status, 'in_review')
+  assert.equal(threadActivity.title, 'review this')
+  assert.equal(threadActivity.replyCount, '3')
+  assert.equal(threadActivity.latestReply.excerpt, 'beta no longer receives this')
+  await core.inboxDone(owner.id, channel.id, sent.message.seq)
+  assert.equal((await core.inboxList(owner.id, 20)).activeCount, '1')
+  await core.inboxDone(owner.id, channel.id, sent.message.seq)
+  const revived = await core.sendMessage({
+    targetId: channel.id,
+    authorId: owner.id,
+    clientRequestId: 'native-activity-revive',
+    text: 'newer activity revives the row',
+  })
+  assert.equal(
+    (await core.inboxList(owner.id, 20)).items[0].lastActivitySeq,
+    revived.message.seq,
+  )
+
   assert.equal((await core.listActors(owner.id)).length, 4)
   const snapshot = await core.snapshot(owner.id)
   assert.equal(snapshot.actor.id, owner.id)
@@ -119,6 +142,7 @@ try {
   const changes = await core.listChanges(owner.id, '0', 500)
   assert(changes.some(change => change.kind === 'message_created'))
   assert(changes.some(change => change.kind === 'task_updated'))
+  assert(changes.some(change => change.kind === 'activity_done_changed'))
   const retentionFloor = await core.pruneChangesBefore(Date.now() + 1)
   assert.equal((await core.snapshot(owner.id)).cursor, retentionFloor)
   await assert.rejects(

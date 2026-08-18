@@ -84,6 +84,7 @@ export interface NativeChangeEvent {
     | 'message_created'
     | 'task_created'
     | 'task_updated'
+    | 'activity_done_changed'
   targetId?: string
   entityId: string
   createdAtMs: number
@@ -105,6 +106,40 @@ export interface NativeCollabSnapshot {
 export interface NativeMessageTail {
   count: string
   messages: NativeMessage[]
+}
+
+export interface NativeActivityInboxReply {
+  senderName: string
+  senderKind: 'user' | 'agent'
+  excerpt: string
+  atMs: number
+}
+
+export interface NativeActivityInboxTask {
+  number: string
+  status: NativeTask['status']
+  assigneeName?: string
+}
+
+export interface NativeActivityInboxItem {
+  conversationId: string
+  targetKind: NativeTarget['kind']
+  parentTargetId?: string
+  rootMessageId?: string
+  targetName: string
+  titleKind: 'thread' | 'message'
+  title: string
+  latestReply?: NativeActivityInboxReply
+  lastActivityAtMs: number
+  lastActivitySeq: string
+  replyCount?: string
+  task?: NativeActivityInboxTask
+}
+
+export interface NativeActivityInboxPage {
+  items: NativeActivityInboxItem[]
+  nextCursor?: string
+  activeCount: string
 }
 
 export interface NativeCollabHandle {
@@ -153,6 +188,8 @@ export interface NativeCollabHandle {
   readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
+  inboxList(actorId: string, limit: number, cursor?: string): Promise<NativeActivityInboxPage>
+  inboxDone(actorId: string, targetId: string, throughSeq: string): Promise<void>
   listActors(actorId: string): Promise<NativeActor[]>
   listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>

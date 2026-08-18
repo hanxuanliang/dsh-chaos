@@ -70,6 +70,7 @@ pub enum ChangeKind {
     MessageCreated,
     TaskCreated,
     TaskUpdated,
+    ActivityDoneChanged,
 }
 
 impl ChangeKind {
@@ -82,6 +83,7 @@ impl ChangeKind {
             Self::MessageCreated => "message_created",
             Self::TaskCreated => "task_created",
             Self::TaskUpdated => "task_updated",
+            Self::ActivityDoneChanged => "activity_done_changed",
         }
     }
 
@@ -94,9 +96,70 @@ impl ChangeKind {
             "message_created" => Some(Self::MessageCreated),
             "task_created" => Some(Self::TaskCreated),
             "task_updated" => Some(Self::TaskUpdated),
+            "activity_done_changed" => Some(Self::ActivityDoneChanged),
             _ => None,
         }
     }
+}
+
+/// The title source used by one Activity inbox row.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityTitleKind {
+    Thread,
+    Message,
+}
+
+#[cfg(feature = "napi")]
+impl ActivityTitleKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Thread => "thread",
+            Self::Message => "message",
+        }
+    }
+}
+
+/// Latest Message preview joined into one Activity inbox row.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ActivityInboxReply {
+    pub sender_name: String,
+    pub sender_kind: ActorKind,
+    pub excerpt: String,
+    pub at_ms: i64,
+}
+
+/// Compact Task state associated with the row's anchor Message.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ActivityInboxTask {
+    pub number: i64,
+    pub status: TaskStatus,
+    pub assignee_name: Option<String>,
+}
+
+/// One active Channel, Direct, or followed Thread conversation.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ActivityInboxItem {
+    pub conversation_id: String,
+    pub target_kind: TargetKind,
+    pub parent_target_id: Option<String>,
+    pub root_message_id: Option<String>,
+    pub target_name: String,
+    pub title_kind: ActivityTitleKind,
+    pub title: String,
+    pub latest_reply: Option<ActivityInboxReply>,
+    pub last_activity_at_ms: i64,
+    pub last_activity_seq: i64,
+    pub reply_count: Option<i64>,
+    pub task: Option<ActivityInboxTask>,
+}
+
+/// One newest-first Activity page plus the total active conversation count.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ActivityInboxPage {
+    pub items: Vec<ActivityInboxItem>,
+    pub next_cursor: Option<String>,
+    pub active_count: i64,
 }
 
 /// One monotonically ordered, recipient-snapshotted collaboration change.

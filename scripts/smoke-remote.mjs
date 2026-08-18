@@ -232,6 +232,34 @@ try {
   assert.equal(tasks.value.length, 1)
   assert.equal(tasks.value[0].anchorText, 'tail message 1')
 
+  const activity = await call('inbox.list', { limit: 20 })
+  assert.equal(activity.ok, true)
+  assert.equal(activity.value.activeCount, '1')
+  assert.equal(activity.value.items[0].conversationId, created.value.id)
+  assert.equal(activity.value.items[0].title, 'tail message 2')
+  const malformedCursor = await call('inbox.list', { cursor: 'bad-cursor' })
+  assert.equal(malformedCursor.ok, false)
+  assert.equal(malformedCursor.error.code, 'invalid_argument')
+  const futureDone = await call('inbox.done', {
+    targetId: created.value.id,
+    throughSeq: '9223372036854775807',
+  })
+  assert.equal(futureDone.ok, false)
+  assert.equal(futureDone.error.code, 'invalid_argument')
+  const done = await call('inbox.done', {
+    targetId: created.value.id,
+    throughSeq: activity.value.items[0].lastActivitySeq,
+  })
+  assert.equal(done.ok, true)
+  assert.equal((await call('inbox.list', {})).value.activeCount, '0')
+  const revived = await call('message.send', {
+    targetId: created.value.id,
+    requestId: 'activity-revive',
+    text: 'newer Activity',
+  })
+  assert.equal(revived.ok, true)
+  assert.equal((await call('inbox.list', {})).value.activeCount, '1')
+
   const response = new MockResponse()
   const request = {
     method: 'GET',
