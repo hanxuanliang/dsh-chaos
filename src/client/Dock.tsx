@@ -20,6 +20,15 @@ import css from './Dock.module.css'
  * it over full-width); ← returns to the list. Lives in the frame-wide
  * shell.overlay layer and never replaces the app's own columns.
  */
+const DOCK_WIDTH_KEY = 'dsh-chaos:dock-width'
+const DOCK_DEFAULT_WIDTH = 560
+const DOCK_MIN_WIDTH = 360
+
+function readStoredWidth(): number | undefined {
+  const parsed = Number(window.localStorage.getItem(DOCK_WIDTH_KEY))
+  return Number.isFinite(parsed) && parsed >= DOCK_MIN_WIDTH ? parsed : undefined
+}
+
 export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | null {
   const state = useChaos(props)
   const open = state.dock === 'open'
@@ -27,6 +36,7 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
   const panelRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<Element | null>(null)
   const [sidebarRight, setSidebarRight] = useState(280)
+  const [dockWidth, setDockWidth] = useState<number | undefined>(readStoredWidth)
 
   useEffect(() => {
     if (!open) return
@@ -71,7 +81,55 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
 
   if (!open) return null
 
-  const dockStyle = { '--chaos-dock-left': `${sidebarRight}px` } as React.CSSProperties
+  const clampWidth = (width: number): number => {
+    const available = Math.max(DOCK_MIN_WIDTH, window.innerWidth - sidebarRight)
+    return Math.round(Math.min(Math.max(width, DOCK_MIN_WIDTH), available))
+  }
+  const applyWidth = (width: number | undefined): void => {
+    setDockWidth(width)
+    if (width === undefined) window.localStorage.removeItem(DOCK_WIDTH_KEY)
+    else window.localStorage.setItem(DOCK_WIDTH_KEY, String(width))
+  }
+  const onHandlePointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const handle = event.currentTarget
+    handle.setPointerCapture(event.pointerId)
+    handle.dataset.active = ''
+    const startX = event.clientX
+    const base = panelRef.current?.getBoundingClientRect().width ?? DOCK_DEFAULT_WIDTH
+    const onMove = (move: PointerEvent): void => { setDockWidth(clampWidth(base + move.clientX - startX)) }
+    const onUp = (up: PointerEvent): void => {
+      handle.removeEventListener('pointermove', onMove)
+      handle.removeEventListener('pointerup', onUp)
+      handle.removeEventListener('pointercancel', onUp)
+      delete handle.dataset.active
+      applyWidth(clampWidth(base + up.clientX - startX))
+    }
+    handle.addEventListener('pointermove', onMove)
+    handle.addEventListener('pointerup', onUp)
+    handle.addEventListener('pointercancel', onUp)
+  }
+  const resizeHandle = (
+    <div
+      className={css.dockResize}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="调整面板宽度"
+      title="拖动调整宽度，双击恢复默认"
+      tabIndex={0}
+      onPointerDown={onHandlePointerDown}
+      onDoubleClick={() => { applyWidth(undefined) }}
+      onKeyDown={event => {
+        const current = panelRef.current?.getBoundingClientRect().width ?? DOCK_DEFAULT_WIDTH
+        if (event.key === 'ArrowLeft') { event.preventDefault(); applyWidth(clampWidth(current - 16)) }
+        if (event.key === 'ArrowRight') { event.preventDefault(); applyWidth(clampWidth(current + 16)) }
+      }}
+    />
+  )
+
+  const dockStyle = dockWidth === undefined
+    ? { '--chaos-dock-left': `${sidebarRight}px` } as React.CSSProperties
+    : { '--chaos-dock-left': `${sidebarRight}px`, '--chaos-dock-width': `${dockWidth}px` } as React.CSSProperties
 
   if (selected === undefined) {
     return (
@@ -95,6 +153,7 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
           </button>
         </header>
         <ActivityList {...props} state={state} />
+        {resizeHandle}
       </div>
     )
   }
@@ -156,6 +215,7 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
             />
           </>
         )}
+      {resizeHandle}
     </div>
   )
 }

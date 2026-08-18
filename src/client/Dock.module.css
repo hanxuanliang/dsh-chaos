@@ -6,7 +6,9 @@
   /* Anchored flush to the sidebar column's right edge; --chaos-dock-left is
      measured from the live column (wide 280 / rail 56) by the component. */
   left: var(--chaos-dock-left, 280px);
-  width: min(560px, calc(100vw - var(--chaos-dock-left, 280px)));
+  width: var(--chaos-dock-width, min(560px, calc(100vw - var(--chaos-dock-left, 280px))));
+  max-width: calc(100vw - var(--chaos-dock-left, 280px));
+  min-width: min(360px, calc(100vw - var(--chaos-dock-left, 280px)));
   display: flex; flex-direction: column;
   background: var(--dsw-alias-bg-base);
   border-right: 1px solid var(--dsw-alias-border-l2);
@@ -16,6 +18,27 @@
   pointer-events: auto;
   outline: none;
 }
+
+/* Right-edge resize handle: wide hit area, indicator line on hover/drag. */
+.dockResize {
+  position: absolute; top: 0; right: -5px; bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.dockResize::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; right: 4px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 150ms ease;
+}
+.dockResize:hover::after,
+.dockResize[data-active]::after,
+.dockResize:focus-visible::after {
+  background: var(--dsw-alias-label-dimmed);
+}
+.dockResize:focus-visible { outline: none; }
 
 .dockHead {
   display: flex; align-items: center; gap: 6px;
