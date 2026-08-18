@@ -1,22 +1,15 @@
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
-  AgentPresetSummary,
-  AgentProfile,
-  AgentWorkspaceEntry,
-  AgentWorkspaceFile,
-} from '../agent-settings-types.ts'
-import type {
-  NativeActor,
   NativeActivityInboxItem,
   NativeActivityInboxPage,
+  NativeActor,
   NativeCollabSnapshot,
   NativeMessage,
   NativeMessageTail,
-  NativeRuntimeBinding,
   NativeSendResult,
-  NativeTask,
   NativeTarget,
+  NativeTask,
 } from '../native.ts'
 import type { CollabDomainResult } from '../remote.ts'
 
@@ -49,60 +42,43 @@ export interface ChaosInboxState {
 export interface ChaosClientState {
   status: 'cold' | 'loading' | 'ready' | 'error'
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
-  surface: 'closed' | 'rail'
-  railTab: 'channels' | 'agents' | 'thread'
-  workbench: 'closed' | 'open'
-  /** Docked right-side conversation panel; mutually exclusive with the workbench modal. */
+  /** Docked right-side collaboration surface (Activity list / conversation). */
   dock: 'closed' | 'open'
-  leftPane: 'sessions' | 'activity'
-  /** Authoritative Activity inbox page (sidebar Activity tab). */
-  inbox: ChaosInboxState
-  asTask: boolean
   cursor: string
   actor?: NativeActor
   actors: readonly NativeActor[]
-  bindings: readonly NativeRuntimeBinding[]
-  agentPresets: readonly AgentPresetSummary[]
-  hostSessionId?: string
-  selectedAgentId?: string
   targets: readonly NativeTarget[]
   followedThreadIds: readonly string[]
-  allTasks: readonly NativeTask[]
+  /** Active members of the selected Channel from the membership projection. */
+  members: readonly NativeActor[]
+  /** Tasks of the selected conversation. */
   tasks: readonly NativeTask[]
   selectedTargetId?: string
   messages: readonly NativeMessage[]
-  /** Active members of the selected Channel from the membership projection. */
-  members: readonly NativeActor[]
   /** Inline reply previews for threads of the selected target, keyed by thread target id. */
   threadPreviews: Record<string, ThreadPreview>
-  /** Right-rail Thread panel: stays open (and keeps SSE) even after unfollow. */
+  /** In-dock Thread view: keeps reading (and SSE) even after unfollow. */
   threadPanelId?: string
   threadPanelMessages: readonly NativeMessage[]
+  /** Authoritative Activity inbox page (dock list view). */
+  inbox: ChaosInboxState
   error: string | undefined
 }
 
 const INITIAL_STATE: ChaosClientState = {
   status: 'cold',
   stream: 'idle',
-  surface: 'closed',
-  railTab: 'channels',
-  workbench: 'closed',
   dock: 'closed',
-  leftPane: 'sessions',
-  inbox: { status: 'idle', items: [], activeCount: '0' },
-  asTask: false,
   cursor: '0',
   actors: [],
-  bindings: [],
-  agentPresets: [],
   targets: [],
   followedThreadIds: [],
-  allTasks: [],
+  members: [],
   tasks: [],
   messages: [],
-  members: [],
   threadPreviews: {},
   threadPanelMessages: [],
+  inbox: { status: 'idle', items: [], activeCount: '0' },
   error: undefined,
 }
 
@@ -154,97 +130,45 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     }
   }
 
-  toggleRail(): void {
-    const surface = this.state.surface === 'rail' ? 'closed' : 'rail'
-    this.publish({ ...this.state, surface })
+  /** Footer Activity entry: open the dock on the Activity list. */
+  openActivity(): void {
+    this.publish(this.listViewState())
+    void this.ensure()
   }
 
-  openRail(): void {
-    if (this.state.surface === 'rail') return
-    this.publish({ ...this.state, surface: 'rail' })
+  /** Conversation → Activity list, staying inside the dock. */
+  backToList(): void {
+    this.publish(this.listViewState())
   }
 
-  openWorkbench(): void {
-    if (this.state.workbench === 'open') return
-    this.publish({ ...this.state, workbench: 'open', dock: 'closed' })
+  closeDock(): void {
+    if (this.state.dock === 'closed') return
+    this.publish({ ...this.state, dock: 'closed' })
   }
 
-  closeWorkbench(): void {
-    if (this.state.workbench === 'closed') return
-    this.publish({ ...this.state, workbench: 'closed' })
-  }
-
-  setAsTask(asTask: boolean): void {
-    this.publish({ ...this.state, asTask })
-  }
-
-  setRailTab(tab: ChaosClientState['railTab']): void {
-    this.publish({ ...this.state, railTab: tab })
-  }
-
-  setLeftPane(pane: ChaosClientState['leftPane']): void {
-    if (this.state.leftPane === pane) return
-    this.publish({ ...this.state, leftPane: pane })
-  }
-
-  openDesk(agentId?: string): void {
-    const next: ChaosClientState = { ...this.state }
-    if (agentId !== undefined) next.selectedAgentId = agentId
-    this.publish(next)
-  }
-
-  setHostSession(sessionId: string | undefined): void {
-    const next: ChaosClientState = { ...this.state }
-    if (sessionId === undefined) delete next.hostSessionId
-    else next.hostSessionId = sessionId
-    this.publish(next)
-  }
-
-  closeSurface(): void {
-    this.publish({ ...this.state, surface: 'closed' })
-  }
-
-  clearTarget(): void {
+  private listViewState(): ChaosClientState {
     const next: ChaosClientState = {
       ...this.state,
+      dock: 'open',
       messages: [],
       tasks: [],
       members: [],
       threadPreviews: {},
-    }
-    delete next.selectedTargetId
-    this.publish(next)
-  }
-
-  async selectTarget(targetId: string): Promise<void> {
-    if (!this.state.targets.some(target => target.id === targetId)) return
-    const next: ChaosClientState = {
-      ...this.state,
-      railTab: 'channels',
-      workbench: 'open',
-      dock: 'closed',
-      selectedTargetId: targetId,
-      messages: [],
-      tasks: [],
-      members: [],
       threadPanelMessages: [],
     }
-    delete next.selectedAgentId
+    delete next.selectedTargetId
     delete next.threadPanelId
-    this.publish(next)
-    await this.reloadTarget(targetId)
+    return next
   }
 
   /**
-   * Open a conversation in the docked right-side panel (Activity inbox landing
-   * surface). Shares the selected-target machinery with the workbench; the two
-   * surfaces are mutually exclusive.
+   * Open a conversation in the docked right-side panel (Activity card landing
+   * surface).
    */
   async openDock(targetId: string): Promise<void> {
     if (!this.state.targets.some(target => target.id === targetId)) return
     const next: ChaosClientState = {
       ...this.state,
-      workbench: 'closed',
       dock: 'open',
       selectedTargetId: targetId,
       messages: [],
@@ -252,15 +176,9 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       members: [],
       threadPanelMessages: [],
     }
-    delete next.selectedAgentId
     delete next.threadPanelId
     this.publish(next)
     await this.reloadTarget(targetId)
-  }
-
-  closeDock(): void {
-    if (this.state.dock === 'closed') return
-    this.publish({ ...this.state, dock: 'closed' })
   }
 
   /**
@@ -314,62 +232,10 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     })
   }
 
-  async createAgent(name: string, presetId: string): Promise<{
-    actor: NativeActor
-    binding: NativeRuntimeBinding
-    workspacePath: string
-  }> {
-    const created = await this.call<{
-      actor: NativeActor
-      binding: NativeRuntimeBinding
-      workspacePath: string
-    }>('agent.create', { name, presetId })
-    await this.reloadProjection()
-    return created
-  }
-
-  async readAgentProfile(agentId: string): Promise<AgentProfile> {
-    return await this.call<AgentProfile>('agent.profile', { agentId })
-  }
-
-  async listAgentWorkspace(
-    agentId: string,
-    dirPath = '',
-    includeHidden = false,
-  ): Promise<AgentWorkspaceEntry[]> {
-    return await this.call<AgentWorkspaceEntry[]>('agent.workspace.list', {
-      agentId,
-      dirPath,
-      includeHidden,
-    })
-  }
-
-  async readAgentWorkspaceFile(agentId: string, path: string): Promise<AgentWorkspaceFile> {
-    return await this.call<AgentWorkspaceFile>('agent.workspace.read', { agentId, path })
-  }
-
-  async createChannel(name: string): Promise<string> {
-    const target = await this.call<NativeTarget>('channel.create', { name })
-    await this.reloadProjection()
-    await this.selectTarget(target.id)
-    return target.id
-  }
-
-  async createDirect(peerId: string): Promise<void> {
-    const target = await this.call<NativeTarget>('direct.create', { peerId })
-    await this.reloadProjection()
-    await this.selectTarget(target.id)
-  }
-
-  async addMember(targetId: string, memberId: string): Promise<void> {
-    await this.call('member.add', { targetId, memberId })
-    await this.reloadProjection()
-  }
-
   async createThread(rootMessageId: string): Promise<void> {
     const target = await this.call<NativeTarget>('thread.create', { rootMessageId })
     await this.reloadProjection()
-    // Threads open in the right-rail panel; the main conversation stays put.
+    // Threads open in the in-dock Thread view; the main conversation stays put.
     await this.openThreadPanel(target.id)
   }
 
@@ -384,28 +250,9 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   async send(text: string): Promise<NativeSendResult> {
-    return await this.sendTo(this.requireSelectedTargetId(), text)
-  }
-
-  /**
-   * Official composer As Task: send the Channel message, then promote that exact
-   * message to a Task. Core still stores Tasks as message-anchored rows;
-   * the UI must not ask the human to pick an anchor first.
-   */
-  async sendAsTask(text: string): Promise<void> {
-    const targetId = this.requireSelectedTargetId()
-    const target = this.state.targets.find(candidate => candidate.id === targetId)
-    if (target?.kind === 'thread') {
-      throw new Error('Thread 回复不能立为 Task')
-    }
-    const sent = await this.sendTo(targetId, text)
-    await this.createTask(sent.message.id)
-  }
-
-  private requireSelectedTargetId(): string {
     const targetId = this.state.selectedTargetId
     if (targetId === undefined) throw new Error('请先选择一个协作目标')
-    return targetId
+    return await this.sendTo(targetId, text)
   }
 
   private async sendTo(targetId: string, text: string): Promise<NativeSendResult> {
@@ -426,7 +273,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     )
     if (thread === undefined) return
     if (thread.parentTargetId !== undefined && this.state.selectedTargetId !== thread.parentTargetId) {
-      await this.selectTarget(thread.parentTargetId)
+      await this.openDock(thread.parentTargetId)
       thread = this.state.targets.find(
         target => target.id === threadTargetId && target.kind === 'thread',
       )
@@ -434,7 +281,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     }
     this.publish({
       ...this.state,
-      workbench: 'open',
+      dock: 'open',
       threadPanelId: thread.id,
       threadPanelMessages: [],
     })
@@ -444,11 +291,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   closeThreadPanel(): void {
     if (this.state.threadPanelId === undefined) return
     this.panelEpoch += 1
-    const next: ChaosClientState = {
-      ...this.state,
-      railTab: this.state.railTab === 'thread' ? 'channels' : this.state.railTab,
-      threadPanelMessages: [],
-    }
+    const next: ChaosClientState = { ...this.state, threadPanelMessages: [] }
     delete next.threadPanelId
     this.publish(next)
   }
@@ -468,28 +311,6 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
 
   async createTask(messageId: string): Promise<void> {
     await this.call<NativeTask>('task.create', { messageId })
-    await this.reloadProjection()
-  }
-
-  async claimTask(messageId: string): Promise<void> {
-    await this.call<NativeTask>('task.claim', { messageId })
-    await this.reloadProjection()
-  }
-
-  async unclaimTask(task: NativeTask): Promise<void> {
-    await this.call<NativeTask>('task.unclaim', {
-      messageId: task.messageId,
-      expectedVersion: task.version,
-    })
-    await this.reloadProjection()
-  }
-
-  async updateTask(task: NativeTask, status: NativeTask['status']): Promise<void> {
-    await this.call<NativeTask>('task.update', {
-      messageId: task.messageId,
-      status,
-      expectedVersion: task.version,
-    })
     await this.reloadProjection()
   }
 
@@ -529,11 +350,9 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   }
 
   private async loadProjectionOnce(): Promise<NativeCollabSnapshot> {
-    const [snapshot, actors, bindings, agentPresets] = await Promise.all([
+    const [snapshot, actors] = await Promise.all([
       this.call<NativeCollabSnapshot>('snapshot', {}),
       this.call<NativeActor[]>('actors', {}),
-      this.call<NativeRuntimeBinding[]>('runtime.bindings', {}).catch(() => [] as NativeRuntimeBinding[]),
-      this.call<AgentPresetSummary[]>('agent.presets', {}),
     ])
     if (this.disposed) throw new Error('dsh-chaos Client 已停止')
     const selectedTargetId = this.state.selectedTargetId !== undefined
@@ -551,11 +370,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       cursor: snapshot.cursor,
       actor: snapshot.actor,
       actors,
-      bindings,
-      agentPresets,
       targets: snapshot.targets,
       followedThreadIds: snapshot.followedThreadIds,
-      allTasks: snapshot.tasks,
       tasks: selectedTargetId === undefined || selectionChanged ? [] : this.state.tasks,
       messages: selectedTargetId === undefined || selectionChanged ? [] : this.state.messages,
       members: selectedTargetId === undefined || selectionChanged ? [] : this.state.members,
@@ -568,8 +384,8 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     if (threadPanelId !== undefined) next.threadPanelId = threadPanelId
     this.publish(next)
     if (selectedTargetId !== undefined) await this.reloadTarget(selectedTargetId)
-    // The open Thread panel keeps reading and keeps receiving SSE refreshes
-    // even after its follow is removed from the left nav.
+    // The open Thread view keeps reading and keeps receiving SSE refreshes
+    // even after its follow is removed.
     if (threadPanelId !== undefined) await this.reloadThreadPanel()
     return snapshot
   }

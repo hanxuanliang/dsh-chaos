@@ -16,10 +16,9 @@ globalThis.window = {
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
 // The rebuilt client declares its required services and registers official
-// seats only: sidebar footer entry, shell.overlay workbench + agent floater +
-// conversation dock, the settings.section Agents management surface, and the
-// sidebar.workspaces region shadowed at priority -1.
-assert.deepEqual(clientModule.inject, ['slots', 'connection', 'sessions', 'workspaces'])
+// seats only: the sidebar footer Activity entry and the shell.overlay docked
+// collaboration panel. Nothing shadows or replaces shipped UI.
+assert.deepEqual(clientModule.inject, ['slots', 'connection'])
 assert.equal(typeof clientModule.apply, 'function')
 
 const injected = []
@@ -49,19 +48,11 @@ const ctx = {
 }
 
 assert.doesNotThrow(() => { clientModule.apply(ctx) })
-assert.deepEqual(
-  injected.sort(),
-  ['settings.section', 'shell.overlay', 'shell.overlay', 'shell.overlay', 'sidebar.footer.action', 'sidebar.workspaces'],
-)
+assert.deepEqual(injected.sort(), ['shell.overlay', 'sidebar.footer.action'])
 assert.deepEqual(
   registered.map(entry => entry.id).sort(),
-  ['dsh-chaos-agent-floater', 'dsh-chaos-agents', 'dsh-chaos-dock', 'dsh-chaos-entry', 'dsh-chaos-workbench', undefined],
+  ['dsh-chaos-activity', 'dsh-chaos-dock'],
 )
-// The sidebar region must shadow the shipped Workspace browser, never throw
-// a same-priority conflict against it.
-const region = registered.find(entry => entry.name === 'sidebar.workspaces')
-assert.equal(region?.priority, -1)
-assert.deepEqual(region?.children, undefined)
 assert.equal(effects.length, 1)
 
-console.log('smoke-client: workbench client loads and registers official slots only')
+console.log('smoke-client: activity client loads and registers official slots only')
