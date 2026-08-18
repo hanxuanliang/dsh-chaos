@@ -14,11 +14,11 @@ import {
 import css from './Dock.module.css'
 
 /**
- * Docked right-side collaboration surface: opens from the footer Activity
- * entry onto the authoritative Activity inbox; a card click lands in the
- * conversation view (Thread replies take it over full-width); ← returns to
- * the list. Lives in the frame-wide shell.overlay layer and never replaces
- * the app's own columns.
+ * Collaboration surface docked flush against the sidebar's right edge:
+ * opens from the footer Activity entry onto the authoritative Activity
+ * inbox; a card click lands in the conversation view (Thread replies take
+ * it over full-width); ← returns to the list. Lives in the frame-wide
+ * shell.overlay layer and never replaces the app's own columns.
  */
 export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | null {
   const state = useChaos(props)
@@ -26,6 +26,7 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
   const selected = state.targets.find(target => target.id === state.selectedTargetId)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<Element | null>(null)
+  const [sidebarRight, setSidebarRight] = useState(280)
 
   useEffect(() => {
     if (!open) return
@@ -42,13 +43,42 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Track the live sidebar column so the panel stays flush with its right
+  // edge across wide/rail flips and window resizes. The column is found by
+  // walking up from our footer entry (hashed host class names are unstable).
+  useEffect(() => {
+    if (!open) return
+    const anchor = document.querySelector('button[aria-label="Activity"]')
+    let column: HTMLElement | null = null
+    let node = anchor !== null ? anchor.parentElement : null
+    while (node !== null) {
+      const rect = node.getBoundingClientRect()
+      if (rect.left <= 1 && rect.width > 0 && rect.width < window.innerWidth * 0.6) column = node
+      node = node.parentElement
+    }
+    if (column === null) return
+    const tracked: HTMLElement = column
+    const update = (): void => { setSidebarRight(Math.round(tracked.getBoundingClientRect().right)) }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(tracked)
+    window.addEventListener('resize', update)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [open])
+
   if (!open) return null
+
+  const dockStyle = { '--chaos-dock-left': `${sidebarRight}px` } as React.CSSProperties
 
   if (selected === undefined) {
     return (
       <div
         ref={panelRef}
         className={css.dock}
+        style={dockStyle}
         role="complementary"
         aria-label="Activity"
         tabIndex={-1}
@@ -81,6 +111,7 @@ export function ConversationDock(props: ChaosSurfaceProps): React.JSX.Element | 
     <div
       ref={panelRef}
       className={css.dock}
+      style={dockStyle}
       role="complementary"
       aria-label={`协作会话 ${title}`}
       tabIndex={-1}

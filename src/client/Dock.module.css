@@ -2,12 +2,15 @@
 
 .dock {
   position: fixed;
-  top: 0; right: 0; bottom: 0;
-  width: min(560px, 94vw);
+  top: 0; bottom: 0;
+  /* Anchored flush to the sidebar column's right edge; --chaos-dock-left is
+     measured from the live column (wide 280 / rail 56) by the component. */
+  left: var(--chaos-dock-left, 280px);
+  width: min(560px, calc(100vw - var(--chaos-dock-left, 280px)));
   display: flex; flex-direction: column;
   background: var(--dsw-alias-bg-base);
-  border-left: 1px solid var(--dsw-alias-border-l2);
-  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.16);
+  border-right: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: 24px 0 48px rgba(0, 0, 0, 0.12);
   box-sizing: border-box;
   /* shell.overlay is click-through; this surface opts back in. */
   pointer-events: auto;
