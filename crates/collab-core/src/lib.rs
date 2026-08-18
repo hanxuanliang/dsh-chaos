@@ -197,6 +197,63 @@ impl CollabCore {
             .await
     }
 
+    /// Delete one Agent's operational state. The actor row and its messages
+    /// stay so history never points at a missing author.
+    pub async fn delete_agent(&self, actor_id: &str) -> Result<()> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let actor = find_actor(&transaction, actor_id).await?;
+        if actor.kind != ActorKind::Agent {
+            return Err(not_found("agent", actor_id));
+        }
+        transaction
+            .execute("DELETE FROM memberships WHERE actor_id = ?1", [actor_id])
+            .await?;
+        transaction
+            .execute(
+                "DELETE FROM runtime_bindings WHERE agent_id = ?1",
+                [actor_id],
+            )
+            .await?;
+        transaction
+            .execute("DELETE FROM agents WHERE actor_id = ?1", [actor_id])
+            .await?;
+        transaction
+            .execute(
+                "DELETE FROM agent_wake_state WHERE agent_id = ?1",
+                [actor_id],
+            )
+            .await?;
+        transaction
+            .execute(
+                "DELETE FROM inbox_batch_items
+                 WHERE batch_id IN (SELECT id FROM inbox_batches WHERE agent_id = ?1)",
+                [actor_id],
+            )
+            .await?;
+        transaction
+            .execute("DELETE FROM inbox_batches WHERE agent_id = ?1", [actor_id])
+            .await?;
+        // The actor set changed; reuse actor_created so clients re-pull actors.
+        let actor_ids = all_actor_ids(&transaction).await?;
+        insert_change(
+            &transaction,
+            ChangeKind::ActorCreated,
+            None,
+            &actor.id,
+            &actor_ids,
+            now,
+        )
+        .await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
     /// Return the stable User for one handle, creating it when absent.
     pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
         self.assert_open()?;
@@ -655,7 +712,9 @@ impl CollabCore {
         Ok(())
     }
 
-    /// List the local actor directory after authenticating the caller.
+    /// List the local actor directory after authenticating the caller. A
+    /// deleted Agent keeps its actors row for message authorship but loses its
+    /// agents row, so the directory lists users and live Agents only.
     pub async fn list_actors(&self, actor_id: &str) -> Result<Vec<Actor>> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
@@ -663,7 +722,9 @@ impl CollabCore {
         let mut rows = connection
             .query(
                 "SELECT id, kind, handle, display_name, created_at_ms
-                 FROM actors ORDER BY handle, id",
+                 FROM actors
+                 WHERE kind = 'user' OR id IN (SELECT actor_id FROM agents)
+                 ORDER BY handle, id",
                 (),
             )
             .await?;
@@ -4879,11 +4940,141 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn delete_agent_removes_operational_state_but_keeps_history() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        core.create_direct(&user.id, &alpha.id).await?;
+        let binding = core
+            .bind_runtime(&alpha.id, "session-delete", "openai", "codex", "default")
+            .await?;
+        core.send_message(SendMessageRequest {
+            target_id: channel.id.clone(),
+            author_id: user.id.clone(),
+            client_request_id: "wake-alpha".into(),
+            text: "wake up".into(),
+        })
+        .await?;
+        core.send_message(SendMessageRequest {
+            target_id: channel.id.clone(),
+            author_id: alpha.id.clone(),
+            client_request_id: "alpha-message".into(),
+            text: "alpha was here".into(),
+        })
+        .await?;
+        let batch = core
+            .check_inbox(&alpha.id, binding.generation, &binding.session_id, 10)
+            .await?;
+        assert!(batch.id.is_some());
+        let directory_before = core.list_actors(&user.id).await?;
+        assert!(directory_before.iter().any(|actor| actor.id == alpha.id));
+        let actors_before = {
+            let connection = core.connection.lock().await;
+            count(&connection, "actors").await?
+        };
+
+        core.delete_agent(&alpha.id).await?;
+
+        // The deleted Agent leaves the directory but keeps its actors row and
+        // stays readable as the author of its history messages.
+        let directory_after = core.list_actors(&user.id).await?;
+        assert!(!directory_after.iter().any(|actor| actor.id == alpha.id));
+        assert!(directory_after.iter().any(|actor| actor.id == user.id));
+        let history = core.read_messages(&user.id, &channel.id, 0, 10).await?;
+        assert!(
+            history
+                .iter()
+                .any(|message| message.author_id == alpha.id
+                    && message.text == "alpha was here")
+        );
+
+        let connection = core.connection.lock().await;
+        assert_eq!(count(&connection, "actors").await?, actors_before);
+        assert_eq!(
+            count_where(&connection, "memberships", "actor_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "runtime_bindings", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "agents", "actor_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "agent_wake_state", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "inbox_batches", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(count(&connection, "inbox_batch_items").await?, 0);
+        assert_eq!(
+            count_where(&connection, "actors", "id", &alpha.id).await?,
+            1
+        );
+        assert_eq!(
+            count_where(&connection, "messages", "author_id", &alpha.id).await?,
+            1
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_agent_rejects_users_and_missing_actors() -> Result<()> {
+        let (core, user, _alpha, _beta, _channel) = fixture().await?;
+        assert!(matches!(
+            core.delete_agent(&user.id).await,
+            Err(CollabError::NotFound { entity: "agent", .. })
+        ));
+        assert!(matches!(
+            core.delete_agent("missing-actor").await,
+            Err(CollabError::NotFound { entity: "actor", .. })
+        ));
+        Ok(())
+    }
+
     async fn count(connection: &Connection, table: &str) -> Result<i64> {
-        let allowed = ["messages", "deliveries", "agent_wake_state"];
+        let allowed = [
+            "messages",
+            "deliveries",
+            "agent_wake_state",
+            "inbox_batch_items",
+            "actors",
+        ];
         assert!(allowed.contains(&table));
         let mut rows = connection
             .query(format!("SELECT COUNT(*) FROM {table}"), ())
+            .await?;
+        let row = rows
+            .next()
+            .await?
+            .ok_or_else(|| CollabError::Database("count returned no row".into()))?;
+        Ok(row.get(0)?)
+    }
+
+    async fn count_where(
+        connection: &Connection,
+        table: &str,
+        column: &str,
+        value: &str,
+    ) -> Result<i64> {
+        let allowed = [
+            ("memberships", "actor_id"),
+            ("runtime_bindings", "agent_id"),
+            ("agents", "actor_id"),
+            ("agent_wake_state", "agent_id"),
+            ("inbox_batches", "agent_id"),
+            ("actors", "id"),
+            ("messages", "author_id"),
+        ];
+        assert!(allowed.contains(&(table, column)));
+        let mut rows = connection
+            .query(
+                format!("SELECT COUNT(*) FROM {table} WHERE {column} = ?1"),
+                [value],
+            )
             .await?;
         let row = rows
             .next()

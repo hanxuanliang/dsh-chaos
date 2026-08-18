@@ -147,6 +147,7 @@ export interface NativeCollabHandle {
   createUser(handle: string, displayName: string): Promise<NativeActor>
   ensureUser(handle: string, displayName: string): Promise<NativeActor>
   createAgent(handle: string, displayName: string, workspacePath: string): Promise<NativeActor>
+  deleteAgent(agentId: string): Promise<void>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>

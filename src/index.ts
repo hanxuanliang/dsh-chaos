@@ -240,10 +240,13 @@ export class CollabService extends Service {
   }
 
   /** Human types a name; home dir, Session, and binding stay off-screen. */
-  async createNamedAgent(name: string, presetId = this.ctx.agentPresets.defaultId) {
+  async createNamedAgent(name: string, presetId?: string, provider?: string, model?: string) {
     const displayName = name.trim()
     if (displayName === '') throw new Error('[invalid_argument] name must not be blank')
-    const preset = await this.ctx.agentPresets.resolve(presetId)
+    if ((provider === undefined) !== (model === undefined)) {
+      throw new Error('[invalid_argument] provider and model must be given together')
+    }
+    const preset = await this.ctx.agentPresets.resolve(presetId ?? this.ctx.agentPresets.defaultId)
     if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
     const base = slugifyHandle(displayName)
     const template = join(dshHome(), 'agents', '{id}')
@@ -262,8 +265,8 @@ export class CollabService extends Service {
       binding = await this.createRuntime({
         agentId: actor.id,
         workspacePath,
-        provider: 'default',
-        model: 'default',
+        provider: provider ?? 'default',
+        model: model ?? 'default',
         preset: preset.id,
       })
     } catch (error) {
@@ -274,6 +277,13 @@ export class CollabService extends Service {
     }
     this.publishChange()
     return { actor, binding, workspacePath }
+  }
+
+  /** Stop the Session first; the binding row goes away with the Agent's collab state. */
+  async deleteAgent(agentId: string) {
+    await this.stopRuntime(agentId)
+    await this.requireHandle().deleteAgent(agentId)
+    this.publishChange()
   }
 
   async createChannel(name: string, creatorId: string) {

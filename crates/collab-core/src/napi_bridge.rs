@@ -220,6 +220,14 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn delete_agent(&self, actor_id: String) -> Result<()> {
+        self.core
+            .delete_agent(&actor_id)
+            .await
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn create_channel(&self, name: String, creator_id: String) -> Result<JsTarget> {
         self.core
             .create_channel(&name, &creator_id)

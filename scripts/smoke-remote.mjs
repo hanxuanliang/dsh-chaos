@@ -184,6 +184,24 @@ try {
   assert.equal(symlinkPreview.ok, false)
   assert.equal(symlinkPreview.error.code, 'invalid_argument')
 
+  // agent.create: presetId is optional; provider/model must come as a pair.
+  const defaulted = await call('agent.create', { name: 'Defaulted Agent' })
+  assert.equal(defaulted.ok, true)
+  assert.equal(defaulted.value.binding.preset, 'standard')
+  assert.equal(defaulted.value.binding.provider, 'default')
+  assert.equal(defaulted.value.binding.model, 'default')
+  const paired = await call('agent.create', {
+    name: 'Paired Agent',
+    provider: 'openai',
+    model: 'codex',
+  })
+  assert.equal(paired.ok, true)
+  assert.equal(paired.value.binding.provider, 'openai')
+  assert.equal(paired.value.binding.model, 'codex')
+  const halfPair = await call('agent.create', { name: 'Half Pair', provider: 'openai' })
+  assert.equal(halfPair.ok, false)
+  assert.equal(halfPair.error.code, 'invalid_argument')
+
   const created = await call('channel.create', {
     name: 'remote-channel',
     creatorId: 'forged-actor',
@@ -259,6 +277,46 @@ try {
   })
   assert.equal(revived.ok, true)
   assert.equal((await call('inbox.list', {})).value.activeCount, '1')
+
+  // agent.delete: the Agent leaves the actor directory and loses its binding,
+  // while its history messages keep pointing at the retained actors row.
+  const historyChannel = await call('channel.create', { name: 'delete-history' })
+  assert.equal(historyChannel.ok, true)
+  const added = await call('member.add', {
+    targetId: historyChannel.value.id,
+    memberId: paired.value.actor.id,
+  })
+  assert.equal(added.ok, true)
+  const pairedNote = await ctx.collab.sendMessage({
+    targetId: historyChannel.value.id,
+    authorId: paired.value.actor.id,
+    clientRequestId: 'paired-note',
+    text: 'paired was here',
+  })
+  assert.equal(pairedNote.message.authorId, paired.value.actor.id)
+  const deleted = await call('agent.delete', { agentId: paired.value.actor.id })
+  assert.equal(deleted.ok, true)
+  const actorsAfterDelete = await call('actors', {})
+  assert(!actorsAfterDelete.value.some(actor => actor.id === paired.value.actor.id))
+  assert(actorsAfterDelete.value.some(actor => actor.id === defaulted.value.actor.id))
+  const bindingsAfterDelete = await call('runtime.bindings', {})
+  assert(!bindingsAfterDelete.value.some(binding => binding.agentId === paired.value.actor.id))
+  const history = await call('history', { targetId: historyChannel.value.id })
+  assert.equal(history.ok, true)
+  assert(history.value.some(
+    message => message.authorId === paired.value.actor.id && message.text === 'paired was here',
+  ))
+  const deletedProfile = await call('agent.profile', { agentId: paired.value.actor.id })
+  assert.equal(deletedProfile.ok, false)
+  assert.equal(deletedProfile.error.code, 'not_found')
+  const deletedAgain = await call('agent.delete', { agentId: paired.value.actor.id })
+  assert.equal(deletedAgain.ok, true)
+  const deleteUser = await call('agent.delete', { agentId: firstSnapshot.value.actor.id })
+  assert.equal(deleteUser.ok, false)
+  assert.equal(deleteUser.error.code, 'not_found')
+  const deleteMissing = await call('agent.delete', { agentId: 'missing-agent' })
+  assert.equal(deleteMissing.ok, false)
+  assert.equal(deleteMissing.error.code, 'not_found')
 
   const response = new MockResponse()
   const request = {

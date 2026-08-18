@@ -1,10 +1,13 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { ChaosClientController } from './controller.ts'
 import { ActivityEntry } from './Entry.tsx'
 import { ConversationDock } from './Dock.tsx'
+import { AgentsSection, createChaosCall } from './AgentsSection.tsx'
+import type { AgentsSectionInjected } from './AgentsSection.tsx'
 import type { ChaosInjected } from './surface.tsx'
 
 export const inject = ['slots', 'connection'] as const
@@ -57,4 +60,19 @@ export function apply(ctx: ClientContext): void {
     order: 95,
     inject: face,
   }, ConversationDock))
+
+  // Settings page for collaboration Agents: its own lightweight RPC face
+  // (channel call + host llm catalog), independent of the dock controller.
+  const agentsFace = (): AgentsSectionInjected => ({
+    call: createChaosCall(connection.rpc),
+    llm: connection.api.llm,
+  })
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'dsh-chaos-agents',
+    order: 90,
+    label: () => '协作 Agents',
+    inject: agentsFace,
+  }, AgentsSection))
 }

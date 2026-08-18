@@ -43,11 +43,12 @@ export interface CollabRemoteApi {
     includeHidden: boolean,
   ): Promise<AgentWorkspaceEntry[]>
   agentWorkspaceFile(viewerId: string, agentId: string, path: string): Promise<AgentWorkspaceFile>
-  createNamedAgent(name: string, presetId: string): Promise<{
+  createNamedAgent(name: string, presetId?: string, provider?: string, model?: string): Promise<{
     actor: NativeActor
     binding: NativeRuntimeBinding
     workspacePath: string
   }>
+  deleteAgent(agentId: string): Promise<void>
   listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
@@ -238,8 +239,13 @@ async function dispatchRemote(
     case 'agent.create':
       return await api.createNamedAgent(
         requiredString(input, 'name'),
-        requiredString(input, 'presetId'),
+        optionalString(input, 'presetId'),
+        optionalString(input, 'provider'),
+        optionalString(input, 'model'),
       )
+    case 'agent.delete':
+      await api.deleteAgent(requiredString(input, 'agentId'))
+      return null
     case 'runtime.bindings':
       return await api.listRuntimeBindings()
     case 'channel.create':
