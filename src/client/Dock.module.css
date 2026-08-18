@@ -1,0 +1,59 @@
+/* Docked right-side conversation panel (Activity inbox landing surface). */
+
+.dock {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: min(560px, 94vw);
+  display: flex; flex-direction: column;
+  background: var(--dsw-alias-bg-base);
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.16);
+  box-sizing: border-box;
+  /* shell.overlay is click-through; this surface opts back in. */
+  pointer-events: auto;
+  outline: none;
+}
+
+.dockHead {
+  display: flex; align-items: center; gap: 6px;
+  flex: none; height: 48px; padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  box-sizing: border-box;
+}
+.dockKind {
+  flex: none;
+  color: var(--dsw-alias-label-dimmed);
+  font-size: 13px;
+}
+.dockTitle {
+  flex: 1; min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px; font-weight: 600; line-height: 20px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dockClose {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border: none; border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.dockClose:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Thread takeover: the reused context panel stretches to full dock width. */
+.dockThread {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0;
+}
+.dockThread > aside {
+  width: auto;
+  flex: 1; min-height: 0;
+  border-left: none;
+}

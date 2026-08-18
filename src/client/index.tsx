@@ -6,6 +6,8 @@ import { ChaosClientController } from './controller.ts'
 import { ChaosEntry, Workbench, type ChaosInjected } from './Workbench.tsx'
 import { AgentFloater } from './AgentFloater.tsx'
 import { AgentsSettings } from './AgentsSettings.tsx'
+import { SidebarRegion } from './SidebarRegion.tsx'
+import { ConversationDock } from './Dock.tsx'
 import type { NativeTask } from '../native.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -73,6 +75,22 @@ export function apply(ctx: ClientContext): void {
     },
     closeWorkbench: () => { controller.closeWorkbench() },
     selectTarget: targetId => controller.selectTarget(targetId),
+    openDock: targetId => controller.openDock(targetId),
+    closeDock: () => { controller.closeDock() },
+    loadInbox: () => controller.loadInbox(),
+    loadMoreInbox: () => {
+      const cursor = controller.getSnapshot().inbox.nextCursor
+      return cursor === undefined ? Promise.resolve() : controller.loadInbox(cursor)
+    },
+    markInboxDone: (targetId, throughSeq) => controller.markInboxDone(targetId, throughSeq),
+    openSession: sessionId => {
+      if (sessions === undefined) return
+      try {
+        sessions.open(sessionId)
+      } catch (error) {
+        console.warn('[dsh-chaos] open session failed', error)
+      }
+    },
     createChannel: name => controller.createChannel(name),
     inviteAgent: async (targetId, channelName) => {
       const created = await createAgent(`${channelName} 助手`)
@@ -111,6 +129,24 @@ export function apply(ctx: ClientContext): void {
     order: 10,
     inject: face,
   }, ChaosEntry))
+
+  // Sidebar browsing region: priority -1 shadows the official Workspace
+  // browser (single-kind cell, lowest priority renders) with the 会话 |
+  // Activity tabs. No children are declared here — the official entry keeps
+  // owning its sidebar.workspaces.directoryFlow hole.
+  ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register({
+    name: 'sidebar.workspaces',
+    priority: -1,
+    inject: face,
+  }, SidebarRegion))
+
+  // Docked right-side conversation panel: the Activity inbox landing surface.
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'dsh-chaos-dock',
+    order: 95,
+    inject: face,
+  }, ConversationDock))
 
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',

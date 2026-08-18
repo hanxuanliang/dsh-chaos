@@ -8,6 +8,8 @@ import type {
 } from '../agent-settings-types.ts'
 import type {
   NativeActor,
+  NativeActivityInboxItem,
+  NativeActivityInboxPage,
   NativeCollabSnapshot,
   NativeMessage,
   NativeMessageTail,
@@ -36,13 +38,25 @@ export interface ThreadPreview {
   latest: ThreadPreviewReply[]
 }
 
+export interface ChaosInboxState {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  items: readonly NativeActivityInboxItem[]
+  nextCursor?: string
+  /** Authoritative active-conversation count from inbox.list (decimal string). */
+  activeCount: string
+}
+
 export interface ChaosClientState {
   status: 'cold' | 'loading' | 'ready' | 'error'
   stream: 'idle' | 'connecting' | 'connected' | 'reconnecting'
   surface: 'closed' | 'rail'
   railTab: 'channels' | 'agents' | 'thread'
   workbench: 'closed' | 'open'
+  /** Docked right-side conversation panel; mutually exclusive with the workbench modal. */
+  dock: 'closed' | 'open'
   leftPane: 'sessions' | 'activity'
+  /** Authoritative Activity inbox page (sidebar Activity tab). */
+  inbox: ChaosInboxState
   asTask: boolean
   cursor: string
   actor?: NativeActor
@@ -73,7 +87,9 @@ const INITIAL_STATE: ChaosClientState = {
   surface: 'closed',
   railTab: 'channels',
   workbench: 'closed',
+  dock: 'closed',
   leftPane: 'sessions',
+  inbox: { status: 'idle', items: [], activeCount: '0' },
   asTask: false,
   cursor: '0',
   actors: [],
@@ -101,6 +117,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
   private projectionRunner: Promise<NativeCollabSnapshot> | undefined
   private loadEpoch = 0
   private panelEpoch = 0
+  private inboxEpoch = 0
 
   constructor(private readonly rpc: ClientConnectionRpc) {}
 
@@ -149,7 +166,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
 
   openWorkbench(): void {
     if (this.state.workbench === 'open') return
-    this.publish({ ...this.state, workbench: 'open' })
+    this.publish({ ...this.state, workbench: 'open', dock: 'closed' })
   }
 
   closeWorkbench(): void {
@@ -205,6 +222,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       ...this.state,
       railTab: 'channels',
       workbench: 'open',
+      dock: 'closed',
       selectedTargetId: targetId,
       messages: [],
       tasks: [],
@@ -215,6 +233,85 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     delete next.threadPanelId
     this.publish(next)
     await this.reloadTarget(targetId)
+  }
+
+  /**
+   * Open a conversation in the docked right-side panel (Activity inbox landing
+   * surface). Shares the selected-target machinery with the workbench; the two
+   * surfaces are mutually exclusive.
+   */
+  async openDock(targetId: string): Promise<void> {
+    if (!this.state.targets.some(target => target.id === targetId)) return
+    const next: ChaosClientState = {
+      ...this.state,
+      workbench: 'closed',
+      dock: 'open',
+      selectedTargetId: targetId,
+      messages: [],
+      tasks: [],
+      members: [],
+      threadPanelMessages: [],
+    }
+    delete next.selectedAgentId
+    delete next.threadPanelId
+    this.publish(next)
+    await this.reloadTarget(targetId)
+  }
+
+  closeDock(): void {
+    if (this.state.dock === 'closed') return
+    this.publish({ ...this.state, dock: 'closed' })
+  }
+
+  /**
+   * Load the authoritative Activity inbox. Without a cursor the first page is
+   * reloaded (sized to cover already-loaded items so a refresh after a Done or
+   * a change event does not clobber appended pages); with a cursor the next
+   * page is appended.
+   */
+  async loadInbox(cursor?: string): Promise<void> {
+    if (this.disposed) return
+    const epoch = ++this.inboxEpoch
+    const append = cursor !== undefined
+    const previous = this.state.inbox
+    if (!append && previous.status === 'idle') {
+      this.publish({ ...this.state, inbox: { ...previous, status: 'loading' } })
+    }
+    try {
+      const page = await this.call<NativeActivityInboxPage>('inbox.list', {
+        limit: append ? 20 : Math.min(50, Math.max(20, previous.items.length)),
+        ...(cursor === undefined ? {} : { cursor }),
+      })
+      if (epoch !== this.inboxEpoch || this.disposed) return
+      const next: ChaosInboxState = {
+        status: 'ready',
+        items: append ? [...this.state.inbox.items, ...page.items] : page.items,
+        activeCount: page.activeCount,
+      }
+      if (page.nextCursor !== undefined) next.nextCursor = page.nextCursor
+      this.publish({ ...this.state, inbox: next })
+    } catch {
+      if (epoch !== this.inboxEpoch || this.disposed) return
+      this.publish({ ...this.state, inbox: { ...this.state.inbox, status: 'error' } })
+    }
+  }
+
+  /**
+   * Mark a conversation Done through its latest seq: it leaves the inbox until
+   * a newer message revives it. The item is removed optimistically; the
+   * activity_done_changed SSE event re-syncs the authoritative page.
+   */
+  async markInboxDone(targetId: string, throughSeq: string): Promise<void> {
+    await this.call('inbox.done', { targetId, throughSeq })
+    const inbox = this.state.inbox
+    if (inbox.status === 'idle') return
+    this.publish({
+      ...this.state,
+      inbox: {
+        ...inbox,
+        items: inbox.items.filter(item => item.conversationId !== targetId),
+      },
+    })
   }
 
   async createAgent(name: string, presetId: string): Promise<{
@@ -402,6 +499,7 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
     this.projectionRequested = false
     this.loadEpoch += 1
     this.panelEpoch += 1
+    this.inboxEpoch += 1
     this.source?.close()
     this.source = undefined
     this.listeners.clear()
@@ -577,7 +675,11 @@ export class ChaosClientController implements HostObservable<ChaosClientState> {
       if (this.source === source) this.publish({ ...this.state, stream: 'reconnecting' })
     }
     source.addEventListener('change', () => {
-      if (this.source === source) void this.refresh()
+      if (this.source !== source) return
+      void this.refresh()
+      // message_created/activity_done_changed both arrive as a coarse change;
+      // once the inbox has been loaded it re-reads its authoritative first page.
+      if (this.state.inbox.status !== 'idle') void this.loadInbox()
     })
     source.addEventListener('resync_required', () => {
       if (this.source === source) void this.resyncEvents(source)

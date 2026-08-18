@@ -14,6 +14,12 @@ export interface ChaosInjected {
   openWorkbench: () => void
   closeWorkbench: () => void
   selectTarget: (targetId: string) => Promise<void>
+  openDock: (targetId: string) => Promise<void>
+  closeDock: () => void
+  loadInbox: () => Promise<void>
+  loadMoreInbox: () => Promise<void>
+  markInboxDone: (targetId: string, throughSeq: string) => Promise<void>
+  openSession: (sessionId: string) => void
   createChannel: (name: string) => Promise<string>
   inviteAgent: (targetId: string, channelName: string) => Promise<void>
   createAgent: (name: string, presetId?: string) => Promise<void>
@@ -32,7 +38,7 @@ export interface ChaosInjected {
 }
 
 type EntryProps = PropsRuntime<'sidebar.footer.action'> & InjectFace<ChaosInjected>
-type WorkbenchProps = PropsRuntime<'shell.overlay'> & InjectFace<ChaosInjected>
+export type WorkbenchProps = PropsRuntime<'shell.overlay'> & InjectFace<ChaosInjected>
 
 function useChaosStore(observable: HostObservable<ChaosClientState>): ChaosClientState {
   return useSyncExternalStore(observable.subscribe, observable.getSnapshot)
@@ -82,12 +88,12 @@ function streamText(state: ChaosClientState): { dot: 'on' | 'busy' | 'off', text
   }
 }
 
-function authorNameOf(state: ChaosClientState, authorId: string): string {
+export function authorNameOf(state: ChaosClientState, authorId: string): string {
   if (state.actor?.id === authorId) return '我'
   return state.actors.find(actor => actor.id === authorId)?.displayName ?? authorId.slice(0, 8)
 }
 
-function timeLabel(ms: number): string {
+export function timeLabel(ms: number): string {
   const date = new Date(ms)
   const now = new Date()
   const sameDay = date.toDateString() === now.toDateString()
@@ -101,7 +107,7 @@ interface Drafts {
   [targetId: string]: string
 }
 
-const TASK_STATUS_TEXT: Record<string, string> = {
+export const TASK_STATUS_TEXT: Record<string, string> = {
   todo: '待办',
   in_progress: '进行中',
   in_review: '验收中',
@@ -447,7 +453,7 @@ function TaskChip(props: { state: ChaosClientState, message: NativeMessage }): R
   )
 }
 
-function MessageList(props: WorkbenchProps & { state: ChaosClientState }): React.JSX.Element {
+export function MessageList(props: WorkbenchProps & { state: ChaosClientState }): React.JSX.Element {
   const { state } = props
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const count = state.messages.length
@@ -494,7 +500,7 @@ function MessageList(props: WorkbenchProps & { state: ChaosClientState }): React
 
 const COMPOSER_MAX_HEIGHT = 160
 
-function Composer(props: WorkbenchProps & {
+export function Composer(props: WorkbenchProps & {
   state: ChaosClientState
   draftKey: string
   onSend: (text: string) => Promise<void>
@@ -594,7 +600,7 @@ function StatusStrip(props: { state: ChaosClientState, sendError: string | undef
 }
 
 /** Right-hand context panel for the open Thread: follow toggle, compact flow, own composer. */
-function ThreadContextPanel(props: WorkbenchProps & { state: ChaosClientState }): React.JSX.Element | null {
+export function ThreadContextPanel(props: WorkbenchProps & { state: ChaosClientState }): React.JSX.Element | null {
   const { state } = props
   const threadId = state.threadPanelId
   const [pending, setPending] = useState(false)

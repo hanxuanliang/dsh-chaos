@@ -1,0 +1,261 @@
+/* Sidebar browsing region: 会话 | Activity tabs. All colors ride --dsw-alias-* tokens. */
+
+.region {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0; min-width: 0;
+}
+
+/* ---- pill tabs: two equal widths, centered, active = gray pill ---- */
+.tabs {
+  display: flex; flex: none; gap: 4px;
+  padding: 4px 10px 8px;
+}
+.tab {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; padding: 0 8px;
+  border: none; border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.tab:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.tab[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+.tabBadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-bg-base);
+  font-size: 10px; font-weight: 600; line-height: 1;
+}
+
+/* ---- collapsed rail ---- */
+.rail {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 4px 0;
+}
+.railButton {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border: none; border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.railButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ---- shared pane ---- */
+.pane {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0; min-width: 0;
+}
+.list {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+.empty {
+  padding: 24px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px; line-height: 18px;
+  text-align: center;
+}
+.emptyHint {
+  display: block; margin-top: 4px;
+  color: var(--dsw-alias-label-dimmed);
+}
+.paneError {
+  flex: none;
+  margin: 0 10px 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px; line-height: 16px;
+}
+.retryButton {
+  margin-left: 6px;
+  border: none; background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  font: inherit; cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---- sessions tab ---- */
+.searchWrap { flex: none; padding: 0 10px 8px; }
+.search {
+  width: 100%; height: 28px; padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit; font-size: 12px;
+  box-sizing: border-box;
+  outline: none;
+}
+.search:focus { border-color: var(--dsw-alias-state-business-primary); }
+.search::placeholder { color: var(--dsw-alias-label-dimmed); }
+
+.group { margin-bottom: 4px; }
+.groupTitle {
+  padding: 6px 8px 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px; font-weight: 600; line-height: 16px;
+  text-transform: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sessionRow {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%; height: 30px; padding: 0 8px;
+  border: none; border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.sessionRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.sessionRow[data-active] {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+.sessionDot {
+  flex: none;
+  width: 6px; height: 6px; border-radius: 999px;
+  background: transparent;
+}
+.sessionDot[data-status='run'] { background: var(--dsw-alias-state-business-primary); }
+.sessionDot[data-status='warn'] { background: var(--dsw-alias-state-warning-primary); }
+.sessionDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
+.sessionTitle {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---- activity tab: cards ---- */
+.card {
+  margin: 0 2px 8px;
+  padding: 10px 10px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.card:hover { border-color: var(--dsw-alias-label-dimmed); }
+.card:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.cardTop {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 4px;
+}
+.cardTarget {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px; font-weight: 600; line-height: 16px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cardKind { color: var(--dsw-alias-label-dimmed); font-weight: 500; }
+.doneButton {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px; line-height: 1;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+.doneButton:hover {
+  color: var(--dsw-alias-state-success-primary);
+  border-color: var(--dsw-alias-state-success-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent);
+}
+.doneButton:disabled { opacity: 0.5; cursor: default; }
+.cardTitle {
+  margin-bottom: 2px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px; font-weight: 500; line-height: 18px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cardMeta {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px; line-height: 16px;
+}
+.cardSender { color: var(--dsw-alias-label-secondary); font-weight: 500; }
+.cardExcerpt {
+  margin: 2px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px; line-height: 17px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cardChips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.chip {
+  display: inline-flex; align-items: center;
+  height: 20px; padding: 0 8px;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px; font-weight: 500; line-height: 1;
+}
+.chip[data-status='in_progress'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+}
+.chip[data-status='in_review'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-warning-primary) 14%, transparent);
+  color: var(--dsw-alias-state-warning-primary);
+}
+.chip[data-status='done'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent);
+  color: var(--dsw-alias-state-success-primary);
+}
+.moreButton {
+  display: block;
+  width: calc(100% - 4px);
+  margin: 0 2px;
+  height: 30px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 12px;
+  cursor: pointer;
+}
+.moreButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.moreButton:disabled { opacity: 0.6; cursor: default; }
