@@ -1290,3 +1290,241 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .memberRow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+/* ---- tasks board (P0-4) -------------------------------------------------- */
+/* Anatomy: dsh-web-ui/packages/dsh-task-board board.module.css remapped to the
+ * panel's padding/scale. .panel prefixes per S5 (taskCard is a button). */
+.taskBoard {
+  --dsh-chaos-lane-review: #7287fd;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 12px 12px;
+}
+.taskBoardHeader {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+}
+.panel .taskBoardSearch {
+  flex: 0 1 240px;
+  min-width: 120px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-input-major);
+  outline: none;
+}
+.panel .taskBoardSearch::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+.panel .taskBoardSearch:focus {
+  border-color: var(--dsw-alias-border-l3);
+}
+.taskColumns {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-auto-columns: minmax(220px, 1fr);
+  grid-auto-flow: column;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+.taskColumn {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.taskColumnHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+}
+.statusDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+}
+.statusDot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
+.statusDot[data-status='in_progress'] { background: var(--dsw-alias-state-warn-primary); }
+/* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
+ * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */
+.statusDot[data-status='in_review'] { background: var(--dsh-chaos-lane-review, #7287fd); }
+.statusDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
+.taskColumnTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.taskColumnCount {
+  flex: none;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.taskCards {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 2px 8px 10px;
+}
+.taskColumnEmpty {
+  padding: 24px 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
+}
+/* Card = whole-button; must beat .panel button { font: inherit } (S5). */
+.panel .taskCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.panel .taskCard:hover {
+  border-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-shadow-lv2);
+  transform: translateY(-1px);
+}
+.panel .taskCard:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.panel .taskCard[data-status='in_progress'] {
+  border-color: var(--dsw-alias-state-warn-primary);
+}
+.taskCardTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.taskCardExcerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.taskCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.taskCardNumber {
+  flex: none;
+}
+.taskCardAssignee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.taskCardTime {
+  flex: none;
+  margin-left: auto;
+}
+/* Detail modal (content lives in .dialogBody — portal, never .panel). */
+.taskDetailHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.taskDetailStatus {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
+.taskDetailTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+.taskDetailMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.taskDetailRow {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.taskDetailRow > dt {
+  flex: none;
+  width: 72px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.taskDetailRow > dd {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+}
+.taskDetailAnchorLabel {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.taskDetailAnchorText {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

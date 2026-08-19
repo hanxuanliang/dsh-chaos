@@ -11,6 +11,7 @@ import type { ChaosTranslate } from './locales.ts'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
+import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import css from './CollabPanel.module.css'
 
 export interface ChannelViewProps {
@@ -103,9 +104,7 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
           </>
         )
         : (
-          <div className={css.mainEmpty}>
-            <p className={css.empty}>{t('channel.tasksPending')}</p>
-          </div>
+          <ChannelTasksBoard t={t} store={store} state={state} channelId={channel.id} />
         )}
       {membersOpen && (
         <ChannelMembersDialog
