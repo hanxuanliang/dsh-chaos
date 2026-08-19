@@ -14,6 +14,14 @@ export default {
   format: 'cjs',
   platform: 'browser',
   target: 'es2024',
+  alias: {
+    // vfile (via react-markdown) re-exports these unconditionally; the DSH
+    // client module table has no node builtins, so alias them to a browser
+    // shim (src/client/shims/node-min.ts).
+    'node:path': resolve(import.meta.dirname, 'src/client/shims/node-min.ts'),
+    'node:process': resolve(import.meta.dirname, 'src/client/shims/node-min.ts'),
+    'node:url': resolve(import.meta.dirname, 'src/client/shims/node-min.ts'),
+  },
   dts: false,
   sourcemap: true,
   clean: false,
@@ -25,6 +33,15 @@ export default {
       '@deepseek-ai/cordis',
       '@deepseek-ai/dsh-client-ui-primitives',
       '@deepseek-ai/dsh-client-ui-slots',
+    ],
+    // DSH client's module table only hosts the neverBundle externals above;
+    // anything in package.json dependencies defaults to externalized and
+    // would brick the whole plugin import at runtime (observed 2026-08-19:
+    // require("react-markdown") missed the module table). Force-inline.
+    alwaysBundle: [
+      /^react-markdown($|\/)/,
+      /^remark-gfm($|\/)/,
+      /^remark-breaks($|\/)/,
     ],
   },
   plugins: [{

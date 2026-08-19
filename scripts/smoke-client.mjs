@@ -1,8 +1,25 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 let clientModule
+
+// The host serves packagers a fixed client module table; any require()
+// outside this set bricks the whole plugin import in the browser (observed
+// 2026-08-19: react-markdown/remark-* had to be force-inlined, and vfile's
+// node:* shims aliased to node-min.ts). Guard the bundle here.
+{
+  const bundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+  const specifiers = [...bundle.matchAll(/require\("([^"]+)"\)/g)].map(m => m[1])
+  const allowed = new Set([
+    'react',
+    'react/jsx-runtime',
+    'react-dom/client',
+    '@deepseek-ai/dsh-client-ui-primitives',
+  ])
+  assert.deepEqual([...new Set(specifiers)].sort(), [...allowed].sort())
+}
 
 globalThis.window = {
   __ModuleLoader__: {
