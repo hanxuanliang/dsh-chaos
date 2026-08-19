@@ -408,9 +408,15 @@ export class CollabStore {
 
   async memberAdd(targetId: string, memberId: string): Promise<void> {
     await this.client.memberAdd(targetId, memberId)
+    // Refetch immediately: dropping the cache key would also disqualify this
+    // channel from reloadTargets' member refresh (which only covers already-
+    // cached channels), leaving the members dialog showing an empty list.
     const members = { ...this.snapshot.membersByChannel }
     delete members[targetId]
     this.set({ membersByChannel: members })
+    void this.client.targetMembers(targetId).then((list) => {
+      this.set({ membersByChannel: { ...this.snapshot.membersByChannel, [targetId]: list } })
+    }, () => {})
   }
 
   // --- SSE invalidation handling (invalidation-only frames; bodies via RPC) ---
@@ -504,7 +510,9 @@ export class CollabStore {
           this.set({ removedNotice: false, activeChannelId: undefined })
         }, 1000)
       }
-      if (active !== undefined && this.snapshot.membersByChannel[active] !== undefined) {
+      // Refetch active members even when uncached (e.g. right after memberAdd
+      // dropped the key) — membership_changed semantics cover this channel.
+      if (active !== undefined) {
         void this.client.targetMembers(active).then((members) => {
           if (this.loadGeneration !== generation) return
           this.set({ membersByChannel: { ...this.snapshot.membersByChannel, [active]: members } })

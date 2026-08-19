@@ -10,6 +10,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
+import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import css from './CollabPanel.module.css'
 
 export interface ChannelViewProps {
@@ -22,7 +23,9 @@ export interface ChannelViewProps {
 
 export function ChannelView({ t, store, state, channel, activeLocale }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
+  const [membersOpen, setMembersOpen] = useState(false)
   useEffect(() => { setTab('messages') }, [channel.id])
+  useEffect(() => { setMembersOpen(false) }, [channel.id])
 
   const members = state.membersByChannel[channel.id]
   const openTasks = Object.values(state.tasksByMessage)
@@ -60,7 +63,12 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
         </div>
         {/* 成员数 chip 单独挂在头部最右端（用户 2026-08-19 拍板），不与 tab 组并列 */}
         {members !== undefined && (
-          <span className={css.memberChip} title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
+          <button
+            type="button"
+            className={css.memberChip}
+            aria-haspopup="dialog"
+            onClick={() => { setMembersOpen(true) }}
+           title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="6" cy="5" r="2.6" />
               <path d="M1.8 13.2c.6-2.4 2.2-3.6 4.2-3.6s3.6 1.2 4.2 3.6" />
@@ -68,7 +76,7 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
               <path d="M11.6 9.7c1.4.3 2.4 1.4 2.7 3.5" />
             </svg>
             <span className={css.memberCount}>{members.length}</span>
-          </span>
+          </button>
         )}
       </header>
       {tab === 'messages'
@@ -99,6 +107,15 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
             <p className={css.empty}>{t('channel.tasksPending')}</p>
           </div>
         )}
+      {membersOpen && (
+        <ChannelMembersDialog
+          t={t}
+          store={store}
+          state={state}
+          channelId={channel.id}
+          onClose={() => { setMembersOpen(false) }}
+        />
+      )}
     </section>
   )
 }

@@ -360,10 +360,10 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-weight: 500;
 }
 
-/* plocal participants-chip anatomy (ChannelHeader member count, top-right):
- * bordered paper chip, 7-unit height, tertiary icon + bold count. Static —
- * no hover affordance until the participants dialog lands. */
-.memberChip {
+/* plocal participants-button anatomy (ChannelHeader member count, top-right):
+ * bordered paper chip, tertiary icon + bold count — real button opening the
+ * members dialog. */
+.panel .memberChip {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -375,6 +375,14 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+.panel .memberChip:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.panel .memberChip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
 }
 .memberCount {
   color: var(--dsw-alias-label-primary);
@@ -1150,6 +1158,75 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* --- members dialog (plocal ChannelMembersDialog graft) --- */
+.dlgGroupLabel {
+  margin: 10px 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.dlgGroupLabel:first-child {
+  margin-top: 2px;
+}
+.dlgMemberList {
+  display: flex;
+  max-height: 300px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 4px;
+}
+/* list-stage rows are not interactive — no pointer affordance (member.remove
+ * does not exist on the host RPC). */
+.dlgMemberList > .memberRow {
+  cursor: default;
+}
+.memberBadge {
+  flex: none;
+  margin-left: auto;
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 15%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+}
+.panel .rowAddButton {
+  display: inline-flex;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+.panel .rowAddButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.panel .rowAddButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.panel .rowAddButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.dialogWideButton {
+  width: 100%;
 }
 
 /* --- create-channel dialog (Modal chrome reuses the AgentCreateDialog fixes) --- */
