@@ -32,7 +32,7 @@ export const zh = {
   'tasks.statusFailed': '状态更新失败：{error}',
   'tasks.anchorGo': '在消息流中查看',
   'tasks.claimSelf': '认领（我）',
-  'thread.title': '线程',
+  'thread.title': 'Thread',
   'thread.close': '关闭线程',
   'thread.reply': '回复',
   'thread.replies': '{count} 条回复',

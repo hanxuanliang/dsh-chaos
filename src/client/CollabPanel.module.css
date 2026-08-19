@@ -1096,19 +1096,21 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   justify-content: center;
   border: none;
   border-radius: 8px;
-  background: var(--dsw-alias-label-primary);
-  color: var(--dsw-alias-bg-base);
+  /* pilot/plocal 发送钮真值：品牌蓝底 + 反白字形（黑/白 label-primary 在
+   * 深色下会变亮白块，观感差）。 */
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary-inverted, #fff);
   cursor: pointer;
-  transition: background 100ms;
+  transition: background 100ms, opacity 100ms;
 }
 
 .sendButton:hover:not(:disabled) {
-  background: var(--dsw-alias-label-secondary);
+  filter: brightness(0.92);
 }
 
 .sendButton:disabled {
-  background: var(--dsw-alias-border-l3);
-  color: var(--dsw-alias-label-tertiary);
+  /* plocal ChatComposer 禁用真值：只 opacity 30%，不换灰暗色块。 */
+  opacity: 0.3;
   cursor: default;
 }
 
@@ -1796,14 +1798,11 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-primary);
 }
 .threadRootText {
-  display: -webkit-box;
-  overflow: hidden;
+  /* spec: root 完整重现——不截断。 */
   font-size: 12px;
   line-height: 1.5;
   color: var(--dsw-alias-label-secondary);
   text-align: left;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1855,4 +1854,18 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .panel .msgReplyButton:hover {
   color: var(--dsw-alias-label-primary);
   border-color: var(--dsw-alias-border-l3);
+}
+
+/* ---- thread panel drag divider (user ask: left border must be draggable) --- */
+.threadResizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  z-index: 5;
+  width: 8px;
+  cursor: col-resize;
+}
+.threadResizeHandle:hover, .threadResizeHandle[data-dragging='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 25%, transparent);
 }

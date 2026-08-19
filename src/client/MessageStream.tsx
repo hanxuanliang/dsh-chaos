@@ -476,7 +476,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
       )}
       <div className={css.stream} ref={scrollerRef} onScroll={onScroll}>
         <div className={css.chatCol}>
-          {state.historyLoading && (
+          {state.historyLoading && messages === undefined && (
             <div className={css.skeletonStack} role="status" aria-label={t('channel.loading')}>
               {SKELETON_ROWS.map(row => <div key={row} className={css.skeletonRow} />)}
             </div>

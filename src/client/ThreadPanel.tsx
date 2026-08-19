@@ -19,7 +19,7 @@
  * - Composer deliberately has NO As-task toggle: tasks anchor top-level
  *   channel messages, and thread replies are not top-level.
  */
-import type { JSX } from 'react'
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -27,6 +27,18 @@ import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
+
+const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
+const THREAD_WIDTH_MIN = 300
+const THREAD_WIDTH_MAX = 640
+
+function readThreadWidth(): number {
+  try {
+    const raw = window.localStorage.getItem(THREAD_WIDTH_KEY)
+    const parsed = raw === null ? NaN : Number.parseInt(raw, 10)
+    return Number.isFinite(parsed) ? Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, parsed)) : 360
+  } catch { return 360 }
+}
 
 export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose }: {
   t: ChaosTranslate
@@ -48,8 +60,49 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
   const handle = rootAuthor?.handle ?? ''
   const seed = avatarSeed(handle, rootAuthor?.displayName ?? handle)
 
+  const [width, setWidth] = useState(readThreadWidth)
+  const [dragging, setDragging] = useState(false)
+  const dragStartX = useRef(0)
+  const dragStartWidth = useRef(width)
+
+  /** 左缘分隔条拖拽：plocal 现象用户反馈——thread 太小时必须可拉。 */
+  const startDrag = useCallback((clientX: number) => {
+    dragStartX.current = clientX
+    dragStartWidth.current = width
+    setDragging(true)
+  }, [width])
+
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (event: MouseEvent): void => {
+      const next = dragStartWidth.current + (dragStartX.current - event.clientX)
+      setWidth(Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, next)))
+    }
+    const onUp = (): void => {
+      setDragging(false)
+      setWidth(current => {
+        try { window.localStorage.setItem(THREAD_WIDTH_KEY, String(current)) } catch { /* best-effort */ }
+        return current
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging])
+
   return (
-    <aside className={css.threadPanel} aria-label={t('thread.title')}>
+    <aside className={css.threadPanel} style={{ position: 'relative', width }} aria-label={t('thread.title')}>
+      <div
+        className={css.threadResizeHandle}
+        data-dragging={dragging || undefined}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize thread panel"
+        onMouseDown={(event) => { event.preventDefault(); startDrag(event.clientX) }}
+      />
       <header className={css.threadHead}>
         <span className={css.threadTitle}>{t('thread.title')}</span>
         <button type="button" className={css.threadClose} aria-label={t('thread.close')} onClick={onClose}>
