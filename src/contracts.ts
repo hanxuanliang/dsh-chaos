@@ -1,6 +1,8 @@
 import type {
+  NativeCollabSnapshot,
   NativeInboxBatch,
   NativeMessage,
+  NativeTarget,
   NativePendingWake,
   NativeRuntimeBinding,
   NativeSendResult,
@@ -63,6 +65,10 @@ export interface CollabRuntimeApi {
   }): Promise<NativeSendResult>
   readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
+  /** Idempotent per root (crates create_thread); actor becomes the thread creator. */
+  createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
+  /** Visible target set + actor, for textual target resolution (B 档统一寻址). */
+  snapshot(actorId: string): Promise<NativeCollabSnapshot>
 }
 
 export interface WarningSink {

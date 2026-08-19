@@ -53,6 +53,78 @@ const requireVersion = (value: string): string => {
 }
 
 /** Register collab tools inside one unpublished Agent scope. */
+const UUID_TARGET_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SHORT_ID_RE = /^[0-9a-f]{4,16}$/i
+
+/**
+ * B 档 target 统一寻址（tae transport 形态翻译）：tools 接受
+ *   UUID 直值                     → 原样使用
+ *   '#channel'                    → 频道 target
+ *   'dm:@handle'                  → direct target（按目标名含 handle 匹配）
+ *   '#channel:<root 消息短 id>'    → EnsureThread 幂等建（或返回既有）后取 thread target
+ *   'dm:@handle:<root 消息短 id>'  → 同上
+ * tae 真值（server/application/target.go resolveThreadTarget）：复合引用
+ * 解析到 root 后内部 EnsureThread——不要求 agent 先拿 thread UUID。
+ */
+async function resolveAgentTarget(
+  collab: CollabRuntimeApi,
+  agentId: string,
+  ref: { targetId?: string | undefined; target?: string | undefined },
+): Promise<{ targetId: string; display: string }> {
+  const { targetId, target } = ref
+  if (targetId !== undefined && target !== undefined) {
+    throw new Error('targetId and target are mutually exclusive; pass exactly one')
+  }
+  if (targetId !== undefined) return { targetId, display: targetId }
+  if (target === undefined || target === '') throw new Error('target or targetId is required')
+  if (UUID_TARGET_RE.test(target)) return { targetId: target, display: target }
+
+  const parsed = parseTargetText(target)
+  const snapshot = await collab.snapshot(agentId)
+  const base = parsed.kind === 'channel'
+    ? snapshot.targets.find((target) => target.kind === 'channel' && target.name === parsed.name)
+    : snapshot.targets.find((target) => target.kind === 'direct' && target.name.includes(parsed.name))
+  if (base === undefined) {
+    throw new Error(`unknown ${parsed.kind} target '${parsed.name}'`)
+  }
+  const rootShort = parsed.rootShort
+  if (rootShort === undefined) {
+    return { targetId: base.id, display: parsed.raw }
+  }
+  if (!SHORT_ID_RE.test(rootShort)) {
+    throw new Error(`invalid root message short id '${rootShort}' (expected 4-16 hex chars)`)
+  }
+  // tae resolveThreadRoot: 短 id 前缀在调用者可见范围内匹配。
+  const page = await collab.readMessages(agentId, base.id, '0', 100)
+  const root = page.find(msg => msg.id.startsWith(rootShort) || msg.id.replaceAll('-', '').startsWith(rootShort))
+  if (root === undefined) {
+    throw new Error(`no message with short id '${rootShort}' in the first 100 messages of '${parsed.name}'`)
+  }
+  const thread = await collab.createThread(root.id, agentId)
+  return { targetId: thread.id, display: parsed.raw }
+}
+
+function parseTargetText(raw: string): { kind: 'channel' | 'direct'; name: string; rootShort: string | undefined; raw: string } {
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('#')) {
+    const body = trimmed.slice(1)
+    const sep = body.indexOf(':')
+    const name = sep === -1 ? body : body.slice(0, sep)
+    const rootShort = sep === -1 ? undefined : body.slice(sep + 1)
+    if (name === '') throw new Error(`invalid channel target '${raw}'`)
+    return { kind: 'channel', name, rootShort: rootShort === '' ? undefined : rootShort, raw: trimmed }
+  }
+  if (trimmed.startsWith('dm:@')) {
+    const body = trimmed.slice(4)
+    const sep = body.indexOf(':')
+    const name = sep === -1 ? body : body.slice(0, sep)
+    const rootShort = sep === -1 ? undefined : body.slice(sep + 1)
+    if (name === '') throw new Error(`invalid direct target '${raw}'`)
+    return { kind: 'direct', name, rootShort: rootShort === '' ? undefined : rootShort, raw: trimmed }
+  }
+  throw new Error(`invalid target '${raw}': expected UUID, '#channel', 'dm:@handle', or '<base>:<message-short-id>'`)
+}
+
 export function installCollabTools(
   agentCtx: Context,
   collab: CollabRuntimeApi,
@@ -116,8 +188,10 @@ export function installCollabTools(
     name: 'message_read',
     description: 'Read one message or an ascending history page from one exact collaboration target. Thread access is inherited from its parent Channel or Direct target.',
     parameters: {
-      targetId: { type: 'string', required: true, description: 'Exact Channel, Direct, or Thread target id.' },
+      targetId: { type: 'string', description: 'Exact UUID target id. Mutually exclusive with target.' },
+      target: { type: 'string', description: "Unified textual target (B 档): '#channel', 'dm:@handle', or '<base>:<message-short-id>' (thread read by short id)." },
       messageId: { type: 'string', description: 'Read exactly this message id within targetId.' },
+      replyToMessageId: { type: 'string', description: 'Resolve the Thread for this root Message id first (idempotent ensure), then read from it.' },
       afterSeq: { type: 'string', description: 'For history reads, return messages after this decimal global sequence. Defaults to "0".' },
       limit: { type: 'integer', description: 'For history reads, return 1 through 100 messages. Defaults to 50.' },
     },
@@ -143,10 +217,19 @@ export function installCollabTools(
       }
       exec.signal.throwIfAborted()
       const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      const addressed = await resolveAgentTarget(collab, binding.agentId, { targetId: args.targetId, target: args.target })
+      let resolvedTargetId = addressed.targetId
+      if (typeof args.replyToMessageId === 'string' && args.replyToMessageId !== '') {
+        if (args.target !== undefined) {
+          throw new Error('target text and replyToMessageId are mutually exclusive; use one of them')
+        }
+        const thread = await collab.createThread(args.replyToMessageId, binding.agentId)
+        resolvedTargetId = thread.id
+      }
       const messages = args.messageId === undefined
-        ? await collab.readMessages(binding.agentId, args.targetId, afterSeq, limit)
-        : [await collab.readMessage(binding.agentId, args.targetId, args.messageId)]
-      return { targetId: args.targetId, messages }
+        ? await collab.readMessages(binding.agentId, resolvedTargetId, afterSeq, limit)
+        : [await collab.readMessage(binding.agentId, resolvedTargetId, args.messageId)]
+      return { targetId: resolvedTargetId, target: addressed.display || undefined, messages }
     },
   }))
 
@@ -154,8 +237,10 @@ export function installCollabTools(
     name: 'message_send',
     description: 'Commit one text message to an exact collaboration target. Author identity is derived from the calling Agent and cannot be supplied by arguments.',
     parameters: {
-      targetId: { type: 'string', required: true, description: 'Exact Channel, direct, or Thread target id from message_check/read.' },
+      targetId: { type: 'string', description: 'Exact UUID target id. Mutually exclusive with target.' },
+      target: { type: 'string', description: "Unified textual target (B 档): '#channel', 'dm:@handle', or '<base>:<message-short-id>' — the last resolves the Thread idempotently (tae EnsureThread), so a reply start needs no separate step." },
       text: { type: 'string', required: true, description: 'Text to commit.' },
+      replyToMessageId: { type: 'string', description: 'Root Message id to reply in a Thread (A 档 idempotent ensure + deliver). Same-shape alternative to the <base>:<short> target text.' },
     },
     output: {
       schema: {
@@ -182,8 +267,19 @@ export function installCollabTools(
     async execute(args, exec) {
       exec.signal.throwIfAborted()
       const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      // tae resolution order (application/target.go resolveThreadTarget):
+      // composite reference → EnsureThread idempotent → regular send.
+      const addressed = await resolveAgentTarget(collab, binding.agentId, { targetId: args.targetId, target: args.target })
+      let targetId = addressed.targetId
+      if (typeof args.replyToMessageId === 'string' && args.replyToMessageId !== '') {
+        if (args.target !== undefined) {
+          throw new Error('target text and replyToMessageId are mutually exclusive; use one of them')
+        }
+        const thread = await collab.createThread(args.replyToMessageId, binding.agentId)
+        targetId = thread.id
+      }
       return collab.sendMessage({
-        targetId: args.targetId,
+        targetId,
         authorId: binding.agentId,
         clientRequestId: String(exec.callId),
         text: args.text,
