@@ -227,7 +227,7 @@ function buildComponents(t: ChaosTranslate): Components {
 }
 
 /** Markdown body + plocal clamp (344 trigger / 320 cap / bottom fade / Show more). */
-function MessageBody({ t, text, names }: { t: ChaosTranslate; text: string; names: ReadonlySet<string> }): JSX.Element {
+export function MessageBody({ t, text, names }: { t: ChaosTranslate; text: string; names: ReadonlySet<string> }): JSX.Element {
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const [oversize, setOversize] = useState(false)
   const [expanded, setExpanded] = useState(false)

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
-import { MessageStream } from './MessageStream.tsx'
+import { MessageBody, MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
@@ -59,6 +59,14 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
     : state.actors.find(a => a.id === rootMessage.authorId)
   const handle = rootAuthor?.handle ?? ''
   const seed = avatarSeed(handle, rootAuthor?.displayName ?? handle)
+  const rootMentionNames = (() => {
+    const names = new Set<string>()
+    for (const actor of state.actors) {
+      names.add(actor.handle.toLowerCase())
+      names.add(actor.displayName.toLowerCase())
+    }
+    return names
+  })()  // names 让 root 卡里的 @提及高亮与主流一致——root 完整渲染也含 markdown。
 
   const [width, setWidth] = useState(readThreadWidth)
   const [dragging, setDragging] = useState(false)
@@ -123,7 +131,9 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
               <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
               <span className={css.threadRootAuthor}>{rootAuthor?.displayName ?? handle}</span>
             </span>
-            <span className={css.threadRootText}>{(rootMessage as NativeMessage).text}</span>
+            <span className={css.threadRootText}>
+              <MessageBody t={t} text={(rootMessage as NativeMessage).text} names={rootMentionNames} />
+            </span>
           </button>
         ) : (
           <div className={css.threadRoot} data-missing="true">

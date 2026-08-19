@@ -1876,3 +1876,24 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .threadResizeHandle:hover, .threadResizeHandle[data-dragging='true'] {
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 25%, transparent);
 }
+
+/* Title 即锚定跳转链（用户拍板：不需要独立锚定区）。portal → .panel 不生效，用 dialogBody 桥。 */
+.dialogBody .taskDetailTitleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+}
+.dialogBody .taskDetailTitleLink:hover {
+  color: var(--dsw-alias-state-business-primary);
+}
+.dialogBody .taskDetailTitleLink:hover .taskDetailTitle {
+  text-decoration: underline;
+}

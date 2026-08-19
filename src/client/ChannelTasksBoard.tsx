@@ -309,10 +309,9 @@ function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: 
   )
 }
 
-function TaskDetailModal({ task, title, anchor, assigneeLabel, createdByLabel, selfId, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
+function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfId, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
   task: NativeTask
   title: string
-  anchor: string
   assigneeLabel: string | undefined
   createdByLabel: string
   selfId: string | undefined
@@ -332,7 +331,13 @@ function TaskDetailModal({ task, title, anchor, assigneeLabel, createdByLabel, s
       contentClassName={css.dialogBody as string}
     >
       <div className={css.taskDetailTitleRow}>
-        <span className={css.taskDetailTitle}>{title}</span>
+        {/* 用户拍板：不需要独立锚定区——title 本身就是跳转链。 */}
+        <button type="button" className={css.taskDetailTitleLink} title={t('tasks.anchorGo')} onClick={onOpenAnchor}>
+          <span className={css.taskDetailTitle}>{title}</span>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 8h9M8.5 4 12.5 8 8.5 12" />
+          </svg>
+        </button>
       </div>
       <dl className={css.taskDetailMeta}>
         <div className={css.taskDetailRow}>
@@ -369,20 +374,7 @@ function TaskDetailModal({ task, title, anchor, assigneeLabel, createdByLabel, s
           <dd>{formatTime(task.updatedAtMs, t)}</dd>
         </div>
       </dl>
-      <div className={css.taskDetailAnchor}>
-        <div className={css.taskDetailAnchorLabel}>{t('tasks.anchor')}</div>
-        {/* Anchor = a jump link, never a dead quote: click lands on the
-            source message in the stream (user direction 2026-08-19). */}
-        <button type="button" className={css.taskDetailAnchorLink} onClick={onOpenAnchor}>
-          <span className={css.taskDetailAnchorText}>{anchor}</span>
-          <span className={css.taskDetailAnchorGo}>
-            {t('tasks.anchorGo')}
-            <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 8h9M8.5 4 12.5 8 8.5 12" />
-            </svg>
-          </span>
-        </button>
-      </div>
+
     </Modal>
   )
 }
@@ -409,7 +401,8 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
     return visible.sort((a, b) => b.updatedAtMs - a.updatedAtMs)
   }, [state.tasksByMessage, channelId, assigneeFilter])
 
-  const members = state.membersByChannel[channelId] ?? []
+  // 用户拍板：认领人筛选只列 channel 内 agents（人侧认领面不放进筛选 pill）。
+  const members = (state.membersByChannel[channelId] ?? []).filter(m => m.kind === 'agent')
 
   const assigneeLabelOf = (task: NativeTask): string | undefined => {
     if (task.assigneeId === undefined) return undefined
@@ -494,7 +487,6 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
         <TaskDetailModal
           task={selected}
           title={(() => { const s = splitAnchor(anchorOf(selected)); return s.title === '' ? `#${selected.number}` : s.title })()}
-          anchor={anchorOf(selected)}
           assigneeLabel={assigneeLabelOf(selected)}
           createdByLabel={createdByLabelOf(selected)}
           selfId={state.selfId}
