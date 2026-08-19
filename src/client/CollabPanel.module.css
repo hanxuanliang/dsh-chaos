@@ -177,7 +177,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* plocal ChatSidebar section header: uppercase wide-tracked toggle label,
  * chevron + count; hover lifts toward secondary label. */
-.railTitle {
+/* font raised to .panel .railTitle (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .railTitle {
   display: inline-flex;
   flex: 1;
   min-width: 0;
@@ -359,13 +360,27 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-weight: 500;
 }
 
-/* dsh-context .lc-card-sub: secondary 12px, baseline-aligned with the title. */
-.channelMeta {
+/* plocal participants-chip anatomy (ChannelHeader member count, top-right):
+ * bordered paper chip, 7-unit height, tertiary icon + bold count. Static —
+ * no hover affordance until the participants dialog lands. */
+.memberChip {
+  display: inline-flex;
   flex: none;
-  align-self: baseline;
-  color: var(--dsw-alias-label-secondary);
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+}
+.memberCount {
+  color: var(--dsw-alias-label-primary);
   font-size: 12px;
-  line-height: 18px;
+  font-weight: 600;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -383,7 +398,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   background: var(--dsw-alias-bg-layer-2);
 }
 
-.tab {
+/* font raised to .panel .tab (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .tab {
   border: none;
   border-radius: 5px;
   padding: 3px 8px;
@@ -600,7 +616,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   pointer-events: none;
 }
 
-.clampToggle {
+/* font raised to .panel .clampToggle (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .clampToggle {
   margin-top: 4px;
   border: none;
   padding: 0;
@@ -782,7 +799,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
  *   in_review   brutal-lavender #7287fd → color-mix(business 50% + error 50%) ≈ 紫
  *   done        brutal-lime #40a02b → state-success-primary (green)
  * Chip 底 = --chip 15% tint（plocal bg-X/15），glyph/字 = --chip，border = l1 灰。 */
-.taskChip {
+/* font raised to .panel .taskChip (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .taskChip {
   display: inline-flex;
   height: 20px;
   align-items: center;
@@ -829,7 +847,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   gap: 8px;
 }
 
-.olderButton {
+/* font raised to .panel .olderButton (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .olderButton {
   align-self: center;
   border: none;
   padding: 2px 8px;
@@ -902,7 +921,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .skeletonRow:nth-child(2) { width: 72%; }
 .skeletonRow:nth-child(3) { width: 44%; }
 
-.retryButton {
+/* font raised to .panel .retryButton (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
+.panel .retryButton {
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   padding: 2px 8px;

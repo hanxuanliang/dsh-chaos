@@ -32,14 +32,22 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
   return (
     <section className={css.channel} aria-label={`# ${channel.name}`}>
       <header className={css.channelHead}>
-        {/* mnemon pageHeader anatomy: title + meta share one baseline *//* dsh-context card-title/card-sub: baseline-aligned, secondary meta */}
         <h3 className={css.channelTitle}>
           <span className={css.channelHash} aria-hidden="true">#</span>
           {channel.name}
         </h3>
+        {/* plocal truth: member count lives top-right as a bordered icon+count
+          * chip (ChannelHeader participants button anatomy); static for now —
+          * the participants dialog is out of P0 scope. */}
         {members !== undefined && (
-          <span className={css.channelMeta}>
-            {members.length === 1 ? t('channel.memberOne') : t('channel.members', { count: members.length })}
+          <span className={css.memberChip} title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="6" cy="5" r="2.6" />
+              <path d="M1.8 13.2c.6-2.4 2.2-3.6 4.2-3.6s3.6 1.2 4.2 3.6" />
+              <path d="M10.3 7.6c1.4 0 2.6-1.1 2.6-2.6 0-.4-.1-.8-.2-1.2" />
+              <path d="M11.6 9.7c1.4.3 2.4 1.4 2.7 3.5" />
+            </svg>
+            <span className={css.memberCount}>{members.length}</span>
           </span>
         )}
         <div className={css.tabs} role="tablist">
