@@ -4,7 +4,7 @@
  * and the in-panel composer. The tasks tab is a P0-2 placeholder only — the
  * real board lands with P0-4.
  */
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import type { NativeTarget } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
@@ -12,6 +12,7 @@ import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
+import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './CollabPanel.module.css'
 
 export interface ChannelViewProps {
@@ -27,6 +28,22 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
   const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
+  /** Open thread root (message id); the target resolves via state.threads (spec §2.1). */
+  const [threadRootId, setThreadRootId] = useState<string | undefined>(undefined)
+  const thread = threadRootId === undefined
+    ? undefined
+    : state.threads.find(t => t.rootMessageId === threadRootId)
+  const threadOpeningRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (threadRootId === undefined) return
+    if (thread !== undefined && state.messagesByChannel[thread.id] !== undefined) return
+    if (threadOpeningRef.current === threadRootId) return
+    threadOpeningRef.current = threadRootId
+    void store.openThread(threadRootId).catch(() => {
+      threadOpeningRef.current = undefined
+    })
+  }, [threadRootId, thread, state.messagesByChannel, store])
+  useEffect(() => { setThreadRootId(undefined) }, [channel.id])
   useEffect(() => { setTab('messages') }, [channel.id])
   useEffect(() => { setMembersOpen(false) }, [channel.id])
 
@@ -84,26 +101,41 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
       </header>
       {tab === 'messages'
         ? (
-          <>
-            <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={() => { setJumpMessageId(undefined) }}
-              t={t}
-              store={store}
-              state={state}
-              channelId={channel.id}
-              activeLocale={activeLocale}
-              onOpenTasks={() => { setTab('tasks') }}
-            />
-            {/* The composer hangs on the same centered 780px column as the stream. */}
-            <div className={css.composerSeat}>
-              <ChannelComposer
+          <div className={css.channelMainRow}>
+            <div className={css.channelMainCol}>
+              <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={() => { setJumpMessageId(undefined) }}
                 t={t}
                 store={store}
                 state={state}
-                channel={channel}
-                disabled={composerDisabled}
+                channelId={channel.id}
+                activeLocale={activeLocale}
+                onOpenTasks={() => { setTab('tasks') }}
+                onOpenThread={(messageId) => { setThreadRootId(messageId) }}
               />
+              {/* The composer hangs on the same centered 780px column as the stream. */}
+              <div className={css.composerSeat}>
+                <ChannelComposer
+                  t={t}
+                  store={store}
+                  state={state}
+                  channel={channel}
+                  disabled={composerDisabled}
+                />
+              </div>
             </div>
-          </>
+            {threadRootId !== undefined && thread !== undefined && (
+              <ThreadPanel
+                t={t}
+                store={store}
+                state={state}
+                thread={thread}
+                parentChannelId={channel.id}
+                activeLocale={activeLocale}
+                onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
+                onClose={() => { setThreadRootId(undefined) }}
+              />
+            )}
+          </div>
         )
         : (
           <ChannelTasksBoard

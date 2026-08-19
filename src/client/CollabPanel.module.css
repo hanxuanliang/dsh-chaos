@@ -1689,3 +1689,202 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
+
+/* ---- thread panel (P0-5, spec §2.1) -------------------------------------- */
+.channelMainRow {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.channelMainCol {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.threadPanel {
+  display: flex;
+  flex: none;
+  width: 360px;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-base);
+}
+.threadHead {
+  display: flex;
+  flex: none;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  padding: 0 12px;
+}
+.threadTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+.panel .threadClose {
+  display: inline-flex;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+.panel .threadClose:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.threadRoot {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 12px 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.panel .threadRootLink {
+  cursor: pointer;
+  text-align: left;
+}
+.panel .threadRootLink:hover {
+  border-color: var(--dsw-alias-border-l3);
+}
+.threadRoot[data-missing='true'] .threadRootText {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: italic;
+}
+.threadRootHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.threadRootAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+.threadRootText {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.threadBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.panel .threadPreview {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-business-primary);
+  background: transparent;
+  cursor: pointer;
+}
+.panel .threadPreview:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.msg, .msgCompact { position: relative; }
+.panel .msgReplyButton {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+.msg:hover .msgReplyButton, .msgCompact:hover .msgReplyButton {
+  opacity: 1;
+}
+.panel .msgReplyButton:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l3);
+}
+.threadComposer {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 12px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--dsw-specific-input-major);
+}
+.threadComposerInput {
+  flex: 1;
+  min-width: 0;
+  max-height: 120px;
+  border: none;
+  outline: none;
+  resize: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+}
+.threadComposerInput::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+.threadComposerError {
+  position: absolute;
+}
+.panel .threadComposerSend {
+  display: inline-flex;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  cursor: pointer;
+}
+.panel .threadComposerSend:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+.panel .threadComposerSend:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -23,7 +23,7 @@ import { isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, 
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { NativeActor, NativeMessage, NativeTask } from '../native.ts'
+import type { NativeActor, NativeMessage, NativeTarget, NativeTask } from '../native.ts'
 import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
@@ -39,6 +39,8 @@ export interface MessageStreamProps {
   /** One-shot jump target (task anchor link → land + flash the row). */
   jumpMessageId?: string | undefined
   onJumpHandled?: (() => void) | undefined
+  /** Message-row thread entry: preview row / hover reply click (spec §2.1). */
+  onOpenThread?: ((messageId: string) => void) | undefined
 }
 
 const COMPACT_WINDOW_MS = 5 * 60 * 1000
@@ -334,7 +336,37 @@ function buildItems(messages: NativeMessage[], t: ChaosTranslate, activeLocale: 
   return items
 }
 
-export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled }: MessageStreamProps): JSX.Element {
+/** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
+function ThreadPreview({ t, thread, totalByChannel, onOpen }: {
+  t: ChaosTranslate
+  thread: NativeTarget | undefined
+  totalByChannel: Record<string, number>
+  onOpen: (() => void) | undefined
+}): JSX.Element | undefined {
+  if (thread === undefined) return undefined
+  const total = totalByChannel[thread.id]
+  return (
+    <button type="button" className={css.threadPreview} onClick={onOpen} disabled={onOpen === undefined}>
+      <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
+      </svg>
+      {total !== undefined ? t('thread.replies', { count: total }) : t('thread.openThread')}
+    </button>
+  )
+}
+
+/** Hover reply affordance on the row's right edge (spec §2.1 incl. hover "回复"). */
+function ReplyButton({ t, onClick }: { t: ChaosTranslate; onClick: () => void }): JSX.Element {
+  return (
+    <button type="button" className={css.msgReplyButton} title={t('thread.reply')} aria-label={t('thread.reply')} onClick={onClick}>
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
+      </svg>
+    </button>
+  )
+}
+
+export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled, onOpenThread }: MessageStreamProps): JSX.Element {
   const messages = state.messagesByChannel[channelId]
   const total = state.totalByChannel[channelId]
   const actorsById = useMemo(() => {
@@ -354,6 +386,14 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     () => buildItems(messages ?? [], t, activeLocale),
     [messages, t, activeLocale],
   )
+  /** Thread target per root message, when one exists. */
+  const threadsByRoot = useMemo(() => {
+    const mapped = new Map<string, NativeTarget>()
+    for (const thread of state.threads) {
+      if (thread.rootMessageId !== undefined) mapped.set(thread.rootMessageId, thread)
+    }
+    return mapped
+  }, [state.threads])
 
   // Auto-scroll: stick to the bottom while the user is near it; keep the
   // viewport anchored by height delta across a "load older" prepend.
@@ -478,7 +518,9 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                   <div className={css.msgBody}>
                     <MessageBody t={t} text={message.text} names={mentionNames} />
                     {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
+                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} totalByChannel={state.totalByChannel} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
                   </div>
+                  {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}
                   <span className={css.msgGutterTime} title={fullTimeTitle(message.createdAtMs, activeLocale)}>
                     {timeLabel(message.createdAtMs)}
                   </span>
@@ -505,8 +547,10 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                   <div className={css.msgBody}>
                     <MessageBody t={t} text={message.text} names={mentionNames} />
                     {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
+                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} totalByChannel={state.totalByChannel} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
                   </div>
                 </div>
+                {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}
               </div>
             )
           })}

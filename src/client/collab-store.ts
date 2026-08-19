@@ -32,6 +32,8 @@ export interface CollabStoreSnapshot {
   bootstrapError: string | undefined
   selfId: string | undefined
   channels: NativeTarget[]
+  /** Thread targets from snapshot.targets (kind === 'thread'). */
+  threads: NativeTarget[]
   actors: NativeActor[]
   activeChannelId: string | undefined
   /** Spec §1.3: the active channel vanished (membership loss) — linger, then empty. */
@@ -131,6 +133,7 @@ export class CollabStore {
     bootstrapError: undefined,
     selfId: undefined,
     channels: [],
+    threads: [],
     actors: [],
     activeChannelId: undefined,
     removedNotice: false,
@@ -202,6 +205,7 @@ export class CollabStore {
       ])
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
+      const threads = snapshot.targets.filter(target => target.kind === 'thread')
       const totals = await this.seedTotals(channels, {})
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
@@ -213,6 +217,7 @@ export class CollabStore {
         bootstrapError: undefined,
         selfId: snapshot.actor.id,
         channels,
+        threads,
         actors,
         totalByChannel: totals,
         unreadByChannel: unread,
@@ -285,7 +290,10 @@ export class CollabStore {
   private async activateChannel(targetId: string, force: boolean): Promise<void> {
     const generation = this.loadGeneration
     const needHistory = force || this.snapshot.messagesByChannel[targetId] === undefined
-    const needMembers = force || this.snapshot.membersByChannel[targetId] === undefined
+    // Thread targets inherit the parent channel's membership — target.members
+    // is not defined for them (crates 404 'active target'), so skip the join.
+    const isThread = this.snapshot.threads.some(thread => thread.id === targetId)
+    const needMembers = !isThread && (force || this.snapshot.membersByChannel[targetId] === undefined)
     if (needHistory) this.set({ historyLoading: true, historyError: undefined })
     try {
       const [tail, members] = await Promise.all([
@@ -435,6 +443,24 @@ export class CollabStore {
     return task
   }
 
+  /**
+   * Open (or lazily create) the Thread for one root message: thread.create is
+   * idempotent per root (crates create_thread), then the thread activates like
+   * any target — history tail + members hydrate the generic per-target maps.
+   */
+  async openThread(rootMessageId: string): Promise<NativeTarget> {
+    const existing = this.snapshot.threads.find(t => t.rootMessageId === rootMessageId)
+    if (existing !== undefined && this.snapshot.messagesByChannel[existing.id] !== undefined) {
+      return existing
+    }
+    const thread = existing ?? await this.client.threadCreate(rootMessageId)
+    if (!this.snapshot.threads.some(t => t.id === thread.id)) {
+      this.set({ threads: [...this.snapshot.threads, thread] })
+    }
+    await this.activateChannel(thread.id, false)
+    return thread
+  }
+
   async createChannel(name: string): Promise<NativeTarget> {
     const target = await this.client.channelCreate(name)
     const generation = this.loadGeneration
@@ -492,9 +518,13 @@ export class CollabStore {
   private async handleMessageCreated(change: NativeChangeEvent): Promise<void> {
     const targetId = change.targetId
     if (targetId === undefined) return
-    if (!this.snapshot.channels.some(channel => channel.id === targetId)) return
+    // Channels AND threads: thread targets hydrate the same generic maps, and
+    // an open thread needs the identical incremental refresh.
+    const knownTarget = this.snapshot.channels.some(channel => channel.id === targetId)
+      || this.snapshot.threads.some(thread => thread.id === targetId)
+    if (!knownTarget) return
     const generation = this.loadGeneration
-    if (targetId === this.snapshot.activeChannelId) {
+    if (targetId === this.snapshot.activeChannelId || this.snapshot.messagesByChannel[targetId] !== undefined) {
       const existing = this.snapshot.messagesByChannel[targetId]
       const afterSeq = maxSeqOf(existing ?? []) ?? '0'
       try {
@@ -592,6 +622,7 @@ export class CollabStore {
         bootstrapped: true,
         selfId: snapshot.actor.id,
         channels,
+        threads: snapshot.targets.filter(target => target.kind === 'thread'),
         actors,
         activeChannelId: active,
         removedNotice: false,

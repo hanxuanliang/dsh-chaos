@@ -96,6 +96,11 @@ export class ChaosClient {
   }
 
   /** Idempotent for an already-tasked message (returns the existing Task). */
+  /** Idempotent per root message (crates create_thread returns the existing row). */
+  threadCreate(rootMessageId: string): Promise<NativeTarget> {
+    return this.call('thread.create', { rootMessageId })
+  }
+
   taskCreate(messageId: string): Promise<NativeTask> {
     return this.call('task.create', { messageId })
   }
