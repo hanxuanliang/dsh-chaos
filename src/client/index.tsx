@@ -1,10 +1,12 @@
 import { AgentSettingsCard } from './AgentSettingsCard.tsx'
+import { mountCollabWorkspace } from './collab-mount.tsx'
 import type { ChaosClientContext } from './dsh-compat.ts'
 import { en, zh } from './locales.ts'
 
-export const inject = ['slots', 'connection', 'locale']
+export const inject = ['slots', 'connection', 'locale', 'sessions', 'conversation']
 
-/** Mount the P0 surface: the Agents management page inside DSH settings. */
+/** Mount the P0 surfaces: the Agents management page in DSH settings and the
+ * sidebar-entry + center-overlay collab panel (P0-1 skeleton). */
 export function apply(rawContext: unknown): void {
   const ctx = rawContext as ChaosClientContext
   ctx.effect(() => ctx.locale.register('chaos', { zh, en }), 'dsh-chaos: locale dictionaries')
@@ -17,4 +19,5 @@ export function apply(rawContext: unknown): void {
     locale: 'chaos',
     inject: () => ({ connection: ctx.connection, t: translate }),
   }, AgentSettingsCard))
+  ctx.effect(() => mountCollabWorkspace(ctx, translate), 'dsh-chaos: collab overlay')
 }

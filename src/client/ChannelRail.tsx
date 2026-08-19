@@ -1,0 +1,69 @@
+/**
+ * Secondary rail of the collab panel: channel navigation (spec §1.1).
+ * The group header's hover"+" is the only channel-create entry; the bottom
+ * settings line is intentionally static text — the host exposes no
+ * settings-navigation API to plugins (checked dsh-client-ui-settings /
+ * ui-sidebar 0.1.0-rc.7), so it declares the path instead of pretending a
+ * link. Unread = tail.count minus the localStorage read marker (no backend
+ * read markers exist).
+ */
+import type { JSX } from 'react'
+import type { CollabStoreSnapshot } from './collab-store.ts'
+import type { ChaosTranslate } from './locales.ts'
+import css from './CollabPanel.module.css'
+
+export interface ChannelRailProps {
+  t: ChaosTranslate
+  state: CollabStoreSnapshot
+  onSelect(targetId: string): void
+  onCreate(): void
+}
+
+export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps): JSX.Element {
+  return (
+    <nav className={css.rail} aria-label={t('panel.channels')}>
+      <div className={css.railHead}>
+        <span className={css.railTitle}>
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+          {t('panel.channels')}
+        </span>
+        <button
+          type="button"
+          className={css.railAdd}
+          aria-label={t('panel.railCreate')}
+          title={t('panel.railCreate')}
+          onClick={onCreate}
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
+            <path d="M8 3.5v9M3.5 8h9" />
+          </svg>
+        </button>
+      </div>
+      <div className={css.railScroll} role="list">
+        {state.channels.length === 0 && <p className={css.railEmpty}>{t('panel.railEmpty')}</p>}
+        {state.channels.map((channel) => {
+          const active = channel.id === state.activeChannelId
+          const unread = state.unreadByChannel[channel.id] ?? 0
+          return (
+            <button
+              key={channel.id}
+              type="button"
+              role="listitem"
+              className={css.railRow}
+              data-active={active || undefined}
+              aria-current={active ? 'true' : undefined}
+              onClick={() => { onSelect(channel.id) }}
+            >
+              <span className={css.railHash} aria-hidden="true">#</span>
+              <span className={css.railName}>{channel.name}</span>
+              {unread > 0 && <span className={css.railUnread}>{unread}</span>}
+            </button>
+          )
+        })}
+      </div>
+      <p className={css.railFoot}>{t('panel.railSettings')}</p>
+    </nav>
+  )
+}

@@ -1,6 +1,15 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { AgentPresetSummary, AgentProfile } from '../agent-settings-types.ts'
-import type { NativeActor, NativeCollabSnapshot, NativeRuntimeBinding } from '../native.ts'
+import type {
+  NativeActor,
+  NativeCollabSnapshot,
+  NativeMessage,
+  NativeMessageTail,
+  NativeRuntimeBinding,
+  NativeSendResult,
+  NativeTarget,
+  NativeTask,
+} from '../native.ts'
 
 /** RPC channel exposed by the host half (COLLAB_RPC_CHANNEL in src/remote.ts). */
 export const CHAOS_RPC_CHANNEL = '/dsh-chaos'
@@ -55,6 +64,44 @@ export class ChaosClient {
 
   actors(): Promise<NativeActor[]> {
     return this.call('actors', {})
+  }
+
+  // --- P0-2 channel/message/task surface (switch cases in src/remote.ts) ---
+
+  targetMembers(targetId: string): Promise<NativeActor[]> {
+    return this.call('target.members', { targetId })
+  }
+
+  channelCreate(name: string): Promise<NativeTarget> {
+    return this.call('channel.create', { name })
+  }
+
+  memberAdd(targetId: string, memberId: string): Promise<null> {
+    return this.call('member.add', { targetId, memberId })
+  }
+
+  /** Forward-only page (no before-cursor exists); `afterSeq` is a decimal string. */
+  history(targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]> {
+    return this.call('history', { targetId, afterSeq, limit })
+  }
+
+  /** `count` is the exact total (decimal string); `messages` is the latest page, ascending. */
+  historyTail(targetId: string, limit: number): Promise<NativeMessageTail> {
+    return this.call('history.tail', { targetId, limit })
+  }
+
+  /** Idempotent on (author, requestId); a replay returns the stored row with `replayed: true`. */
+  messageSend(targetId: string, requestId: string, text: string): Promise<NativeSendResult> {
+    return this.call('message.send', { targetId, requestId, text })
+  }
+
+  /** Idempotent for an already-tasked message (returns the existing Task). */
+  taskCreate(messageId: string): Promise<NativeTask> {
+    return this.call('task.create', { messageId })
+  }
+
+  tasks(targetId?: string): Promise<NativeTask[]> {
+    return this.call('tasks', targetId === undefined ? {} : { targetId })
   }
 
   agentPresets(): Promise<AgentPresetSummary[]> {

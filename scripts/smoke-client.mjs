@@ -25,7 +25,7 @@ await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
 // The P0 client declares the services it needs and registers a single
 // settings.section entry (id 'chaos-agents') for the Agents management page.
-assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale'])
+assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale', 'sessions', 'conversation'])
 assert.equal(typeof clientModule.apply, 'function')
 
 const injected = []
@@ -79,6 +79,7 @@ assert.ok(face.connection === ctx.connection)
 assert.equal(typeof face.t, 'function')
 assert.equal(face.t('settings.tab'), '协作 Agents')
 assert.deepEqual(namespaces, ['chaos'])
-assert.equal(effects.length, 1)
+assert.equal(effects.length, 2)
+assert.ok(effects.includes('dsh-chaos: collab overlay'))
 
 console.log('smoke-client: P0 client loads and registers the settings.section Agents page')

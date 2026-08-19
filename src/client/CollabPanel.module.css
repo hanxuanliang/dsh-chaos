@@ -1,0 +1,1180 @@
+/* Collab overlay panel + sidebar entry row.
+ * Visual tokens: host --dsw-alias-* / --dsw-specific-* directly (dsh-mnemon
+ * precedent). The overlay mounts as a full-pane child of the host
+ * [data-pane='conversation'] column (mnemon takeover pattern). */
+
+.entry {
+  display: flex;
+  width: 100%;
+  height: 32px;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.entry:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-nav-item-hover);
+}
+
+.entry[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-nav-item-active);
+  font-weight: 600;
+}
+
+.entryIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.entryLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entryCount {
+  margin-left: auto;
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+[data-dsh-frame][data-sidebar-collapsed] .entry {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
+}
+
+[data-dsh-frame][data-sidebar-collapsed] .entryLabel,
+[data-dsh-frame][data-sidebar-collapsed] .entryCount {
+  display: none;
+}
+
+/* --- center overlay --- */
+
+/* The center-column takeover mirrors the dsh-mnemon panel pattern: full-pane,
+ * header and native composer covered too (2026-08-19 user decision — in
+ * collab, the displayed surface is the workspace alone). The composer stays
+ * blocked underneath through the official composer-blocks face as invisible
+ * defense in depth. */
+[data-pane='conversation'],
+[class*='centerCol'] {
+  position: relative;
+}
+
+.panel {
+  box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+  isolation: isolate;
+  /* Local mono axis for the stream's timestamps / code / meta copy. */
+  --chaos-mono: var(--ds-font-family-code, ui-monospace, 'SFMono-Regular', Menlo, monospace);
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+}
+
+/* Visibility + sibling hiding ride the single html attr signal (attribute
+ * selectors pass through CSS-module hashing untouched, per the mnemon
+ * precedent), gated by the family attrs so only one family owns the pane. */
+html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-active]):not([data-dsh-mnemon-active]) .panel {
+  display: flex;
+}
+
+html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-active]):not([data-dsh-mnemon-active]) [data-pane='conversation'] > :not([data-dsh-chaos-panel]),
+html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-active]):not([data-dsh-mnemon-active]) [class*='centerCol'] > :not([data-dsh-chaos-panel]) {
+  display: none !important;
+}
+
+.panel *, .panel *::before, .panel *::after { box-sizing: border-box; }
+.panel button { color: inherit; font: inherit; }
+
+.header {
+  display: flex;
+  flex: none;
+  height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.closeButton {
+  display: inline-flex;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.rail {
+  display: flex;
+  width: 220px;
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--dsw-alias-border-l1);
+}
+
+/* P0-2 rail: 10px meta group header + hover-only create button (spec §1.1 —
+ * the "+" here is the only channel-create entry). */
+.railHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 6px;
+}
+
+.railTitle {
+  display: inline-flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.railAdd {
+  display: inline-flex;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.railHead:hover .railAdd,
+.railAdd:focus-visible {
+  opacity: 1;
+}
+
+.railAdd:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.railScroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+.railRow {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.railRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.railRow[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+  font-weight: 500;
+}
+
+.railHash {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.railName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railUnread {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.railEmpty {
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.railFoot {
+  flex: none;
+  margin: 8px 0 0;
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mainEmpty {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.empty {
+  max-width: 320px;
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* --- channel header + tabs (spec §1.2) --- */
+
+.channel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.channelHead {
+  display: flex;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.channelTitle {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channelHash {
+  margin-right: 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 500;
+}
+
+.channelMeta {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.tab {
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font-weight: 500;
+}
+
+/* --- message stream --- */
+
+.streamWrap {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.connBar {
+  display: flex;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.stream {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Centered content column shared by the stream and the composer (pilot
+ * InputBar's width axis: --dsh-composer-card-max-width 780, side clearance 16):
+ * every stream child lives inside it, so compact/full rows and the composer
+ * card hang on the same two vertical edges. */
+.chatCol {
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  max-width: 780px;
+  flex-direction: column;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+}
+
+/* plocal day divider: a sticky centered pill, not a hairline. */
+.dayDivider {
+  position: sticky;
+  z-index: 1;
+  top: 12px;
+  align-self: center;
+  margin: 4px 0 8px;
+}
+
+.dayDivider > span {
+  display: inline-block;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, transparent);
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/* plocal row anatomy: flex row, mb-1(4px), px-8 py-1 (8/4), hover tint.
+ * Full rows add mt-1.5; compact rows swap the 28px avatar for an equal-width
+ * empty placeholder so both body columns share one left edge (avatar 28 + gap 8). */
+.msg {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.msg:hover,
+.msgCompact:hover {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
+}
+
+.msg:active,
+.msgCompact:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent);
+}
+
+.msgCompact {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.msgAvatarPlaceholder {
+  flex: none;
+  width: 28px;
+  align-self: stretch;
+}
+
+/* Compact gutter time: absolute right, invisible until row hover, mono 10px. */
+.msgGutterTime {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  color: transparent;
+  font-family: var(--chaos-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  user-select: none;
+}
+
+.msgCompact:hover .msgGutterTime {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.avatar {
+  display: inline-grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.msgMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.msgHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.msgName {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.msgName:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.msgTime {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Backend messages carry no author kind — it is joined from the actors table;
+ * the model suffix comes from runtime.bindings when present (else AGENT alone). */
+.msgBadge {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.msgBody {
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.msgText {
+  position: relative;
+  overflow-wrap: anywhere;
+}
+
+.msgText[data-clamped] {
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.clampFade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(to top, var(--dsw-alias-bg-base), transparent);
+  pointer-events: none;
+}
+
+.clampToggle {
+  margin-top: 4px;
+  border: none;
+  padding: 0;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.clampToggle:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* --- markdown components map (plocal truth §4 shapes, host tokens) --- */
+
+.mdP {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+}
+
+.mdP:last-child {
+  margin-bottom: 0;
+}
+
+.mdLink {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: none;
+}
+
+.mdLink:hover {
+  text-decoration: underline;
+}
+
+.mdCode {
+  border-radius: 4px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  font-family: var(--chaos-mono);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
+/* Dark slab: derived from host tokens by direction inversion, so it stays
+ * self-consistent in both themes (label-primary ≈ ink in light ≈ near-white
+ * in dark) — no fixed #07111f-style literal. */
+.preShell {
+  position: relative;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 10px;
+  --shell-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 94%, var(--dsw-alias-bg-base));
+  --shell-fg: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, var(--dsw-alias-label-primary));
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+
+.preShell .mdCode {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+.mdPre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: var(--chaos-mono);
+  font-size: inherit;
+  line-height: 1.5;
+}
+
+.codeCopy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--shell-fg) 25%, transparent);
+  border-radius: 6px;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.preShell:hover .codeCopy,
+.codeCopy:focus-visible {
+  opacity: 1;
+}
+
+.mdH1,
+.mdH2,
+.mdH3,
+.mdH4 {
+  margin: 8px 0 4px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.mdH1 { font-size: 1.286em; }
+.mdH2 { font-size: 1.143em; }
+.mdH3 { font-size: 1.071em; }
+.mdH4 { font-size: 1em; }
+
+.mdUl {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.mdOl {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  list-style: decimal;
+}
+
+.mdLi {
+  margin-bottom: 2px;
+}
+
+.mdBlockquote {
+  margin: 8px 0;
+  border-left: 3px solid var(--dsw-alias-border-l2);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  color: color-mix(in srgb, var(--dsw-alias-label-primary) 85%, transparent);
+}
+
+.mdHr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.tableWrap {
+  margin: 8px 0;
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.mdTable {
+  border-collapse: collapse;
+  border: 1px solid var(--dsw-alias-border-l1);
+  font-size: 13px;
+}
+
+.mdTh {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mdTd {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+}
+
+.mention {
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 700;
+}
+
+/* plocal TaskChip (truth §5): 20px h, 0 6px padding, r6, 1px gray border,
+ * 10px bold, gap 4 — icon + #N (+ @assignee), no "task"/status words.
+ * plocal brutal palette → host alias approximation (host has no purple
+ * token, so in_review derives one by color-mix per the arbitration rule):
+ *   todo        brutal-orange #fe640b → state-warn-primary (functional amber)
+ *   in_progress brutal-cyan #04a5e5 → state-business-primary (唯一青/蓝 functional token)
+ *   in_review   brutal-lavender #7287fd → color-mix(business 50% + error 50%) ≈ 紫
+ *   done        brutal-lime #40a02b → state-success-primary (green)
+ * Chip 底 = --chip 15% tint（plocal bg-X/15），glyph/字 = --chip，border = l1 灰。 */
+.taskChip {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--chip) 15%, transparent);
+  color: var(--chip);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.taskChip[data-status='todo'] { --chip: var(--dsw-alias-state-warn-primary); }
+.taskChip[data-status='in_progress'] { --chip: var(--dsw-alias-state-business-primary); }
+.taskChip[data-status='in_review'] {
+  --chip: color-mix(in srgb, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-error-primary));
+}
+.taskChip[data-status='done'] { --chip: var(--dsw-alias-state-success-primary); }
+
+.taskChip:hover {
+  filter: brightness(0.9);
+}
+
+.taskChipId {
+  flex: none;
+}
+
+.taskChipAssignee {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Head of the column: "load older" trigger / "beginning" hint — plocal keeps
+ * both as centered mono microcopy. */
+.olderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.olderButton {
+  align-self: center;
+  border: none;
+  padding: 2px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font-family: var(--chaos-mono);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.olderButton:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.headHint {
+  margin: 0;
+  padding: 2px 0 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.streamEmpty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.streamEmpty > p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.streamError {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+}
+
+.resyncNote {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.skeletonStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+@keyframes chaos-skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.skeletonRow {
+  width: 60%;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  animation: chaos-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeletonRow:nth-child(2) { width: 72%; }
+.skeletonRow:nth-child(3) { width: 44%; }
+
+.retryButton {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.retryButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
+
+/* The centered 780/16 column the composer shares with the stream (pilot
+ * .root paddings: 0 16 8 — the seat owns clearance, the wrap stays clean). */
+.composerSeat {
+  flex: none;
+  width: 100%;
+  max-width: 780px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 0 16px 8px;
+}
+
+.composerWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composerError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+}
+
+.composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* pilot 真值: border-l2-darkmode-thin（输入框描边比按钮弱一档） */
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin, var(--dsw-alias-border-l2, var(--dsw-alias-border-l1)));
+  border-radius: 14px;
+  padding-top: 8px;
+  background: var(--dsw-specific-input-major, var(--dsw-alias-bg-base));
+  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
+  font-size: 14px;
+  line-height: 22px;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+/* pilot InputBar: 描边加深 l4 + 3px label-primary 8% 灰环 —— 不是蓝环；
+ * business 蓝只留给链接/@高亮（见 .mdLink/.mention）。 */
+.composer:focus-within {
+  border-color: var(--dsw-alias-border-l4);
+  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08)),
+    0 0 0 3px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+}
+
+.composer[data-inert] {
+  opacity: 0.72;
+}
+
+.composerScroll {
+  max-height: 336px;
+  overflow-y: auto;
+}
+
+.composerInput {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 4px 12px 0 16px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+  resize: none;
+  white-space: pre-wrap;
+}
+
+.composerInput::placeholder {
+  color: var(--dsw-alias-label-caption);
+  user-select: none;
+}
+
+.composerInput:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: not-allowed;
+}
+
+/* pilot .row: padding 0 6 6, 左右两组 gap 6/4（此处左右各一控件，gap 留给
+ * 行内恒定间距即可），28px 控件一律 r8。 */
+.composerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px 6px;
+}
+
+/* pilot chip 选择钮（PermissionSelect 同款）：28px 高 r8 透明底，
+ * 13/20 w500 secondary 字，hover 浅灰底。 */
+.asTask {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.asTask:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.asTask input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--dsw-alias-label-primary);
+}
+
+.sendButton {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--dsw-alias-label-secondary);
+}
+
+.sendButton:disabled {
+  background: var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+.mentionPop {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  width: 280px;
+  max-height: 320px;
+  flex-direction: column;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--dsw-alias-bg-menu, var(--dsw-alias-bg-layer-2));
+  box-shadow: var(--dsw-shadow-lv3, 0 8px 24px rgb(0 0 0 / 0.16));
+}
+
+.mentionItem {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mentionItem:hover,
+.mentionItem[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.avatarXs {
+  display: inline-grid;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.memberName {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberHandle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- create-channel dialog (Modal chrome reuses the AgentCreateDialog fixes) --- */
+
+.dialogBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dialogBody > *:last-child { margin-top: 0; }
+.dialogBody > *:first-child { padding-bottom: 0; }
+.dialogBody *, .dialogBody *::before, .dialogBody *::after { box-sizing: border-box; }
+
+.field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
+.req { margin-left: 2px; color: var(--dsw-alias-state-error-primary); font-style: normal; }
+.hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
+.error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.input { display: block; }
+.input input { width: 100%; }
+
+.memberPick {
+  display: flex;
+  max-height: 220px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.memberRow {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.memberRow input {
+  margin: 0;
+  flex: none;
+}
+
+.memberRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
