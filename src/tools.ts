@@ -201,6 +201,7 @@ export function installCollabTools(
         additionalProperties: false,
         properties: {
           targetId: { type: 'string', required: true },
+          target: { type: 'string' },
           messages: { type: 'array', required: true, items: MESSAGE_SCHEMA },
         },
       },
@@ -229,7 +230,9 @@ export function installCollabTools(
       const messages = args.messageId === undefined
         ? await collab.readMessages(binding.agentId, resolvedTargetId, afterSeq, limit)
         : [await collab.readMessage(binding.agentId, resolvedTargetId, args.messageId)]
-      return { targetId: resolvedTargetId, target: addressed.display || undefined, messages }
+      const result: { targetId: string; target?: string; messages: typeof messages } = { targetId: resolvedTargetId, messages }
+      if (addressed.display !== undefined) result.target = addressed.display
+      return result
     },
   }))
 
