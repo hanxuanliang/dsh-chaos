@@ -150,8 +150,6 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
           </select>
         )}
         {selectedDescription !== '' && <small className={css.hint}>{selectedDescription}</small>}
-        {selected?.isDefault === true && <small className={css.hint}>{t('create.presetDefault')}</small>}
-        <small className={css.hint}>{t('create.presetHint')}</small>
       </div>
 
       <div className={css.field}>
