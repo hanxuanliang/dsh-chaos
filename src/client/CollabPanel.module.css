@@ -412,19 +412,17 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   overflow-y: auto;
 }
 
-/* Centered content column shared by the stream and the composer (pilot
- * InputBar's width axis: --dsh-composer-card-max-width 780, side clearance 16):
- * every stream child lives inside it, so compact/full rows and the composer
- * card hang on the same two vertical edges. */
+/* Full-width content column shared by the stream and the composer — plocal
+ * truth (MessageScroller container w-full px-2): rows hug the left edge, no
+ * centered max-width column. Row px (8) + this px (8) = 16px from panel edge,
+ * matching plocal (scroller px-2 + row px-2). */
 .chatCol {
   display: flex;
   min-height: 100%;
   width: 100%;
-  max-width: 780px;
   flex-direction: column;
   box-sizing: border-box;
-  margin: 0 auto;
-  padding: 12px 16px 24px;
+  padding: 12px 8px 24px;
 }
 
 /* plocal day divider: a sticky centered pill, not a hairline. */
@@ -912,15 +910,13 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
 
-/* The centered 780/16 column the composer shares with the stream (pilot
- * .root paddings: 0 16 8 — the seat owns clearance, the wrap stays clean). */
+/* Full-width composer seat — plocal truth (ChatComposer root w-full px-2):
+ * the card spans the chat width instead of a centered 780 column. */
 .composerSeat {
   flex: none;
   width: 100%;
-  max-width: 780px;
   box-sizing: border-box;
-  margin: 0 auto;
-  padding: 0 16px 8px;
+  padding: 0 8px 8px;
 }
 
 .composerWrap {
