@@ -331,13 +331,15 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   flex-direction: column;
 }
 
+/* Channel header v2 (three-repo graft): mnemon pageHeader hairline row
+ * rhythm, dsh-context card-title/card-sub baseline meta + segmented-pill
+ * idiom, pilot toolbar hit-area discipline. */
 .channelHead {
   display: flex;
-  height: 44px;
   flex: none;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 10px 10px 9px 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
@@ -357,37 +359,48 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-weight: 500;
 }
 
+/* dsh-context .lc-card-sub: secondary 12px, baseline-aligned with the title. */
 .channelMeta {
   flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 10px;
+  align-self: baseline;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
   font-variant-numeric: tabular-nums;
 }
 
+/* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
+ * padding, compact 11px buttons; active = primary-fill pair; hover lifts
+ * text only. */
 .tabs {
   display: flex;
   flex: none;
   gap: 2px;
   margin-left: auto;
-  border-radius: 8px;
-  padding: 2px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  padding: 1px;
   background: var(--dsw-alias-bg-layer-2);
 }
 
 .tab {
-  height: 24px;
   border: none;
-  border-radius: 6px;
-  padding: 0 10px;
+  border-radius: 5px;
+  padding: 3px 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.6;
   cursor: pointer;
 }
 
-.tab[data-active] {
+.tab:hover {
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-base);
+}
+
+.tab[data-active] {
+  color: var(--dsw-alias-label-primary-foreground);
+  background: var(--dsw-alias-button-primary-fill);
   font-weight: 500;
 }
 

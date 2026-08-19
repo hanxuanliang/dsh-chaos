@@ -32,12 +32,15 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
   return (
     <section className={css.channel} aria-label={`# ${channel.name}`}>
       <header className={css.channelHead}>
+        {/* mnemon pageHeader anatomy: title + meta share one baseline *//* dsh-context card-title/card-sub: baseline-aligned, secondary meta */}
         <h3 className={css.channelTitle}>
           <span className={css.channelHash} aria-hidden="true">#</span>
           {channel.name}
         </h3>
         {members !== undefined && (
-          <span className={css.channelMeta}>{t('channel.members', { count: members.length })}</span>
+          <span className={css.channelMeta}>
+            {members.length === 1 ? t('channel.memberOne') : t('channel.members', { count: members.length })}
+          </span>
         )}
         <div className={css.tabs} role="tablist">
           <button
