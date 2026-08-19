@@ -542,9 +542,16 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* Compact gutter time: absolute right, invisible until row hover, mono 10px. */
 .msgGutterTime {
+  /* plocal 真值：compact 行 hover 时时间进左 gutter（avatar 占位区）居中，
+   * 不动右缘（右缘留给 hover 回复钮，互不重叠）。 */
   position: absolute;
-  top: 4px;
-  right: 8px;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 40px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
   color: transparent;
   font-family: var(--chaos-mono);
   font-size: 10px;
