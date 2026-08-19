@@ -522,7 +522,10 @@ export class CollabStore {
     // an open thread needs the identical incremental refresh.
     const knownTarget = this.snapshot.channels.some(channel => channel.id === targetId)
       || this.snapshot.threads.some(thread => thread.id === targetId)
-    if (!knownTarget) return
+    if (!knownTarget) {
+      this.scheduleUnknownTargetReload(targetId)
+      return
+    }
     const generation = this.loadGeneration
     if (targetId === this.snapshot.activeChannelId || this.snapshot.messagesByChannel[targetId] !== undefined) {
       const existing = this.snapshot.messagesByChannel[targetId]
@@ -557,6 +560,27 @@ export class CollabStore {
     this.set({ unreadByChannel: { ...this.snapshot.unreadByChannel, [targetId]: this.unreadFor(targetId) } })
   }
 
+  private readonly unknownTargetTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private static readonly UNKNOWN_TARGET_RETRY_MS = [250, 750, 1500, 3000, 6000]
+
+  /** Burst-safe reload for frames arriving before the target catalog catches up. */
+  private scheduleUnknownTargetReload(targetId: string): void {
+    if (this.unknownTargetTimers.has(targetId)) return
+    let attempt = 0
+    const tick = (): void => {
+      this.unknownTargetTimers.delete(targetId)
+      const known = this.snapshot.channels.some(c => c.id === targetId)
+        || this.snapshot.threads.some(t => t.id === targetId)
+      if (known) return
+      void this.reloadTargets()
+      attempt += 1
+      const delay = CollabStore.UNKNOWN_TARGET_RETRY_MS[attempt]
+      if (delay === undefined) return
+      this.unknownTargetTimers.set(targetId, setTimeout(tick, delay))
+    }
+    this.unknownTargetTimers.set(targetId, setTimeout(tick, CollabStore.UNKNOWN_TARGET_RETRY_MS[0] ?? 250))
+  }
+
   /** target_created / membership_changed: reread the target set and seed new totals. */
   private async reloadTargets(): Promise<void> {
     const generation = this.loadGeneration
@@ -572,7 +596,7 @@ export class CollabStore {
         if (channel.id === this.snapshot.activeChannelId) unread[channel.id] = 0
         else if (unread[channel.id] === undefined) unread[channel.id] = Math.max(0, (totals[channel.id] ?? 0) - readMarker(channel.id))
       }
-      this.set({ channels, totalByChannel: totals, unreadByChannel: unread })
+      this.set({ channels, threads, totalByChannel: totals, unreadByChannel: unread })
       // Spec §1.3: the active channel vanished (kicked) — linger one beat with
       // an honest notice before falling back to the empty state.
       const active = this.snapshot.activeChannelId
@@ -592,8 +616,9 @@ export class CollabStore {
           this.set({ membersByChannel: { ...this.snapshot.membersByChannel, [active]: members } })
         }, () => {})
       }
-    } catch {
+    } catch (e) {
       // Snapshot failures leave the previous target set; the next frame retries.
+      console.warn('[dsh-chaos] reloadTargets failed', e)
     }
   }
 
