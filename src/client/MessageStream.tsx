@@ -500,6 +500,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                 )}
             </div>
           )}
+            <div className={css.listPush} aria-hidden="true" />
           {items.map((item) => {
             if (item.kind === 'divider') {
               return <div key={item.key} className={css.dayDivider}><span>{item.label}</span></div>

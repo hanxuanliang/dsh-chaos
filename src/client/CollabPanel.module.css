@@ -455,6 +455,19 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   overflow-y: auto;
 }
 
+/* Bottom growth (plocal MessageScroller truth: an elastic spacer pushes the
+   rendered window to the bottom, so fresh replies grow upward — channel and
+   thread streams grow identically). */
+.chatCol {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+.listPush {
+  flex: 1 1 0;
+  min-height: 8px;
+}
+
 /* Full-width content column shared by the stream and the composer — plocal
  * truth (MessageScroller container w-full px-2): rows hug the left edge, no
  * centered max-width column. Row px (8) + this px (8) = 16px from panel edge,

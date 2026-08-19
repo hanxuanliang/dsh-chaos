@@ -21,6 +21,13 @@ export interface ChannelComposerProps {
   store: CollabStore
   state: CollabStoreSnapshot
   channel: NativeTarget
+  /**
+   * plocal truth (RightPanel thread dock): the thread composer IS the channel
+   * composer — one component, zero behavior drift. Threads opt out of the
+   * As-task row only, because tasks anchor top-level channel messages and a
+   * thread reply can never be one.
+   */
+  hideAsTask?: boolean
   disabled: boolean
 }
 
@@ -57,7 +64,7 @@ type SendFailure = { kind: 'send'; asTask: boolean } | { kind: 'task'; messageId
 /** Plan-B token: '@' after a non-token char (CJK/whitespace/punctuation terminate), slug chars only to the caret. */
 const MENTION_TOKEN = /(^|[^A-Za-z0-9_@-])@([A-Za-z0-9_-]*)$/
 
-export function ChannelComposer({ t, store, state, channel, disabled }: ChannelComposerProps): JSX.Element {
+export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask = false }: ChannelComposerProps): JSX.Element {
   const [text, setText] = useState(() => readDraft(channel.id))
   const [asTask, setAsTask] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -266,7 +273,7 @@ export function ChannelComposer({ t, store, state, channel, disabled }: ChannelC
             className={css.composerInput}
             rows={2}
             value={text}
-            placeholder={t('composer.placeholder', { name: channel.name })}
+            placeholder={hideAsTask ? t('thread.placeholder') : t('composer.placeholder', { name: channel.name })}
             disabled={inert}
             onChange={(event) => { setText(event.target.value); refreshMention(event.currentTarget) }}
             onKeyDown={onKeyDown}
@@ -278,15 +285,17 @@ export function ChannelComposer({ t, store, state, channel, disabled }: ChannelC
           />
         </div>
         <div className={css.composerRow}>
-          <label className={css.asTask}>
-            <input
-              type="checkbox"
-              checked={asTask}
-              disabled={inert}
-              onChange={(event) => { setAsTask(event.target.checked) }}
-            />
-            <span>{t('composer.asTask')}</span>
-          </label>
+          {!hideAsTask && (
+            <label className={css.asTask}>
+              <input
+                type="checkbox"
+                checked={asTask}
+                disabled={inert}
+                onChange={(event) => { setAsTask(event.target.checked) }}
+              />
+              <span>{t('composer.asTask')}</span>
+            </label>
+          )}
           <button
             type="button"
             className={css.sendButton}

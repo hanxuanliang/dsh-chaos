@@ -19,86 +19,14 @@
  * - Composer deliberately has NO As-task toggle: tasks anchor top-level
  *   channel messages, and thread replies are not top-level.
  */
-import { useEffect, useRef, useState, type JSX } from 'react'
+import type { JSX } from 'react'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { MessageStream } from './MessageStream.tsx'
+import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
-
-function readThreadDraft(threadId: string): string {
-  try { return window.localStorage.getItem(`dsh-chaos:draft:thread:${threadId}`) ?? '' } catch { return '' }
-}
-function writeThreadDraft(threadId: string, value: string): void {
-  try {
-    if (value === '') window.localStorage.removeItem(`dsh-chaos:draft:thread:${threadId}`)
-    else window.localStorage.setItem(`dsh-chaos:draft:thread:${threadId}`, value)
-  } catch { /* storage may be unavailable; drafts are best-effort */ }
-}
-
-function ThreadComposer({ t, store, threadId }: {
-  t: ChaosTranslate
-  store: CollabStore
-  threadId: string
-}): JSX.Element {
-  const [text, setText] = useState(() => readThreadDraft(threadId))
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const requestRef = useRef<string>(crypto.randomUUID())
-
-  useEffect(() => {
-    setText(readThreadDraft(threadId))
-    setError(undefined)
-    requestRef.current = crypto.randomUUID()
-  }, [threadId])
-
-  const send = async (): Promise<void> => {
-    const body = text.trim()
-    if (body === '' || busy) return
-    setBusy(true)
-    setError(undefined)
-    try {
-      await store.sendMessage(threadId, requestRef.current, body)
-      setText('')
-      writeThreadDraft(threadId, '')
-      requestRef.current = crypto.randomUUID()
-    } catch (cause) {
-      setError(t('thread.sendFailed', { error: cause instanceof Error ? cause.message : String(cause) }))
-    }
-    setBusy(false)
-  }
-
-  return (
-    <div className={css.threadComposer}>
-      {error !== undefined && <div className={css.threadComposerError} role="alert">{error}</div>}
-      <textarea
-        className={css.threadComposerInput}
-        rows={2}
-        placeholder={t('thread.placeholder')}
-        aria-label={t('thread.placeholder')}
-        value={text}
-        disabled={busy}
-        onChange={(event) => { setText(event.target.value); writeThreadDraft(threadId, event.target.value) }}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-          if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() }
-        }}
-      />
-      <button
-        type="button"
-        className={css.threadComposerSend}
-        disabled={busy || text.trim() === ''}
-        aria-label={t('composer.send')}
-        onClick={() => { void send() }}
-      >
-        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M8 13V3M4 6.5 8 2.5l4 4" />
-        </svg>
-      </button>
-    </div>
-  )
-}
 
 export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose }: {
   t: ChaosTranslate
@@ -160,7 +88,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
           onOpenTasks={() => { /* threads have no board */ }}
         />
       </div>
-      <ThreadComposer t={t} store={store} threadId={thread.id} />
+      <ChannelComposer t={t} store={store} state={state} channel={thread} disabled={state.connection !== 'live'} hideAsTask />
     </aside>
   )
 }
