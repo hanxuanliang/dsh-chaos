@@ -1805,12 +1805,12 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-primary);
 }
 .threadRootText {
-  /* spec: root 完整重现——不截断。 */
-  font-size: 12px;
-  line-height: 1.5;
+  /* spec: root 完整重现——不截断、markdown 与主流一致（同一 MessageBody，
+   * 排版不加独立 override，左右两侧像素级同源）。 */
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--dsw-alias-label-secondary);
   text-align: left;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 .threadBody {

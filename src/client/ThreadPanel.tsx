@@ -131,9 +131,9 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
               <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
               <span className={css.threadRootAuthor}>{rootAuthor?.displayName ?? handle}</span>
             </span>
-            <span className={css.threadRootText}>
+            <div className={css.threadRootText}>
               <MessageBody t={t} text={(rootMessage as NativeMessage).text} names={rootMentionNames} />
-            </span>
+            </div>
           </button>
         ) : (
           <div className={css.threadRoot} data-missing="true">
