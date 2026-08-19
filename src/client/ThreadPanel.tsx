@@ -29,14 +29,14 @@ import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
 
 const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
-const THREAD_WIDTH_MIN = 320
-const THREAD_WIDTH_MAX = 720
+const THREAD_WIDTH_MIN = 340
+const THREAD_WIDTH_MAX = 900
 
 function readThreadWidth(): number {
   try {
     const raw = window.localStorage.getItem(THREAD_WIDTH_KEY)
     const parsed = raw === null ? NaN : Number.parseInt(raw, 10)
-    return Number.isFinite(parsed) ? Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, parsed)) : 420
+    return Number.isFinite(parsed) ? Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, parsed)) : 480
   } catch { return 360 }
 }
 

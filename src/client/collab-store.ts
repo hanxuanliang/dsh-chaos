@@ -206,7 +206,7 @@ export class CollabStore {
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
       const threads = snapshot.targets.filter(target => target.kind === 'thread')
-      const totals = await this.seedTotals(channels, {})
+      const totals = await this.seedTotals([...channels, ...threads], {})
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
@@ -564,7 +564,8 @@ export class CollabStore {
       const snapshot = await this.client.snapshot()
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
-      const totals = await this.seedTotals(channels, this.snapshot.totalByChannel)
+      const threads = snapshot.targets.filter(target => target.kind === 'thread')
+      const totals = await this.seedTotals([...channels, ...threads], this.snapshot.totalByChannel)
       if (this.loadGeneration !== generation) return
       const unread: Record<string, number> = { ...this.snapshot.unreadByChannel }
       for (const channel of channels) {
@@ -610,7 +611,8 @@ export class CollabStore {
       ])
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
-      const totals = await this.seedTotals(channels, {})
+      const threads = snapshot.targets.filter(target => target.kind === 'thread')
+      const totals = await this.seedTotals([...channels, ...threads], {})
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
