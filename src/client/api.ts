@@ -17,6 +17,16 @@ type CollabDomainResult<T> =
 export interface CreateAgentRequest {
   name: string
   presetId: string
+  /** Optional route override; host requires provider and model together. */
+  provider?: string
+  model?: string
+}
+
+/** Host model catalog group (apiproxy `llm.models` ModelProviderGroup). */
+export interface LlmModelGroup {
+  id: string
+  name: string
+  models: { id: string; name: string; description?: string }[]
 }
 
 /** Result of agent.create: the actor, its runtime binding, and the workspace path. */
@@ -51,6 +61,19 @@ export class ChaosClient {
     return this.call('agent.presets', {})
   }
 
+  /**
+   * Host model catalog (`llm.models`, one call, all provider groups) — the
+   * same data the host Models settings page renders. Note: this rides the
+   * host apiproxy, not the '/dsh-chaos' channel, so only the transport
+   * envelope needs unwrapping.
+   */
+  async modelCatalog(): Promise<{ groups: LlmModelGroup[]; failures: unknown[] }> {
+    const response = await this.connection.api.llm.models({})
+    const result = response.result
+    if (!result.ok) throw new Error(result.error.message)
+    return result.value as { groups: LlmModelGroup[]; failures: unknown[] }
+  }
+
   agentProfile(agentId: string): Promise<AgentProfile> {
     return this.call('agent.profile', { agentId })
   }
@@ -60,7 +83,7 @@ export class ChaosClient {
   }
 
   createAgent(request: CreateAgentRequest): Promise<CreatedAgent> {
-    return this.call('agent.create', { name: request.name, presetId: request.presetId })
+    return this.call('agent.create', request)
   }
 
   deleteAgent(agentId: string): Promise<null> {

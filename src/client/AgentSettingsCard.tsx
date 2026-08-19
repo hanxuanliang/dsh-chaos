@@ -123,7 +123,10 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
     const named = presets?.find(preset => preset.id === binding.preset)?.name?.trim()
     return {
       preset: named === undefined || named === '' ? binding.preset : named,
-      route: `${binding.provider}/${binding.model}`,
+      // 'default' is the host sentinel for "follow the host default model".
+      route: binding.provider === 'default' && binding.model === 'default'
+        ? t('agents.routeDefault')
+        : `${binding.provider}/${binding.model}`,
     }
   }
 
@@ -137,7 +140,6 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
       <header className={css.headerRow}>
         <div className={css.titleBlock}>
           <h1>{t('agents.title')}</h1>
-          <p>{t('agents.caption')}</p>
         </div>
         <Button variant="outline" size="sm" icon={<IconPlusOutline16 size={16} />} aria-label={t('agents.create')} onClick={openCreateDialog} />
       </header>
@@ -155,16 +157,6 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
         <div className={css.empty} role="alert">
           <p className={css.emptyText}>{t('agents.loadFailed', { error: loadError ?? '' })}</p>
           <Button variant="outline" size="sm" onClick={() => load(true)}>{t('agents.retry')}</Button>
-        </div>
-      )}
-
-      {phase === 'ready' && rows.length === 0 && (
-        <div className={css.empty}>
-          <p className={css.emptyText}>{t('agents.empty')}</p>
-          <button type="button" className={css.addButton} onClick={openCreateDialog}>
-            <IconPlusOutline16 size={16} />
-            {t('agents.emptyAction')}
-          </button>
         </div>
       )}
 

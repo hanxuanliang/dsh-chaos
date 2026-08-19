@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type JSX } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary } from '../agent-settings-types.ts'
-import { ChaosClient } from './api.ts'
+import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from './api.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './AgentCreateDialog.module.css'
 
@@ -27,6 +27,13 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
   const [presetId, setPresetId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
+  // '' = follow the host default model (host writes the 'default' sentinel).
+  const [provider, setProvider] = useState('')
+  const [modelId, setModelId] = useState('')
+  const [catalog, setCatalog] = useState<{ groups: LlmModelGroup[]; failures: unknown[] } | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+  const catalogRequest = useRef(0)
 
   // Default to the host default preset (first healthy preset as fallback).
   useEffect(() => {
@@ -36,16 +43,41 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
     if (fallback !== undefined) setPresetId(fallback.id)
   }, [presets, presetId])
 
+  const loadCatalog = useCallback((): void => {
+    const request = ++catalogRequest.current
+    setCatalogLoading(true)
+    setCatalogError(null)
+    client.modelCatalog().then(result => {
+      if (catalogRequest.current !== request) return
+      setCatalog(result)
+      setCatalogLoading(false)
+    }, (reason: unknown) => {
+      if (catalogRequest.current !== request) return
+      setCatalogError(reason instanceof Error ? reason.message : String(reason))
+      setCatalogLoading(false)
+    })
+  }, [client])
+
+  useEffect(() => {
+    loadCatalog()
+    return () => { catalogRequest.current += 1 }
+  }, [loadCatalog])
+
   const trimmedName = name.trim()
   const selected = presets?.find(preset => preset.id === presetId)
   const selectedDescription = selected?.description?.trim() ?? ''
-  const canSubmit = trimmedName !== '' && presetId !== '' && !submitting
+  const providerModels = catalog?.groups.find(group => group.id === provider)?.models ?? []
+  // Host RPC rule (src/index.ts createNamedAgent): provider and model must be given together.
+  const canSubmit = trimmedName !== '' && presetId !== '' && (provider === '' || modelId !== '') && !submitting
 
   const submit = (): void => {
     if (!canSubmit) return
     setSubmitting(true)
     setFailure(null)
-    client.createAgent({ name: trimmedName, presetId }).then(() => {
+    const request: CreateAgentRequest = provider === ''
+      ? { name: trimmedName, presetId }
+      : { name: trimmedName, presetId, provider, model: modelId }
+    client.createAgent(request).then(() => {
       onCreated()
       onClose()
     }, (reason: unknown) => {
@@ -120,6 +152,44 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
         {selectedDescription !== '' && <small className={css.hint}>{selectedDescription}</small>}
         {selected?.isDefault === true && <small className={css.hint}>{t('create.presetDefault')}</small>}
         <small className={css.hint}>{t('create.presetHint')}</small>
+      </div>
+
+      <div className={css.field}>
+        <span className={css.labelText}>{t('create.route')}</span>
+        {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
+        {catalogError !== null && (
+          <p className={css.hint} role="alert">
+            {t('create.routeFailed', { error: catalogError })}{' '}
+            <Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>
+          </p>
+        )}
+        {catalog !== null && (
+          <>
+            <select
+              className={css.select}
+              aria-label={t('create.route')}
+              value={provider}
+              disabled={submitting}
+              onChange={event => { setProvider(event.target.value); setModelId(''); setFailure(null) }}
+            >
+              <option value="">{t('create.providerPlaceholder')}</option>
+              {catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
+            </select>
+            {provider !== '' && (
+              <select
+                className={css.select}
+                aria-label={t('create.route')}
+                value={modelId}
+                disabled={submitting || providerModels.length === 0}
+                onChange={event => { setModelId(event.target.value); setFailure(null) }}
+              >
+                {modelId === '' && <option value="" disabled>{providerModels.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>}
+                {providerModels.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            )}
+          </>
+        )}
+        <small className={css.hint}>{t('create.routeHint')}</small>
       </div>
 
       {failure !== null && <p className={css.error} role="alert">{t('create.failed', { error: failure })}</p>}

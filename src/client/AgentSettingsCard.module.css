@@ -38,14 +38,6 @@
   line-height: 24px;
 }
 
-.titleBlock p {
-  max-width: 68ch;
-  margin: 4px 0 0;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .banner {
   margin: 0;
   border: 1px solid var(--dsw-alias-state-error-primary);
@@ -109,26 +101,6 @@
 }
 
 .emptyText { margin: 0; max-width: 56ch; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
-
-.addButton {
-  appearance: none;
-  display: inline-flex;
-  height: 36px;
-  align-items: center;
-  gap: 6px;
-  border: 1px dashed var(--dsw-alias-border-l3);
-  border-radius: 10px;
-  padding: 0 14px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.addButton:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
-.addButton:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-border-l3); }
 
 /* List block: a card container with the rows inside it
  * (dsh-context .lc-card — layer-1 background + l1 border, 10px radius). */

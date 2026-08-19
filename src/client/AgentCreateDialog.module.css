@@ -31,16 +31,24 @@
 .input { display: block; }
 .input input { width: 100%; }
 
+/* Select chrome borrowed from the host ModelsSettings "API 协议" select
+ * (ui-settings-models ModelsSection.module.css .selectInput): OS arrow
+ * replaced by an inset 12px chevron (#81858C caption gray, both themes). */
 .select {
+  appearance: none;
   width: 100%;
   min-width: 0;
   height: 38px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   outline: none;
-  padding: 0 10px;
+  padding: 0 32px 0 10px;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-layer-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 12px;
   font: inherit;
   font-size: 12px;
 }
