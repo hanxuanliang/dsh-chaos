@@ -209,12 +209,13 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   letter-spacing: 0;
 }
 
-/* plocal keeps the section-create plus always visible (hover bg only). */
+/* plocal keeps the section-create plus always visible (hover bg only);
+ * 24px grid, host IconPlusOutline16. */
 .railAdd {
   display: inline-flex;
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
   border: none;
@@ -1199,31 +1200,40 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   line-height: 16px;
   letter-spacing: 0.04em;
 }
-.panel .rowAddButton {
-  display: inline-flex;
+/* plocal AddAgentList: the whole row is the button — flat row, hover tint,
+ * right-edge host plus icon. */
+.dialogBody .addRow {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.dialogBody .addRow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dialogBody .addRow:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.dialogBody .addRow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.addRowIcon {
+  display: inline-grid;
   flex: none;
   width: 22px;
   height: 22px;
   margin-left: auto;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
+  place-items: center;
   color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-.panel .rowAddButton:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.panel .rowAddButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
-}
-.panel .rowAddButton:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 .dialogWideButton {
   width: 100%;

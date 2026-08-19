@@ -8,7 +8,7 @@
  * refreshes the member list in place (store.reloadTargets).
  */
 import { useMemo, useState, type JSX } from 'react'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
@@ -121,28 +121,23 @@ export function ChannelMembersDialog({ t, store, state, channelId, onClose }: Ch
               {available.map((agent) => {
                 const seed = avatarSeed(agent.handle, agent.displayName)
                 const busy = addingId === agent.id
+                /* plocal AddAgentList row: the whole row is the button. */
                 return (
-                  <div key={agent.id} className={css.memberRow}>
+                  <button
+                    key={agent.id}
+                    type="button"
+                    className={css.addRow}
+                    disabled={addingId !== null}
+                    aria-label={t('members.addOne', { name: agent.displayName })}
+                    onClick={() => { add(agent.id) }}
+                  >
                     <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
                     <span className={css.memberName}>{agent.displayName}</span>
                     <span className={css.memberHandle}>@{agent.handle}</span>
-                    <button
-                      type="button"
-                      className={css.rowAddButton}
-                      disabled={addingId !== null}
-                      aria-label={t('members.addOne', { name: agent.displayName })}
-                      title={t('members.addOne', { name: agent.displayName })}
-                      onClick={() => { add(agent.id) }}
-                    >
-                      {busy
-                        ? '…'
-                        : (
-                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                            <path d="M8 3.5v9M3.5 8h9" />
-                          </svg>
-                        )}
-                    </button>
-                  </div>
+                    <span className={css.addRowIcon} aria-hidden="true">
+                      {busy ? '…' : <IconPlusOutline16 size={14} />}
+                    </span>
+                  </button>
                 )
               })}
             </div>

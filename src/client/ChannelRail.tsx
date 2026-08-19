@@ -6,6 +6,7 @@
  * the localStorage read marker (no backend read markers exist).
  */
 import { useState, type JSX } from 'react'
+import { IconPlusOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
@@ -41,9 +42,7 @@ export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps):
           title={t('panel.railCreate')}
           onClick={onCreate}
         >
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
-            <path d="M8 3.5v9M3.5 8h9" />
-          </svg>
+          <IconPlusOutline16 size={14} />
         </button>
       </div>
       {open && <div className={css.railScroll} role="list">
