@@ -31,6 +31,9 @@ const TASK_SCHEMA = {
       enum: ['todo', 'in_progress', 'in_review', 'done'],
     },
     assigneeId: { type: 'string' },
+    /** Authoritative snippet the store joins on every Task read — declare it or
+     * additionalProperties:false rejects every tool envelope. */
+    anchorText: { type: 'string' },
     version: { type: 'string', required: true },
     createdAtMs: { type: 'number', required: true },
     updatedAtMs: { type: 'number', required: true },
