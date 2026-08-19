@@ -36,6 +36,9 @@ export interface MessageStreamProps {
   channelId: string
   activeLocale(): string
   onOpenTasks(): void
+  /** One-shot jump target (task anchor link → land + flash the row). */
+  jumpMessageId?: string | undefined
+  onJumpHandled?: (() => void) | undefined
 }
 
 const COMPACT_WINDOW_MS = 5 * 60 * 1000
@@ -331,7 +334,7 @@ function buildItems(messages: NativeMessage[], t: ChaosTranslate, activeLocale: 
   return items
 }
 
-export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks }: MessageStreamProps): JSX.Element {
+export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled }: MessageStreamProps): JSX.Element {
   const messages = state.messagesByChannel[channelId]
   const total = state.totalByChannel[channelId]
   const actorsById = useMemo(() => {
@@ -376,6 +379,37 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     }
     if (pinnedRef.current) el.scrollTop = el.scrollHeight
   }, [channelId, messages, state.olderLoading])
+
+  // Task-anchor jump: scroll the target row into view and flash it. If the
+  // row is not in the merged window yet, page older until it appears (or the
+  // channel is fully backfilled); handled jumps are reported exactly once.
+  const jumpHandledRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (jumpMessageId === undefined || jumpHandledRef.current === jumpMessageId) return
+    const el = scrollerRef.current
+    if (el === null) return
+    const row = el.querySelector(`[data-message-id="${jumpMessageId}"]`)
+    if (row !== null) {
+      jumpHandledRef.current = jumpMessageId
+      pinnedRef.current = false
+      row.scrollIntoView({ block: 'center' })
+      row.setAttribute('data-jump-flash', '')
+      window.setTimeout(() => { row.removeAttribute('data-jump-flash') }, 1600)
+      onJumpHandled?.()
+      return
+    }
+    const channelMessages = state.messagesByChannel[channelId]
+    const totalCount = state.totalByChannel[channelId]
+    const hasMoreToLoad = channelMessages !== undefined && totalCount !== undefined && channelMessages.length < totalCount
+    if (!state.olderLoading) {
+      if (hasMoreToLoad) {
+        void store.loadOlder()
+      } else {
+        jumpHandledRef.current = jumpMessageId
+        onJumpHandled?.()
+      }
+    }
+  }, [jumpMessageId, state.messagesByChannel, state.totalByChannel, state.olderLoading, channelId, store, onJumpHandled])
 
   const onScroll = (event: UIEvent<HTMLDivElement>): void => {
     const el = event.currentTarget
@@ -439,7 +473,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
               : undefined
             if (item.compact === true) {
               return (
-                <div key={item.key} className={css.msgCompact}>
+                <div key={item.key} className={css.msgCompact} data-message-id={message.id}>
                   <div className={css.msgAvatarPlaceholder} aria-hidden="true" />
                   <div className={css.msgBody}>
                     <MessageBody t={t} text={message.text} names={mentionNames} />
@@ -456,7 +490,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
             const seed = avatarSeed(handle, displayName)
             const binding = author === undefined ? undefined : state.bindingsByAgent[author.id]
             return (
-              <div key={item.key} className={css.msg}>
+              <div key={item.key} className={css.msg} data-message-id={message.id}>
                 <span className={css.avatar} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
                 <div className={css.msgMain}>
                   <div className={css.msgHead}>

@@ -1307,25 +1307,16 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .taskBoardHeader {
   display: flex;
   flex: none;
-  justify-content: flex-end;
+  gap: 8px;
 }
-.panel .taskBoardSearch {
-  flex: 0 1 240px;
-  min-width: 120px;
-  border: 1px solid var(--dsw-alias-border-l2);
+.panel .taskBoardError {
+  flex: none;
+  border: 1px solid var(--dsw-alias-state-error-secondary);
   border-radius: 8px;
-  padding: 5px 10px;
-  font: inherit;
+  padding: 6px 10px;
   font-size: 12px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-specific-input-major);
-  outline: none;
-}
-.panel .taskBoardSearch::placeholder {
-  color: var(--dsw-alias-label-tertiary);
-}
-.panel .taskBoardSearch:focus {
-  border-color: var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-state-error-tertiary, transparent);
 }
 .taskColumns {
   display: grid;
@@ -1515,16 +1506,160 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.taskDetailAnchorText {
-  max-height: 240px;
+/* the whole bordered anchor box is the jump link (button in a portal —
+ * no .panel reset applies; set font explicitly). */
+.taskDetailAnchorLink {
+  display: block;
+  width: 100%;
+  max-height: 260px;
   overflow-y: auto;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 10px;
   padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.55;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  text-align: left;
+}
+.taskDetailAnchorText {
+  display: block;
+  font-size: 13px;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ---- status dropdown + assignee filter pill (plocal TaskStatusMenu) ------- */
+.statusDropdown {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+.panel .filterPill,
+.dialogBody .statusChip,
+.panel .statusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.panel .filterPill {
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+}
+.panel .filterPill:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.panel .filterPill.filterPillActive {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+/* tinted chip: 15% self-hue fill + same-hue text (plocal chipClass port). */
+.statusChip {
+  color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+}
+.statusChip[data-status='in_progress'] {
+  color: var(--dsw-alias-state-warn-label);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 16%, transparent);
+}
+.statusChip[data-status='in_review'] {
+  color: #5f6fe8;
+  background: color-mix(in srgb, #7287fd 16%, transparent);
+}
+.statusChip[data-status='done'] {
+  color: #1a9e52;
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
+}
+.statusChip:hover {
+  filter: brightness(0.97);
+}
+.filterPill:focus-visible,
+.statusChip:focus-visible,
+.statusMenuItem:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.statusMenu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv2);
+}
+.panel .statusMenuItem,
+.dialogBody .statusMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.panel .statusMenuItem:hover:not(:disabled),
+.dialogBody .statusMenuItem:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.panel .statusMenuItem:disabled,
+.dialogBody .statusMenuItem:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.statusMenuLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Detail: head row is the title only; status lives in meta rows now. */
+.taskDetailTitleRow {
+  display: flex;
+  margin-bottom: 12px;
+}
+.taskDetailAnchorGo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-business-primary);
+}
+.taskDetailAnchorLink:hover {
+  border-color: var(--dsw-alias-border-l3);
+}
+.taskDetailAnchorLink:hover .taskDetailAnchorGo {
+  text-decoration: underline;
+}
+
+/* Task-anchor jump flash: warn-tinted wash that fades (paper §3.2 高亮 1s). */
+.msg[data-jump-flash],
+.msgCompact[data-jump-flash] {
+  border-radius: 8px;
+  animation: dshChaosJumpFlash 1.5s ease-out;
+}
+@keyframes dshChaosJumpFlash {
+  0% { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 24%, transparent); }
+  100% { background: transparent; }
 }

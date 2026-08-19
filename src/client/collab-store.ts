@@ -392,6 +392,26 @@ export class CollabStore {
     return task
   }
 
+  /** Claim unowned task (todo → in_progress + self assignee, server-fenced). */
+  async claimTask(messageId: string): Promise<NativeTask> {
+    const task = await this.client.taskClaim(messageId)
+    this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [task.messageId]: task } })
+    return task
+  }
+
+  /**
+   * Status migration via the version-fenced RPC. The expected version is read
+   * from this snapshot at call time; a stale read surfaces as the backend's
+   * typed conflict error, which the caller renders verbatim (never faked).
+   */
+  async updateTaskStatus(messageId: string, status: NativeTask['status']): Promise<NativeTask> {
+    const current = this.snapshot.tasksByMessage[messageId]
+    if (current === undefined) throw new Error(`task for ${messageId} is not loaded`)
+    const task = await this.client.taskUpdateStatus(messageId, status, current.version)
+    this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [task.messageId]: task } })
+    return task
+  }
+
   async createChannel(name: string): Promise<NativeTarget> {
     const target = await this.client.channelCreate(name)
     const generation = this.loadGeneration

@@ -25,6 +25,8 @@ export interface ChannelViewProps {
 export function ChannelView({ t, store, state, channel, activeLocale }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
+  /** One-shot jump request: task anchor click → land on the stream row. */
+  const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
   useEffect(() => { setTab('messages') }, [channel.id])
   useEffect(() => { setMembersOpen(false) }, [channel.id])
 
@@ -83,7 +85,7 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
       {tab === 'messages'
         ? (
           <>
-            <MessageStream
+            <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={() => { setJumpMessageId(undefined) }}
               t={t}
               store={store}
               state={state}
@@ -104,7 +106,13 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
           </>
         )
         : (
-          <ChannelTasksBoard t={t} store={store} state={state} channelId={channel.id} />
+          <ChannelTasksBoard
+            t={t}
+            store={store}
+            state={state}
+            channelId={channel.id}
+            onOpenMessage={(messageId) => { setTab('messages'); setJumpMessageId(messageId) }}
+          />
         )}
       {membersOpen && (
         <ChannelMembersDialog

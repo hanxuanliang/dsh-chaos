@@ -104,6 +104,15 @@ export class ChaosClient {
     return this.call('tasks', targetId === undefined ? {} : { targetId })
   }
 
+  /** todo → in_progress with an assignee attached (fixed-principal actor). */
+  taskClaim(messageId: string): Promise<NativeTask> {
+    return this.call('task.claim', { messageId })
+  }
+
+  taskUpdateStatus(messageId: string, status: NativeTask['status'], expectedVersion: string): Promise<NativeTask> {
+    return this.call('task.update', { messageId, status, expectedVersion })
+  }
+
   agentPresets(): Promise<AgentPresetSummary[]> {
     return this.call('agent.presets', {})
   }
