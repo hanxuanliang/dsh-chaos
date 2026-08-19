@@ -1049,10 +1049,15 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .composerRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   padding: 0 6px 6px;
 }
+
+/* As-task 是行内唯一左列件：无条件的 margin-right:auto 既保住频道双列
+ * 布局，也让 thread 无 As-task 时发送钮仍钉在右缘（space-between 会把
+ * 单键孩子甩到左边）。 */
+.asTask { margin-right: auto; }
 
 /* pilot chip 选择钮（PermissionSelect 同款）：28px 高 r8 透明底，
  * 13/20 w500 secondary 字，hover 浅灰底。 */
