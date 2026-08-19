@@ -23,27 +23,34 @@ globalThis.window = {
 
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
-// The rebuilt client declares its required services and registers official
-// seats only: the sidebar footer Activity entry, the shell.overlay docked
-// collaboration panel, and the settings.section Agents page. Nothing shadows
-// or replaces shipped UI.
-assert.deepEqual(clientModule.inject, ['slots', 'connection'])
+// The P0 client declares the services it needs and registers a single
+// settings.section entry (id 'chaos-agents') for the Agents management page.
+assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale'])
 assert.equal(typeof clientModule.apply, 'function')
 
 const injected = []
 const registered = []
 const effects = []
+const namespaces = []
 const ctx = {
-  get(name) {
-    assert.equal(name, 'connection')
-    return {
-      rpc: { async call() { throw new Error('smoke: rpc must not fire during apply') } },
-      api: { llm: {} },
-    }
+  connection: {
+    rpc: { async call() { throw new Error('smoke: rpc must not fire during apply') } },
   },
   effect(fn, label) {
     assert.equal(typeof fn, 'function')
     effects.push(label)
+    fn()
+  },
+  locale: {
+    register(namespace, dictionaries) {
+      namespaces.push(namespace)
+      assert.ok(typeof dictionaries.zh === 'object')
+      assert.ok(typeof dictionaries.en === 'object')
+    },
+    bind(namespace) {
+      assert.equal(namespace, 'chaos')
+      return key => (key === 'settings.tab' ? '协作 Agents' : key)
+    },
   },
   slots: {
     inject(name, factory) {
@@ -60,15 +67,18 @@ const ctx = {
 }
 
 assert.doesNotThrow(() => { clientModule.apply(ctx) })
-assert.deepEqual(injected.sort(), ['settings.section', 'shell.overlay', 'sidebar.footer.action'])
-assert.deepEqual(
-  registered.map(entry => entry.id).sort(),
-  ['dsh-chaos-activity', 'dsh-chaos-agents', 'dsh-chaos-dock'],
-)
-const agentsEntry = registered.find(entry => entry.id === 'dsh-chaos-agents')
+assert.deepEqual(injected, ['settings.section'])
+assert.deepEqual(registered.map(entry => entry.id), ['chaos-agents'])
+const agentsEntry = registered[0]
 assert.equal(agentsEntry.name, 'settings.section')
-assert.equal(agentsEntry.order, 90)
+assert.equal(agentsEntry.order, 40)
+assert.equal(agentsEntry.locale, 'chaos')
 assert.equal(agentsEntry.label(), '协作 Agents')
+const face = agentsEntry.inject()
+assert.ok(face.connection === ctx.connection)
+assert.equal(typeof face.t, 'function')
+assert.equal(face.t('settings.tab'), '协作 Agents')
+assert.deepEqual(namespaces, ['chaos'])
 assert.equal(effects.length, 1)
 
-console.log('smoke-client: activity client loads and registers official slots only')
+console.log('smoke-client: P0 client loads and registers the settings.section Agents page')

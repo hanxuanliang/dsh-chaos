@@ -1,0 +1,50 @@
+/* Visual tokens: host --dsw-alias-* directly (dsh-mnemon precedent; see the
+ * sibling AgentSettingsCard.module.css header for the --collab-* TODO). */
+.body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The host Modal reserves margin-top:20px on its body div for the
+ * title → description → body flow; with no description that reads as dead
+ * space under the title, so we reclaim it — the 16px content gap above
+ * already carries the rhythm. */
+.body > *:last-child { margin-top: 0; }
+
+/* Same story one level up: the host header reserves padding-bottom:12px for
+ * the title → description transition; without a description it doubles the
+ * title → first-field gap. */
+.body > *:first-child { padding-bottom: 0; }
+
+.body *, .body *::before, .body *::after { box-sizing: border-box; }
+
+.field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+
+.labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
+.req { margin-left: 2px; color: var(--dsw-alias-state-error-primary); font-style: normal; }
+.hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
+.error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+
+.input { display: block; }
+.input input { width: 100%; }
+
+.select {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  outline: none;
+  padding: 0 10px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  font: inherit;
+  font-size: 12px;
+}
+
+.select:disabled { cursor: default; opacity: .46; }
+.select:focus-visible { box-shadow: 0 0 0 2px var(--dsw-alias-border-l3); }
+.select option:disabled { color: var(--dsw-alias-label-tertiary); }
