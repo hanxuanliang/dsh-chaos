@@ -1491,7 +1491,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 .taskDetailRow > dt {
   flex: none;
-  width: 72px;
+  width: 104px;
   color: var(--dsw-alias-label-tertiary);
 }
 .taskDetailRow > dd {
@@ -1662,4 +1662,30 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 @keyframes dshChaosJumpFlash {
   0% { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 24%, transparent); }
   100% { background: transparent; }
+}
+
+/* Assignee editor chip: bordered value + pencil (raft task panel idiom). */
+.assigneeChipStatic {
+  color: var(--dsw-alias-label-primary);
+}
+.dialogBody .assigneeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+.dialogBody .assigneeChip:hover {
+  border-color: var(--dsw-alias-border-l3);
+}
+.dialogBody .assigneeChip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
 }

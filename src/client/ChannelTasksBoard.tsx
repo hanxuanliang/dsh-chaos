@@ -54,6 +54,15 @@ const ALLOWED: Record<TaskStatus, readonly TaskStatus[]> = {
   done: ['in_progress'],
 }
 
+/** Raft task panel idiom: small pencil = editable affordance cue. */
+function PencilGlyph(): JSX.Element {
+  return (
+    <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m10.5 2.5 3 3L6 13H3v-3L10.5 2.5Z" />
+    </svg>
+  )
+}
+
 /** Compact relative/absolute time label (dsh-task-board TaskCard.formatTime). */
 function formatTime(ms: number, t: ChaosTranslate): string {
   const minutes = Math.floor((Date.now() - ms) / 60000)
@@ -118,6 +127,7 @@ function TaskStatusDropdown({ task, t, onMove }: {
         <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />
         </svg>
+        <PencilGlyph />
       </button>
       {open && (
         <span role="menu" className={css.statusMenu}>
@@ -240,13 +250,76 @@ function TaskCard({ task, title, excerpt, assigneeLabel, t, onOpen }: {
   )
 }
 
-function TaskDetailModal({ task, title, anchor, assigneeLabel, t, onMove, onOpenAnchor, onClose }: {
+/** Raft assignee chip: bordered value + pencil, menu offers the few HONEST
+ * actions the fixed-principal surface supports — claim (when the pool holds
+ * the task) or unclaim self (when I hold it); someone else's claim is
+ * read-only. */
+function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: {
+  task: NativeTask
+  selfId: string | undefined
+  assigneeLabel: string | undefined
+  t: ChaosTranslate
+  onClaim: () => void
+  onUnclaim: () => void
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (event: MouseEvent): void => {
+      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => { document.removeEventListener('mousedown', close) }
+  }, [open])
+
+  const mine = task.assigneeId !== undefined && task.assigneeId === selfId
+  const editable = task.assigneeId === undefined || mine
+  if (!editable) {
+    return <span className={css.assigneeChipStatic}>{assigneeLabel}</span>
+  }
+  return (
+    <span ref={rootRef} className={css.statusDropdown}>
+      <button
+        type="button"
+        className={css.assigneeChip}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => { setOpen(v => !v) }}
+      >
+        {assigneeLabel ?? t('tasks.unassigned')}
+        <PencilGlyph />
+      </button>
+      {open && (
+        <span role="menu" className={css.statusMenu}>
+          {task.assigneeId === undefined && (
+            <button type="button" role="menuitem" className={css.statusMenuItem} onClick={() => { setOpen(false); onClaim() }}>
+              <span className={css.statusMenuLabel}>{t('tasks.claimSelf')}</span>
+            </button>
+          )}
+          {mine && (
+            <button type="button" role="menuitem" className={css.statusMenuItem} onClick={() => { setOpen(false); onUnclaim() }}>
+              <span className={css.statusMenuLabel}>{t('tasks.unclaimSelf')}</span>
+            </button>
+          )}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function TaskDetailModal({ task, title, anchor, assigneeLabel, createdByLabel, selfId, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
   task: NativeTask
   title: string
   anchor: string
   assigneeLabel: string | undefined
+  createdByLabel: string
+  selfId: string | undefined
   t: ChaosTranslate
   onMove: (target: TaskStatus) => void
+  onClaim: () => void
+  onUnclaim: () => void
   onOpenAnchor: () => void
   onClose: () => void
 }): JSX.Element {
@@ -270,7 +343,22 @@ function TaskDetailModal({ task, title, anchor, assigneeLabel, t, onMove, onOpen
         </div>
         <div className={css.taskDetailRow}>
           <dt>{t('tasks.assignee')}</dt>
-          <dd>{assigneeLabel ?? t('tasks.unassigned')}</dd>
+          <dd>
+            <AssigneeEditor
+              task={task}
+              selfId={selfId}
+              assigneeLabel={assigneeLabel}
+              t={t}
+              onClaim={onClaim}
+              onUnclaim={onUnclaim}
+            />
+          </dd>
+        </div>
+        <div className={css.taskDetailRow}>
+          {/* Native Task has no creator column (pool semantics); the honest
+              provenance is the anchor message's author. */}
+          <dt>{t('tasks.sourceAuthor')}</dt>
+          <dd>{createdByLabel}</dd>
         </div>
         <div className={css.taskDetailRow}>
           <dt>{t('tasks.created')}</dt>
@@ -336,6 +424,17 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
     return t('tasks.anchorMissing')
   }
 
+  const createdByLabelOf = (task: NativeTask): string => {
+    const msg = state.messagesByChannel[channelId]?.find(m => m.id === task.messageId)
+    if (msg === undefined) return t('tasks.authorUnknown')
+    const actor = state.actors.find(a => a.id === msg.authorId)
+    return actor === undefined ? t('tasks.authorUnknown') : `@${actor.handle}`
+  }
+
+  const surfaceError = (error: unknown): void => {
+    setMoveError(t('tasks.statusFailed', { error: error instanceof Error ? error.message : String(error) }))
+  }
+
   const move = (task: NativeTask, target: TaskStatus): void => {
     setMoveError(undefined)
     // todo(unassigned) → in_progress routes through claim so the move
@@ -343,9 +442,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
     const action = task.status === 'todo' && target === 'in_progress' && task.assigneeId === undefined
       ? store.claimTask(task.messageId)
       : store.updateTaskStatus(task.messageId, target)
-    action.catch((error: unknown) => {
-      setMoveError(t('tasks.statusFailed', { error: error instanceof Error ? error.message : String(error) }))
-    })
+    action.catch(surfaceError)
   }
 
   const selected = selectedMessageId === undefined
@@ -399,8 +496,12 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
           title={(() => { const s = splitAnchor(anchorOf(selected)); return s.title === '' ? `#${selected.number}` : s.title })()}
           anchor={anchorOf(selected)}
           assigneeLabel={assigneeLabelOf(selected)}
+          createdByLabel={createdByLabelOf(selected)}
+          selfId={state.selfId}
           t={t}
           onMove={(target) => { move(selected, target) }}
+          onClaim={() => { setMoveError(undefined); store.claimTask(selected.messageId).catch(surfaceError) }}
+          onUnclaim={() => { setMoveError(undefined); store.unclaimTask(selected.messageId).catch(surfaceError) }}
           onOpenAnchor={() => { setSelectedMessageId(undefined); onOpenMessage(selected.messageId) }}
           onClose={() => { setSelectedMessageId(undefined) }}
         />

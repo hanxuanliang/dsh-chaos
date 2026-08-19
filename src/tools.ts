@@ -193,7 +193,7 @@ export function installCollabTools(
 
   agentCtx.tools.register(defineTool({
     name: 'task_create',
-    description: 'Attach Task metadata to one committed top-level Channel or Direct message. Actor identity comes from the calling Agent.',
+    description: 'Attach Task metadata to one committed top-level Channel or Direct message. Actor identity comes from the calling Agent. Convention (agreed 2026-08-19, "方案A"): the creator claims their fresh Task in the same call — create returns in_progress with self as assignee; the native pool semantics stay untouched underneath.',
     parameters: {
       messageId: { type: 'string', required: true, description: 'Top-level Message id to convert to a Task.' },
     },
@@ -207,7 +207,8 @@ export function installCollabTools(
     async execute(args, exec) {
       exec.signal.throwIfAborted()
       const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
-      return collab.createTask(args.messageId, binding.agentId)
+      const task = await collab.createTask(args.messageId, binding.agentId)
+      return collab.claimTask(task.messageId, binding.agentId)
     },
   }))
 

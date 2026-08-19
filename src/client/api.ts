@@ -109,6 +109,11 @@ export class ChaosClient {
     return this.call('task.claim', { messageId })
   }
 
+  /** Release own claim back to the pool (fixed-principal, version-fenced). */
+  taskUnclaim(messageId: string, expectedVersion: string): Promise<NativeTask> {
+    return this.call('task.unclaim', { messageId, expectedVersion })
+  }
+
   taskUpdateStatus(messageId: string, status: NativeTask['status'], expectedVersion: string): Promise<NativeTask> {
     return this.call('task.update', { messageId, status, expectedVersion })
   }
