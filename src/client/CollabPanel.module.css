@@ -175,19 +175,40 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   padding: 0 4px 6px;
 }
 
+/* plocal ChatSidebar section header: uppercase wide-tracked toggle label,
+ * chevron + count; hover lifts toward secondary label. */
 .railTitle {
   display: inline-flex;
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--dsw-alias-label-tertiary);
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.railTitle:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+.railLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.railCount {
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
+/* plocal keeps the section-create plus always visible (hover bg only). */
 .railAdd {
   display: inline-flex;
   flex: none;
@@ -199,17 +220,10 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-radius: 6px;
   color: var(--dsw-alias-label-tertiary);
   background: transparent;
-  opacity: 0;
   cursor: pointer;
 }
-
-.railHead:hover .railAdd,
-.railAdd:focus-visible {
-  opacity: 1;
-}
-
 .railAdd:hover {
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
@@ -278,15 +292,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   line-height: 18px;
 }
 
-.railFoot {
-  flex: none;
-  margin: 8px 0 0;
-  padding: 8px 8px 0;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 16px;
-}
 
 .main {
   display: flex;
@@ -827,15 +832,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-secondary);
 }
 
-.headHint {
-  margin: 0;
-  padding: 2px 0 8px;
-  color: var(--dsw-alias-label-tertiary);
-  font-family: var(--chaos-mono);
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-}
 
 .streamEmpty {
   display: flex;

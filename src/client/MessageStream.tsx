@@ -15,7 +15,8 @@
  * - plocal TaskChip: status icon + #N (+ @assignee), 4-state icon/color only.
  * - Long bodies clamp at 344→320px with a bottom fade + Show more/Collapse.
  * - Head: "load older" button (forward paging; backend has no before-cursor)
- *   or a "beginning of messages" hint; tail keeps the conn-bar/resync faces.
+ *   (no "beginning of messages" hint — user asked for a bare top edge); tail
+ *   keeps the conn-bar/resync faces.
  * P0 still skips virtual scrolling, thread previews, and hover reply.
  */
 import { isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type ReactNode, type UIEvent } from 'react'
@@ -393,11 +394,6 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
   }
 
   const hasMore = messages !== undefined && total !== undefined && messages.length < total
-  const showBeginning = !hasMore
-    && messages !== undefined
-    && messages.length > 0
-    && !state.historyLoading
-    && state.historyError === undefined
 
   return (
     <div className={css.streamWrap}>
@@ -430,7 +426,6 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                 )}
             </div>
           )}
-          {showBeginning && <p className={css.headHint}>{t('stream.beginning')}</p>}
           {items.map((item) => {
             if (item.kind === 'divider') {
               return <div key={item.key} className={css.dayDivider}><span>{item.label}</span></div>

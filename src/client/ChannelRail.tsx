@@ -1,13 +1,11 @@
 /**
  * Secondary rail of the collab panel: channel navigation (spec §1.1).
- * The group header's hover"+" is the only channel-create entry; the bottom
- * settings line is intentionally static text — the host exposes no
- * settings-navigation API to plugins (checked dsh-client-ui-settings /
- * ui-sidebar 0.1.0-rc.7), so it declares the path instead of pretending a
- * link. Unread = tail.count minus the localStorage read marker (no backend
- * read markers exist).
+ * Group header anatomy borrows plocal's ChatSidebar section header (uppercase
+ * wide-tracked label + functional chevron collapse + count + always-visible
+ * "+"); the "+" is the only channel-create entry. Unread = tail.count minus
+ * the localStorage read marker (no backend read markers exist).
  */
-import type { JSX } from 'react'
+import { useState, type JSX } from 'react'
 import type { CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
@@ -20,15 +18,22 @@ export interface ChannelRailProps {
 }
 
 export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps): JSX.Element {
+  const [open, setOpen] = useState(true)
   return (
     <nav className={css.rail} aria-label={t('panel.channels')}>
       <div className={css.railHead}>
-        <span className={css.railTitle}>
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 6l4 4 4-4" />
+        <button
+          type="button"
+          className={css.railTitle}
+          aria-expanded={open}
+          onClick={() => { setOpen(!open) }}
+        >
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d={open ? 'M4 6l4 4 4-4' : 'M6 4l4 4-4 4'} />
           </svg>
-          {t('panel.channels')}
-        </span>
+          <span className={css.railLabel}>{t('panel.channels')}</span>
+          <span className={css.railCount}>{state.channels.length}</span>
+        </button>
         <button
           type="button"
           className={css.railAdd}
@@ -41,7 +46,7 @@ export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps):
           </svg>
         </button>
       </div>
-      <div className={css.railScroll} role="list">
+      {open && <div className={css.railScroll} role="list">
         {state.channels.length === 0 && <p className={css.railEmpty}>{t('panel.railEmpty')}</p>}
         {state.channels.map((channel) => {
           const active = channel.id === state.activeChannelId
@@ -62,8 +67,7 @@ export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps):
             </button>
           )
         })}
-      </div>
-      <p className={css.railFoot}>{t('panel.railSettings')}</p>
+      </div>}
     </nav>
   )
 }
