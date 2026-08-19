@@ -88,7 +88,10 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
           onOpenTasks={() => { /* threads have no board */ }}
         />
       </div>
-      <ChannelComposer t={t} store={store} state={state} channel={thread} disabled={state.connection !== 'live'} hideAsTask />
+      {/* Same seat padding as the channel main column — one placement rule, zero visual drift. */}
+      <div className={css.composerSeat}>
+        <ChannelComposer t={t} store={store} state={state} channel={thread} disabled={state.connection !== 'live'} hideAsTask />
+      </div>
     </aside>
   )
 }
