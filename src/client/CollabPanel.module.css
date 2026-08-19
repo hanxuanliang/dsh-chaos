@@ -369,7 +369,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   align-items: center;
   gap: 5px;
   height: 24px;
-  margin-left: auto;
+  margin-left: 8px;
   padding: 0 8px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 8px;
