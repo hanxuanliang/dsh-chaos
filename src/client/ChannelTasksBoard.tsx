@@ -37,6 +37,7 @@ import { StatusChip } from './atoms/StatusChip.tsx'
 import { TaskCard } from './blocks/TaskCard.tsx'
 import { KanbanLane, KanbanLaneGrid } from './blocks/KanbanLane.tsx'
 import { AssigneePopover } from './blocks/AssigneePopover.tsx'
+import { ErrorBanner } from './atoms/ErrorBanner.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -337,7 +338,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
         <AssigneeFilter t={t} members={members} value={assigneeFilter} onChange={setAssigneeFilter} />
       </header>
       {moveError !== undefined && (
-        <div className={css.taskBoardError} role="alert">{moveError}</div>
+        <ErrorBanner>{moveError}</ErrorBanner>
       )}
       <KanbanLaneGrid>
         {LANES.map((lane) => {
