@@ -170,6 +170,8 @@ function AssigneeFilter({ t, members, value, onChange }: {
     <Menu
       open={open}
       portal
+      compact
+      dense
       onClose={() => { setOpen(false) }}
       onSelect={(id) => { onChange(id === 'all' ? '' : id); setOpen(false) }}
       selectedId={selectedId}
