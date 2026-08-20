@@ -5085,8 +5085,7 @@ mod tests {
         assert!(
             history
                 .iter()
-                .any(|message| message.author_id == alpha.id
-                    && message.text == "alpha was here")
+                .any(|message| message.author_id == alpha.id && message.text == "alpha was here")
         );
 
         let connection = core.connection.lock().await;
@@ -5128,11 +5127,17 @@ mod tests {
         let (core, user, _alpha, _beta, _channel) = fixture().await?;
         assert!(matches!(
             core.delete_agent(&user.id).await,
-            Err(CollabError::NotFound { entity: "agent", .. })
+            Err(CollabError::NotFound {
+                entity: "agent",
+                ..
+            })
         ));
         assert!(matches!(
             core.delete_agent("missing-actor").await,
-            Err(CollabError::NotFound { entity: "actor", .. })
+            Err(CollabError::NotFound {
+                entity: "actor",
+                ..
+            })
         ));
         Ok(())
     }
