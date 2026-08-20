@@ -12,6 +12,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface ChannelCreateDialogProps {
   t: ChaosTranslate
@@ -117,7 +118,7 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
                     disabled={submitting}
                     onChange={() => { toggle(agent.id) }}
                   />
-                  <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
+                  <AvatarChip seed={seed} aria-hidden="true" />
                   <span className={css.memberName}>{agent.displayName}</span>
                   <span className={css.memberHandle}>@{agent.handle}</span>
                 </label>

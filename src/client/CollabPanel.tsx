@@ -7,6 +7,7 @@ import { ChannelView } from './ChannelView.tsx'
 import { ChannelCreateDialog } from './ChannelCreateDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
+import { PillTabs } from './atoms/PillTabs.tsx'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -34,28 +35,12 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
   return (
     <>
       <header className={css.header}>
-        <div className={css.tabs} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={panelView === 'collab'}
-            data-active={panelView === 'collab' ? 'true' : undefined}
-            className={css.tab}
-            onClick={() => { setPanelView('collab') }}
-          >
-            {t('panel.title')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={panelView === 'activity'}
-            data-active={panelView === 'activity' ? 'true' : undefined}
-            className={css.tab}
-            onClick={() => { setPanelView('activity') }}
-          >
-            {t('channel.tabActivity', { count: state.activityCount })}
-          </button>
-        </div>
+        <PillTabs
+          items={[
+            { id: 'collab', label: t('panel.title'), active: panelView === 'collab', onClick: () => { setPanelView('collab') } },
+            { id: 'activity', label: t('activity.title') + ` (${String(state.activityCount)})`, active: panelView === 'activity', onClick: () => { setPanelView('activity') } },
+          ]}
+        />
         <button
           type="button"
           className={css.closeButton}

@@ -14,6 +14,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface ChannelMembersDialogProps {
   t: ChaosTranslate
@@ -31,7 +32,7 @@ function MemberRow({ actor }: { actor: NativeActor }): JSX.Element {
   const seed = avatarSeed(actor.handle, actor.displayName)
   return (
     <div className={css.memberRow}>
-      <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
+      <AvatarChip seed={seed} aria-hidden="true" />
       <span className={css.memberName}>{actor.displayName}</span>
       <span className={css.memberHandle}>@{actor.handle}</span>
       {actor.kind === 'agent' && <span className={css.memberBadge}>AGENT</span>}
@@ -131,7 +132,7 @@ export function ChannelMembersDialog({ t, store, state, channelId, onClose }: Ch
                     aria-label={t('members.addOne', { name: agent.displayName })}
                     onClick={() => { add(agent.id) }}
                   >
-                    <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
+                    <AvatarChip seed={seed} aria-hidden="true" />
                     <span className={css.memberName}>{agent.displayName}</span>
                     <span className={css.memberHandle}>@{agent.handle}</span>
                     <span className={css.addRowIcon} aria-hidden="true">

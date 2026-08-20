@@ -14,6 +14,7 @@ import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './CollabPanel.module.css'
+import { PillTabs } from './atoms/PillTabs.tsx'
 
 export interface ChannelViewProps {
   t: ChaosTranslate
@@ -74,28 +75,12 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
           <span className={css.channelHash} aria-hidden="true">#</span>
           {channel.name}
         </h3>
-        <div className={css.tabs} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'messages'}
-            data-active={tab === 'messages' || undefined}
-            className={css.tab}
-            onClick={() => { setTab('messages') }}
-          >
-            {t('channel.tabMessages')}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'tasks'}
-            data-active={tab === 'tasks' || undefined}
-            className={css.tab}
-            onClick={() => { setTab('tasks') }}
-          >
-            {t('channel.tabTasks', { count: openTasks })}
-          </button>
-        </div>
+        <PillTabs
+          items={[
+            { id: 'messages', label: t('channel.tabMessages'), active: tab === 'messages', onClick: () => { setTab('messages') } },
+            { id: 'tasks', label: t('channel.tabTasks', { count: openTasks }), active: tab === 'tasks', onClick: () => { setTab('tasks') } },
+          ]}
+        />
         {/* 成员数 chip 单独挂在头部最右端（用户 2026-08-19 拍板），不与 tab 组并列 */}
         {members !== undefined && (
           <button

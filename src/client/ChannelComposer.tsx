@@ -16,6 +16,7 @@ import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface ChannelComposerProps {
   t: ChaosTranslate
@@ -260,7 +261,7 @@ export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask
                   }}
                   onClick={() => { pickMention(agent) }}
                 >
-                  <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
+                  <AvatarChip seed={seed} aria-hidden="true" />
                   <span className={css.memberName}>{agent.displayName}</span>
                   <span className={css.memberHandle}>@{agent.handle}</span>
                 </button>

@@ -1,0 +1,48 @@
+/* StatusChip 原子: tinted chip + data-status 色(原 panel scope 扶平) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+  color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+}
+
+.chip[data-status='in_progress'] {
+  color: var(--dsw-alias-state-warn-label);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 16%, transparent);
+}
+
+.chip[data-status='in_review'] {
+  color: #5f6fe8;
+  background: color-mix(in srgb, #7287fd 16%, transparent);
+}
+
+.chip[data-status='done'] {
+  color: #1a9e52;
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
+}
+
+.chip:hover:not([disabled]) { filter: brightness(0.98); }
+
+.chip[data-open='true'] { outline: 1px solid var(--dsw-alias-border-l1); }
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.dot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
+.dot[data-status='in_progress'] { background: var(--dsw-alias-state-warn-primary); }
+.dot[data-status='in_review'] { background: var(--dsh-chaos-lane-review, #7287fd); }
+.dot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }

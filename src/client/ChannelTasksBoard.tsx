@@ -32,9 +32,9 @@ import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
-import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
-import { StatusChip } from './StatusChip.tsx'
+import { StatusChip } from './atoms/StatusChip.tsx'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -379,7 +379,7 @@ function AssigneeRow({ actor, query, current, onPick }: {
   }
   return (
     <button type="button" role="menuitemradio" aria-checked={current} className={css.assigneeMenuItem} data-current={current ? 'true' : undefined} onClick={onPick}>
-      <span className={css.avatarXs} style={{ background: avatarSeed(actor.handle, actor.displayName).background }} aria-hidden="true">{actor.displayName.charAt(0).toUpperCase()}</span>
+      <AvatarChip handle={actor.handle} displayName={actor.displayName} />
       <span className={css.assigneeRowLabel}>{actor.displayName || `@${actor.handle}`}</span>
       {current && <CheckGlyph />}
     </button>

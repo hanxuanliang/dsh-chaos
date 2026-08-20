@@ -28,6 +28,7 @@ import { MessageBody, MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
 const THREAD_WIDTH_MIN = 340
@@ -127,7 +128,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
             onClick={() => { onRootJump((rootMessage as NativeMessage).id) }}
           >
             <span className={css.threadRootHead}>
-              <span className={css.avatarXs} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
+              <AvatarChip seed={seed} aria-hidden="true" />
               <span className={css.threadRootAuthor}>{rootAuthor?.displayName ?? handle}</span>
             </span>
             <div className={css.threadRootText}>

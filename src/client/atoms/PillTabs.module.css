@@ -1,0 +1,40 @@
+/* PillTabs(原 .tabs/.tab 系列迁移): 消费方自定段选条
+ *  - .panel .tab 提升到 :root scope(原 0-2-0 应特; module=0-1-1 己方名)
+ *  - data-align='lead' 修 margin-auto 贴左（Activity filter row）
+ */
+.tabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  padding: 1px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.tabs[data-align='lead'] { margin-left: 0; }
+
+.tab {
+  border: none;
+  border-radius: 5px;
+  padding: 3px 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.tab:hover:not([disabled]) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.tab[data-active] {
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  background: var(--dsw-alias-button-primary-fill);
+  font-weight: 500;
+}
+
+.tab[disabled] { cursor: default; }

@@ -29,6 +29,7 @@ import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
+import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface MessageStreamProps {
   t: ChaosTranslate
@@ -359,14 +360,7 @@ function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
           {/* tae/plocal 终局形态：头像组（最近 3 位回复者）+ 计数；不含回复正文。 */}
           <span className={css.threadPreviewAvatars} aria-hidden="true">
             {summary.recentReplierIds.map(id => (
-              <span
-                key={id}
-                className={css.avatarXs}
-                style={{ background: avatarSeed(id, actorNamesById.get(id) ?? id).background }}
-                title={actorNamesById.get(id) ?? id}
-              >
-                {(actorNamesById.get(id) ?? '?').slice(0, 1).toUpperCase()}
-              </span>
+              <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} title={actorNamesById.get(id) ?? id} />
             ))}
           </span>
           {t('thread.replies', { count: summary.replyCount })}

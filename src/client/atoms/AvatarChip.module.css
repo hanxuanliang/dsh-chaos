@@ -1,0 +1,13 @@
+/* AvatarChip: 20px 圆形种子字 chip(原 .avatarXs 单原子迁移;
+ * label-primary-foreground 宿主 runtime 实测=深黑, 字面白保话) */
+.avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+}
+
+.xs { width: 20px; height: 20px; font-size: 11px; line-height: 20px; }
+.md { width: 24px; height: 24px; font-size: 12px; line-height: 24px; }

@@ -18,8 +18,9 @@ import css from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ChannelView } from './ChannelView.tsx'
-import { StatusChip } from './StatusChip.tsx'
+import { StatusChip } from './atoms/StatusChip.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
+import { PillTabs } from './atoms/PillTabs.tsx'
 
 interface ActivityViewProps {
   t: ChaosTranslate
@@ -147,11 +148,15 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   )
 
   const filterTabs = (
-    <span className={css.tabs} role="tablist" aria-label={t('activity.filtersAria')}>
-      <button type="button" role="tab" aria-selected="true" data-active="true" className={css.tab}>{t('activity.filterAll')}</button>
-      <button type="button" role="tab" aria-selected="false" disabled className={css.tab} title={t('activity.filterPending')}>{t('activity.filterUnread')}</button>
-      <button type="button" role="tab" aria-selected="false" disabled className={css.tab} title={t('activity.filterPending')}>{t('activity.filterMentions')}</button>
-    </span>
+    <PillTabs
+      align="lead"
+      ariaLabel={t('activity.filtersAria')}
+      items={[
+        { id: 'all', label: t('activity.filterAll'), active: true },
+        { id: 'unread', label: t('activity.filterUnread'), disabled: true, title: t('activity.filterPending') },
+        { id: 'mentions', label: t('activity.filterMentions'), disabled: true, title: t('activity.filterPending') },
+      ]}
+    />
   )
 
   const titleBlock = (

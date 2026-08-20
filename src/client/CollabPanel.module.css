@@ -396,38 +396,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
  * padding, compact 11px buttons; active = primary-fill pair; hover lifts
  * text only. */
-.tabs {
-  display: flex;
-  flex: none;
-  gap: 2px;
-  margin-left: auto;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  padding: 1px;
-  background: var(--dsw-alias-bg-layer-2);
-}
 
-/* font raised to .panel .tab (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
-.panel .tab {
-  border: none;
-  border-radius: 5px;
-  padding: 3px 8px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font-size: 11px;
-  line-height: 1.6;
-  cursor: pointer;
-}
 
-.tab:hover {
-  color: var(--dsw-alias-label-primary);
-}
 
-.tab[data-active] {
-  color: var(--dsw-alias-label-primary-foreground);
-  background: var(--dsw-alias-button-primary-fill);
-  font-weight: 500;
-}
 
 /* --- message stream --- */
 
@@ -1158,18 +1129,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-.avatarXs {
-  display: inline-grid;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--dsw-alias-label-primary-foreground, #fff);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 20px;
-}
 
 .memberName {
   flex: none;
@@ -1381,18 +1340,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   gap: 6px;
   padding: 9px 12px;
 }
-.statusDot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-}
-.statusDot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
-.statusDot[data-status='in_progress'] { background: var(--dsw-alias-state-warn-primary); }
 /* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
  * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */
-.statusDot[data-status='in_review'] { background: var(--dsh-chaos-lane-review, #7287fd); }
-.statusDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
 .taskColumnTitle {
   flex: 1;
   min-width: 0;
@@ -1573,19 +1522,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 .panel .filterPill,
 .dialogBody .statusChip,
-.panel .statusChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
 .panel .filterPill {
   color: var(--dsw-alias-label-secondary);
   background: transparent;
@@ -1596,23 +1532,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .panel .filterPill.filterPillActive {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
-}
-/* tinted chip: 15% self-hue fill + same-hue text (plocal chipClass port). */
-.statusChip {
-  color: var(--dsw-alias-state-business-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
-}
-.statusChip[data-status='in_progress'] {
-  color: var(--dsw-alias-state-warn-label);
-  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 16%, transparent);
-}
-.statusChip[data-status='in_review'] {
-  color: #5f6fe8;
-  background: color-mix(in srgb, #7287fd 16%, transparent);
-}
-.statusChip[data-status='done'] {
-  color: #1a9e52;
-  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
 }
 .statusChip:hover {
   filter: brightness(0.97);
@@ -2076,8 +1995,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityHeaderTop { display: flex; flex: none; align-items: baseline; gap: 8px; padding: 10px 12px 4px; }
 .activityFilterRow { display: flex; flex: none; align-items: center; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 
-/* tabs 类自ChannelView 搬来带 margin:auto(频道头居中用)——此处贴左 */
-.activityFilterRow .tabs { margin: 0; }
 
 /* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
