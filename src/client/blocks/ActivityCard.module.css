@@ -58,13 +58,6 @@
   gap: 8px;
 }
 
-.target {
-  flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
 .time {
   flex: none;
   margin-left: auto;

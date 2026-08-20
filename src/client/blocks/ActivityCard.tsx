@@ -25,7 +25,6 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, onOpen, onDon
       <button type="button" className={css.rowMain} onClick={onOpen}>
         <span className={css.body}>
           <span className={css.line1}>
-            <span className={css.target}>#{item.targetName}</span>
             <span className={css.time}>{timeLabel}</span>
           </span>
           <span className={css.titleText}>{item.title}</span>
