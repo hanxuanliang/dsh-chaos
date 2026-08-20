@@ -25,6 +25,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './blocks/MessageStream.module.css'
 import { MessageRow } from './blocks/MessageRow.tsx'
+import { IconBubble } from './atoms/DomainIcons.tsx'
 
 export interface MessageStreamProps {
   t: ChaosTranslate
@@ -226,9 +227,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
           )}
           {messages !== undefined && messages.length === 0 && !state.historyLoading && state.historyError === undefined && (
             <div className={css.streamEmpty}>
-              <svg viewBox="0 0 16 16" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M2.5 3.5h11v8h-7l-4 3v-11Z" />
-              </svg>
+              <IconBubble />
               <p>{t('channel.empty')}</p>
             </div>
           )}

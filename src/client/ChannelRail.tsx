@@ -10,6 +10,7 @@ import { IconPlusOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './blocks/ChannelRail.module.css'
+import { IconChevron } from './atoms/DomainIcons.tsx'
 
 export interface ChannelRailProps {
   t: ChaosTranslate
@@ -29,9 +30,7 @@ export function ChannelRail({ t, state, onSelect, onCreate }: ChannelRailProps):
           aria-expanded={open}
           onClick={() => { setOpen(!open) }}
         >
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d={open ? 'M4 6l4 4 4-4' : 'M6 4l4 4-4 4'} />
-          </svg>
+          <IconChevron open={open} />
           <span className={css.railLabel}>{t('panel.channels')}</span>
           <span className={css.railCount}>{state.channels.length}</span>
         </button>

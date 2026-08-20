@@ -15,6 +15,7 @@ import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './blocks/ChannelView.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
+import { IconMembers } from './atoms/DomainIcons.tsx'
 
 export interface ChannelViewProps {
   t: ChaosTranslate
@@ -89,12 +90,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             aria-haspopup="dialog"
             onClick={() => { setMembersOpen(true) }}
            title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="6" cy="5" r="2.6" />
-              <path d="M1.8 13.2c.6-2.4 2.2-3.6 4.2-3.6s3.6 1.2 4.2 3.6" />
-              <path d="M10.3 7.6c1.4 0 2.6-1.1 2.6-2.6 0-.4-.1-.8-.2-1.2" />
-              <path d="M11.6 9.7c1.4.3 2.4 1.4 2.7 3.5" />
-            </svg>
+            <IconMembers />
             <span className={css.memberCount}>{members.length}</span>
           </button>
         )}

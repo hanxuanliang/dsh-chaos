@@ -9,6 +9,7 @@ import type { NativeActor, NativeMessage, NativeTarget, NativeTask, NativeThread
 import type { ChaosTranslate } from '../locales.ts'
 import { MessageBody } from '../atoms/MessageBody.tsx'
 import css from './MessageRow.module.css'
+import { IconReply } from '../atoms/DomainIcons.tsx'
 
 /** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
 export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, variant = 'avatar' }: {
@@ -24,9 +25,7 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, vari
   if (thread === undefined) return undefined
   return (
     <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant} onClick={onOpen} disabled={onOpen === undefined}>
-      <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
-      </svg>
+      <IconReply size={12} />
       {summary === undefined ? (
         t('thread.openThread')
       ) : (
@@ -49,9 +48,7 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, vari
 function ReplyButton({ title, onClick }: { title: string; onClick: () => void }): JSX.Element {
   return (
     <button type="button" className={css.replyButton} data-plugin="dsh-chaos" title={title} aria-label={title} onClick={onClick}>
-      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
-      </svg>
+      <IconReply size={12} />
     </button>
   )
 }

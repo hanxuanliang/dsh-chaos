@@ -8,6 +8,7 @@ import { ChannelCreateDialog } from './ChannelCreateDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
+import { IconJoin } from './atoms/DomainIcons.tsx'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -91,9 +92,7 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
           )}
           {!state.removedNotice && state.bootstrapError === undefined && state.bootstrapped && active === undefined && (
             <div className={css.mainEmpty}>
-              <svg viewBox="0 0 16 16" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
-                <path d="M9.5 2.5 14 8l-4.5 5.5M13.5 8H6M6 2.5 1.5 8 6 13.5" />
-              </svg>
+              <IconJoin />
               <p className={css.empty}>{t('panel.selectChannel')}</p>
             </div>
           )}
