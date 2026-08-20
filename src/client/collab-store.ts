@@ -21,6 +21,7 @@ import type {
   NativeRuntimeBinding,
   NativeTarget,
   NativeTask,
+  NativeThreadSummary,
 } from '../native.ts'
 import type { ChaosClient } from './api.ts'
 import { CollabEvents } from './collab-events.ts'
@@ -34,6 +35,8 @@ export interface CollabStoreSnapshot {
   channels: NativeTarget[]
   /** Thread targets from snapshot.targets (kind === 'thread'). */
   threads: NativeTarget[]
+  /** tae thread-summaries 投影 (keyed by rootMessageId): 计数+最近 3 位回复者。 */
+  threadSummariesByRoot: Record<string, NativeThreadSummary>
   actors: NativeActor[]
   activeChannelId: string | undefined
   /** Spec §1.3: the active channel vanished (membership loss) — linger, then empty. */
@@ -134,6 +137,7 @@ export class CollabStore {
     selfId: undefined,
     channels: [],
     threads: [],
+    threadSummariesByRoot: {},
     actors: [],
     activeChannelId: undefined,
     removedNotice: false,
@@ -206,7 +210,12 @@ export class CollabStore {
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
       const threads = snapshot.targets.filter(target => target.kind === 'thread')
-      const totals = await this.seedTotals([...channels, ...threads], {})
+      const totals = await this.seedTotals(channels, {})
+      const threadRootIds = threads
+        .map(thread => thread.rootMessageId)
+        .filter((id): id is string => id !== undefined)
+      await this.refreshThreadSummaries(threadRootIds)
+      if (this.loadGeneration !== generation) return
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
@@ -458,6 +467,7 @@ export class CollabStore {
       this.set({ threads: [...this.snapshot.threads, thread] })
     }
     await this.activateChannel(thread.id, false)
+    void this.refreshThreadSummaries([rootMessageId])
     return thread
   }
 
@@ -544,6 +554,24 @@ export class CollabStore {
             ...this.snapshot.headDoneByChannel,
             [targetId]: merged.messages.length >= total,
           }
+          // 线程本地增量：summaries 已知的 thread 帧直接推到计数与头像组 —
+          // 不等 reloadTargets（tae 的 forum 界面同步观感）。
+          const lastAuthor = merged.messages[merged.messages.length - 1]?.authorId
+          const threadRoot = this.snapshot.threads.find(t => t.id === targetId)?.rootMessageId
+          const existingSummary = threadRoot === undefined
+            ? undefined
+            : this.snapshot.threadSummariesByRoot[threadRoot]
+          if (threadRoot !== undefined && existingSummary !== undefined && lastAuthor !== undefined) {
+            const restOfRepliers = existingSummary.recentReplierIds.filter(id => id !== lastAuthor)
+            patch.threadSummariesByRoot = {
+              ...this.snapshot.threadSummariesByRoot,
+              [threadRoot]: {
+                ...existingSummary,
+                replyCount: existingSummary.replyCount + merged.appended,
+                recentReplierIds: [lastAuthor, ...restOfRepliers].slice(0, 3),
+              },
+            }
+          }
         }
         this.set(patch)
         this.markRead(targetId)
@@ -557,7 +585,41 @@ export class CollabStore {
     if (total !== undefined) {
       this.set({ totalByChannel: { ...this.snapshot.totalByChannel, [targetId]: total + 1 } })
     }
+    const root = this.snapshot.threads.find(t => t.id === targetId)?.rootMessageId
+    const summary = root === undefined ? undefined : this.snapshot.threadSummariesByRoot[root]
+    if (root !== undefined && summary !== undefined && change.entityId !== undefined) {
+      const authorId = this.snapshot.actors.find(() => false)?.id // 详文不在帧里：作者 id 从消息本身不可知——用 lastReplyAtMs 提前，作者待下一次 reload
+      void authorId
+      this.set({
+        threadSummariesByRoot: {
+          ...this.snapshot.threadSummariesByRoot,
+          [root]: { ...summary, replyCount: summary.replyCount + 1 },
+        },
+      })
+    }
     this.set({ unreadByChannel: { ...this.snapshot.unreadByChannel, [targetId]: this.unreadFor(targetId) } })
+  }
+
+  /**
+   * tae thread-summaries 批量投影：rootMessageIds ≤100（超过切片分轮）。
+   * 服务端会省略无回复/不可见条目——对应 root 的旧项须跪删，而不是留 stale。
+   */
+  private async refreshThreadSummaries(rootMessageIds: string[]): Promise<void> {
+    const unique = [...new Set(rootMessageIds)]
+    if (unique.length === 0) return
+    const chunks: string[][] = []
+    for (let i = 0; i < unique.length; i += 100) chunks.push(unique.slice(i, i + 100))
+    const generation = this.loadGeneration
+    const merged: Record<string, NativeThreadSummary> = {}
+    for (const chunk of chunks) {
+      const rows = await this.client.threadSummaries(chunk)
+      for (const row of rows) merged[row.rootMessageId] = row
+    }
+    if (this.loadGeneration !== generation) return
+    const next = { ...this.snapshot.threadSummariesByRoot }
+    for (const root of unique) delete next[root]
+    for (const [root, summary] of Object.entries(merged)) next[root] = summary
+    this.set({ threadSummariesByRoot: next })
   }
 
   private readonly unknownTargetTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -589,7 +651,7 @@ export class CollabStore {
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
       const threads = snapshot.targets.filter(target => target.kind === 'thread')
-      const totals = await this.seedTotals([...channels, ...threads], this.snapshot.totalByChannel)
+      const totals = await this.seedTotals(channels, this.snapshot.totalByChannel)
       if (this.loadGeneration !== generation) return
       const unread: Record<string, number> = { ...this.snapshot.unreadByChannel }
       for (const channel of channels) {
@@ -597,6 +659,12 @@ export class CollabStore {
         else if (unread[channel.id] === undefined) unread[channel.id] = Math.max(0, (totals[channel.id] ?? 0) - readMarker(channel.id))
       }
       this.set({ channels, threads, totalByChannel: totals, unreadByChannel: unread })
+      {
+        const threadRootIds = threads
+          .map(thread => thread.rootMessageId)
+          .filter((id): id is string => id !== undefined)
+        void this.refreshThreadSummaries(threadRootIds)
+      }
       // Spec §1.3: the active channel vanished (kicked) — linger one beat with
       // an honest notice before falling back to the empty state.
       const active = this.snapshot.activeChannelId
@@ -637,7 +705,11 @@ export class CollabStore {
       if (this.loadGeneration !== generation) return
       const channels = snapshot.targets.filter(target => target.kind === 'channel')
       const threads = snapshot.targets.filter(target => target.kind === 'thread')
-      const totals = await this.seedTotals([...channels, ...threads], {})
+      const totals = await this.seedTotals(channels, {})
+      if (this.loadGeneration !== generation) return
+      await this.refreshThreadSummaries(
+        threads.map(t => t.rootMessageId).filter((id): id is string => id !== undefined),
+      )
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
@@ -663,6 +735,12 @@ export class CollabStore {
         historyError: undefined,
       }
       this.set(patch)
+      void this.refreshThreadSummaries(
+        snapshot.targets
+          .filter(target => target.kind === 'thread')
+          .map(target => target.rootMessageId)
+          .filter((id): id is string => id !== undefined),
+      )
       if (active !== undefined) await this.activateChannel(active, true)
       const unread: Record<string, number> = {}
       for (const channel of channels) unread[channel.id] = this.unreadFor(channel.id)

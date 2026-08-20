@@ -308,3 +308,14 @@ pub struct CollabSnapshot {
     pub followed_thread_ids: Vec<String>,
     pub tasks: Vec<Task>,
 }
+
+/// Batch thread preview for one root Message: count + recent distinct repliers
+/// (tae thread-summaries 等价物；不含回复正文——UI 只显示计数与头像组）。
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ThreadSummary {
+    pub root_message_id: String,
+    pub thread_id: String,
+    pub reply_count: i64,
+    pub last_reply_at_ms: Option<i64>,
+    pub recent_replier_ids: Vec<String>,
+}

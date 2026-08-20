@@ -1900,3 +1900,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .dialogBody .taskDetailTitleLink:hover svg {
   color: var(--dsw-alias-label-secondary);
 }
+
+
+/* ── P1 previews: tae 头像组（重叠压一列，面板 token 边界白描） ──────────── */
+.threadPreviewAvatars { display: inline-flex; padding-left: 4px; }
+.threadPreviewAvatars .avatarXs { width: 15px; height: 15px; font-size: 9px; margin-left: -4px; box-shadow: 0 0 0 1.5px var(--dsw-alias-message-hover, var(--dsw-alias-tertiary)); }

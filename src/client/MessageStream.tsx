@@ -23,7 +23,7 @@ import { isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, 
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { NativeActor, NativeMessage, NativeTarget, NativeTask } from '../native.ts'
+import type { NativeActor, NativeMessage, NativeTarget, NativeTask, NativeThreadSummary } from '../native.ts'
 import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
@@ -337,20 +337,40 @@ function buildItems(messages: NativeMessage[], t: ChaosTranslate, activeLocale: 
 }
 
 /** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
-function ThreadPreview({ t, thread, totalByChannel, onOpen }: {
+function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
   t: ChaosTranslate
   thread: NativeTarget | undefined
-  totalByChannel: Record<string, number>
+  /** tae thread.summaries 批量投影；未知时回退纯「打开线程」。 */
+  summary: NativeThreadSummary | undefined
+  actorNamesById: Map<string, string>
   onOpen: (() => void) | undefined
 }): JSX.Element | undefined {
   if (thread === undefined) return undefined
-  const total = totalByChannel[thread.id]
   return (
     <button type="button" className={css.threadPreview} onClick={onOpen} disabled={onOpen === undefined}>
       <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
       </svg>
-      {total !== undefined ? t('thread.replies', { count: total }) : t('thread.openThread')}
+      {summary === undefined ? (
+        t('thread.openThread')
+      ) : (
+        <>
+          {/* tae/plocal 终局形态：头像组（最近 3 位回复者）+ 计数；不含回复正文。 */}
+          <span className={css.threadPreviewAvatars} aria-hidden="true">
+            {summary.recentReplierIds.map(id => (
+              <span
+                key={id}
+                className={css.avatarXs}
+                style={{ background: avatarSeed(id, actorNamesById.get(id) ?? id).background }}
+                title={actorNamesById.get(id) ?? id}
+              >
+                {(actorNamesById.get(id) ?? '?').slice(0, 1).toUpperCase()}
+              </span>
+            ))}
+          </span>
+          {t('thread.replies', { count: summary.replyCount })}
+        </>
+      )}
     </button>
   )
 }
@@ -372,6 +392,11 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
   const actorsById = useMemo(() => {
     const mapped = new Map<string, NativeActor>()
     for (const actor of state.actors) mapped.set(actor.id, actor)
+    return mapped
+  }, [state.actors])
+  const actorNamesById = useMemo(() => {
+    const mapped = new Map<string, string>()
+    for (const actor of state.actors) mapped.set(actor.id, actor.displayName)
     return mapped
   }, [state.actors])
   const mentionNames = useMemo(() => {
@@ -519,7 +544,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                   <div className={css.msgBody}>
                     <MessageBody t={t} text={message.text} names={mentionNames} />
                     {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
-                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} totalByChannel={state.totalByChannel} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
+                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} summary={state.threadSummariesByRoot[message.id]} actorNamesById={actorNamesById} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
                   </div>
                   {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}
                   <span className={css.msgGutterTime} title={fullTimeTitle(message.createdAtMs, activeLocale)}>
@@ -548,7 +573,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                   <div className={css.msgBody}>
                     <MessageBody t={t} text={message.text} names={mentionNames} />
                     {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
-                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} totalByChannel={state.totalByChannel} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
+                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} summary={state.threadSummariesByRoot[message.id]} actorNamesById={actorNamesById} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
                   </div>
                 </div>
                 {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}

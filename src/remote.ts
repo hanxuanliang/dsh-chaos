@@ -18,6 +18,7 @@ import type {
   NativeRuntimeBinding,
   NativeSendResult,
   NativeTarget,
+  NativeThreadSummary,
   NativeTask,
 } from './native.ts'
 
@@ -53,6 +54,7 @@ export interface CollabRemoteApi {
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
+  threadSummaries(actorId: string, rootMessageIds: string[]): Promise<NativeThreadSummary[]>
   followThread(threadTargetId: string, actorId: string): Promise<void>
   unfollowThread(threadTargetId: string, actorId: string): Promise<void>
   addMember(targetId: string, actorId: string, addedBy: string): Promise<void>
@@ -111,6 +113,22 @@ function record(payload: unknown): Record<string, unknown> {
     throw new Error('[invalid_argument] payload must be an object')
   }
   return payload as Record<string, unknown>
+}
+
+/** Non-empty string array with an upper bound (batch endpoints). */
+function stringArray(input: Record<string, unknown>, key: string, max: number): string[] {
+  const raw = input[key]
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > max) {
+    throw new Error(`[invalid_argument] ${key} must be an array of 1..${max} strings`)
+  }
+  const out: string[] = []
+  for (const value of raw) {
+    if (typeof value !== 'string' || value === '') {
+      throw new Error(`[invalid_argument] ${key} entries must be non-empty strings`)
+    }
+    out.push(value)
+  }
+  return out
 }
 
 function requiredString(payload: Record<string, unknown>, name: string): string {
@@ -254,6 +272,11 @@ async function dispatchRemote(
       return await api.createDirect(actorId, requiredString(input, 'peerId'))
     case 'thread.create':
       return await api.createThread(requiredString(input, 'rootMessageId'), actorId)
+    case 'thread.summaries':
+      return await api.threadSummaries(
+        actorId,
+        stringArray(input, 'rootMessageIds', 100),
+      )
     case 'thread.follow':
       await api.followThread(requiredString(input, 'threadTargetId'), actorId)
       return null

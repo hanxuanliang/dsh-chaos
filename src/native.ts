@@ -10,6 +10,14 @@ export interface NativeActor {
   createdAtMs: number
 }
 
+export interface NativeThreadSummary {
+  rootMessageId: string
+  threadId: string
+  replyCount: number
+  lastReplyAtMs: number | null
+  recentReplierIds: string[]
+}
+
 export interface NativeTarget {
   id: string
   kind: 'channel' | 'direct' | 'thread'
@@ -151,6 +159,8 @@ export interface NativeCollabHandle {
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
+  /** tae thread-summaries 等价物：批量 rootMessageIds（≤100）→ 计数+最近 3 个回复者（不含正文/不含无回复/不可见 thread）。 */
+  threadSummaries(actorId: string, rootMessageIds: string[]): Promise<NativeThreadSummary[]>
   followThread(threadTargetId: string, actorId: string): Promise<void>
   unfollowThread(threadTargetId: string, actorId: string): Promise<void>
   addMember(targetId: string, actorId: string, addedBy: string): Promise<void>

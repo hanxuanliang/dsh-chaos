@@ -14,7 +14,7 @@ pub use model::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
     Actor, ActorKind, ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, Message,
     MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
-    TargetKind, Task, TaskStatus,
+    TargetKind, Task, TaskStatus, ThreadSummary,
 };
 
 use std::collections::BTreeSet;
@@ -574,6 +574,108 @@ impl CollabCore {
         .await?;
         transaction.commit().await?;
         Ok(target)
+    }
+
+    /// Batch summaries for Threads rooted at the given top-level Messages
+    /// (tae GET thread-summaries 等价物): one call returns the reply count
+    /// plus up to 3 most-recent distinct repliers for up to 100 roots.
+    /// Roots without a Thread, zero-reply Threads, and Threads whose parent
+    /// the actor cannot read are omitted — previews never fail loudly on
+    /// partial data.
+    pub async fn thread_summaries(
+        &self,
+        actor_id: &str,
+        root_message_ids: &[String],
+    ) -> Result<Vec<ThreadSummary>> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        if root_message_ids.len() > 100 {
+            return Err(CollabError::InvalidArgument(
+                "root_message_ids must contain at most 100 ids".into(),
+            ));
+        }
+        if root_message_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut unique: Vec<String> = Vec::new();
+        for id in root_message_ids {
+            // 后端 uuid 形态约束：SQL IN 字面量从受控字符集构造。
+            if id.len() > 64 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+                return Err(CollabError::InvalidArgument(
+                    "root_message_id must be a backend-assigned id".into(),
+                ));
+            }
+            if !unique.contains(id) {
+                unique.push(id.clone());
+            }
+        }
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+
+        let quoted = unique
+            .iter()
+            .map(|id| format!("'{}'", id))
+            .collect::<Vec<String>>()
+            .join(", ");
+        let counts_sql = format!(
+            "SELECT t.id, t.root_message_id, t.parent_target_id, COUNT(m.id), MAX(m.created_at_ms)              FROM targets t LEFT JOIN messages m ON m.target_id = t.id              WHERE t.root_message_id IN ({}) GROUP BY t.id",
+            quoted,
+        );
+        let mut rows = connection.query(&counts_sql, ()).await?;
+        let mut summaries: Vec<ThreadSummary> = Vec::new();
+        let mut visible_thread_ids: Vec<String> = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let thread_id: String = row.get(0)?;
+            let root_message_id: String = row.get(1)?;
+            let parent_target_id: Option<String> = row.get(2)?;
+            let reply_count: i64 = row.get(3)?;
+            let last_reply_at_ms: Option<i64> = row.get(4)?;
+            let visible = match parent_target_id.as_deref() {
+                Some(parent) => {
+                    is_active_member(&connection, parent, actor_id).await?
+                        || is_active_member(&connection, &thread_id, actor_id).await?
+                }
+                None => is_active_member(&connection, &thread_id, actor_id).await?,
+            };
+            if !visible || reply_count == 0 {
+                continue;
+            }
+            visible_thread_ids.push(thread_id.clone());
+            summaries.push(ThreadSummary {
+                root_message_id,
+                thread_id,
+                reply_count,
+                last_reply_at_ms,
+                recent_replier_ids: Vec::new(),
+            });
+        }
+
+        // 最近 3 个不同回复者（按各自最近一次出现的 seq 排序）。
+        if !visible_thread_ids.is_empty() {
+            let quoted_threads = visible_thread_ids
+                .iter()
+                .map(|id| format!("'{}'", id))
+                .collect::<Vec<String>>()
+                .join(", ");
+            let repliers_sql = format!(
+                "SELECT target_id, author_id FROM (                    SELECT m.target_id, m.author_id,                           ROW_NUMBER() OVER (PARTITION BY m.target_id ORDER BY m.seq DESC) AS rn                    FROM messages m WHERE m.target_id IN ({})                  ) GROUP BY target_id, author_id ORDER BY target_id, rn",
+                quoted_threads,
+            );
+            let mut rows = connection.query(&repliers_sql, ()).await?;
+            while let Some(row) = rows.next().await? {
+                let target_id: String = row.get(0)?;
+                let author_id: String = row.get(1)?;
+                if let Some(summary) = summaries
+                    .iter_mut()
+                    .find(|summary| summary.thread_id == target_id)
+                {
+                    if summary.recent_replier_ids.len() < 3 {
+                        summary.recent_replier_ids.push(author_id);
+                    }
+                }
+            }
+        }
+        Ok(summaries)
     }
 
     /// Follow one Thread after rechecking access to its parent target.

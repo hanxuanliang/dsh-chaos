@@ -304,6 +304,11 @@ export class CollabService extends Service {
     return target
   }
 
+  /** 只读批量预览——不触发 change publish（无任何 write 副作用）。 */
+  async threadSummaries(actorId: string, rootMessageIds: string[]) {
+    return await this.requireHandle().threadSummaries(actorId, rootMessageIds)
+  }
+
   async followThread(threadTargetId: string, actorId: string) {
     await this.requireHandle().followThread(threadTargetId, actorId)
     this.publishChange()

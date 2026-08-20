@@ -9,6 +9,7 @@ import type {
   NativeSendResult,
   NativeTarget,
   NativeTask,
+  NativeThreadSummary,
 } from '../native.ts'
 
 /** RPC channel exposed by the host half (COLLAB_RPC_CHANNEL in src/remote.ts). */
@@ -99,6 +100,11 @@ export class ChaosClient {
   /** Idempotent per root message (crates create_thread returns the existing row). */
   threadCreate(rootMessageId: string): Promise<NativeTarget> {
     return this.call('thread.create', { rootMessageId })
+  }
+
+  /** tae 等价物的 batch 预览：≤100 root → 计数+最近 3 个回复者（含头像组人面）。 */
+  threadSummaries(rootMessageIds: string[]): Promise<NativeThreadSummary[]> {
+    return this.call('thread.summaries', { rootMessageIds })
   }
 
   taskCreate(messageId: string): Promise<NativeTask> {
