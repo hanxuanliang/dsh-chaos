@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore, type JSX } from 'react'
 import type { CollabStore } from './collab-store.ts'
 import { ChannelRail } from './ChannelRail.tsx'
+import { ActivityView } from './ActivityView.tsx'
 import { ChannelView } from './ChannelView.tsx'
 import { ChannelCreateDialog } from './ChannelCreateDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
@@ -23,14 +24,37 @@ export interface CollabPanelProps {
 export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProps): JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [createOpen, setCreateOpen] = useState(false)
-  /** Activity tab 里跨频道的 thread 行点击: 新 ChannelView mount initializer 一次性消费。 */
+  /** 面板顶栏切视图(plocal Activity 为独立 shell section → 我们对应面板级)。 */
+  const [panelView, setPanelView] = useState<'collab' | 'activity'>('collab')
+  /** Activity 行点击 → 新 ChannelView mount 初始值一次性消费 (key 换血保证 remount)。 */
   const [pendingThreadRoot, setPendingThreadRoot] = useState<string | undefined>(undefined)
   const active = state.channels.find(channel => channel.id === state.activeChannelId)
 
   return (
     <>
       <header className={css.header}>
-        <h2 className={css.title}>{t('panel.title')}</h2>
+        <div className={css.tabs} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelView === 'collab'}
+            data-active={panelView === 'collab' ? 'true' : undefined}
+            className={css.tab}
+            onClick={() => { setPanelView('collab') }}
+          >
+            {t('panel.title')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelView === 'activity'}
+            data-active={panelView === 'activity' ? 'true' : undefined}
+            className={css.tab}
+            onClick={() => { setPanelView('activity') }}
+          >
+            {t('channel.tabActivity', { count: state.activityCount })}
+          </button>
+        </div>
         <button
           type="button"
           className={css.closeButton}
@@ -43,6 +67,21 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
           </svg>
         </button>
       </header>
+      {panelView === 'activity' ? (
+        <div className={css.body}>
+          <ActivityView
+            t={t}
+            store={store}
+            state={state}
+            onOpenChannel={(channelId) => { setPendingThreadRoot(undefined); setPanelView('collab'); store.setActiveChannel(channelId) }}
+            onOpenThreadRoot={(rootMessageId, parentChannelId) => {
+              setPendingThreadRoot(rootMessageId)
+              setPanelView('collab')
+              store.setActiveChannel(parentChannelId)
+            }}
+          />
+        </div>
+      ) : (
       <div className={css.body}>
         <ChannelRail
           t={t}
@@ -89,15 +128,11 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
               activeLocale={activeLocale}
               pendingThreadRoot={pendingThreadRoot}
               onPendingThreadConsumed={() => { setPendingThreadRoot(undefined) }}
-              onSwitchChannel={(channelId) => { setPendingThreadRoot(undefined); store.setActiveChannel(channelId) }}
-              onOpenCrossChannelThread={(rootMessageId, parentChannelId) => {
-                setPendingThreadRoot(rootMessageId)
-                store.setActiveChannel(parentChannelId)
-              }}
             />
           )}
         </main>
       </div>
+      )}
       {createOpen && (
         <ChannelCreateDialog
           t={t}

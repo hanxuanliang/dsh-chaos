@@ -10,7 +10,6 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
-import { ActivityView } from './ActivityView.tsx'
 import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
@@ -28,24 +27,23 @@ export interface ChannelViewProps {
    */
   pendingThreadRoot?: string | undefined
   onPendingThreadConsumed(): void
-  onSwitchChannel(channelId: string): void
-  onOpenCrossChannelThread(rootMessageId: string, parentChannelId: string): void
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, onSwitchChannel, onOpenCrossChannelThread }: ChannelViewProps): JSX.Element {
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks' | 'activity'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
   const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
   /** Open thread root —— 初始值吃 pendingThreadRoot mount 时一次性消费。 */
   const [threadRootId, setThreadRootId] = useState<string | undefined>(pendingThreadRoot ?? undefined)
-  const pendingConsumedOnce = useRef(false)
+  // mount 初始值已吃 pendingThreadRoot; 这个 effect 只管「同频道 lifetime
+  // 内」的后续消费(mount 时 threadRootId 已被初始值顶着, 不会双重开火)。
   useEffect(() => {
-    if (pendingThreadRoot === undefined || pendingConsumedOnce.current) return
-    pendingConsumedOnce.current = true
+    if (pendingThreadRoot === undefined || threadRootId === pendingThreadRoot) return
+    setThreadRootId(pendingThreadRoot)
     setJumpMessageId(pendingThreadRoot)
     onPendingThreadConsumed()
-  }, [pendingThreadRoot, onPendingThreadConsumed])
+  }, [pendingThreadRoot, threadRootId, onPendingThreadConsumed])
   const thread = threadRootId === undefined
     ? undefined
     : state.threads.find(t => t.rootMessageId === threadRootId)
@@ -95,16 +93,6 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             onClick={() => { setTab('tasks') }}
           >
             {t('channel.tabTasks', { count: openTasks })}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'activity'}
-            data-active={tab === 'activity' || undefined}
-            className={css.tab}
-            onClick={() => { setTab('activity') }}
-          >
-            {t('channel.tabActivity', { count: state.activityCount })}
           </button>
         </div>
         {/* 成员数 chip 单独挂在头部最右端（用户 2026-08-19 拍板），不与 tab 组并列 */}
@@ -163,32 +151,13 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             )}
           </div>
         )
-        : tab === 'tasks'
-        ? (
+        : (
           <ChannelTasksBoard
             t={t}
             store={store}
             state={state}
             channelId={channel.id}
             onOpenMessage={(messageId) => { setTab('messages'); setJumpMessageId(messageId) }}
-          />
-        )
-        : (
-          <ActivityView
-            t={t}
-            store={store}
-            state={state}
-            onOpenChannel={(channelId) => { onSwitchChannel(channelId) }}
-            onOpenThreadRoot={(rootMessageId, parentChannelId) => {
-              if (parentChannelId === channel.id) {
-                setTab('messages')
-                setThreadRootId(rootMessageId)
-                setJumpMessageId(rootMessageId)
-                void store.openThread(rootMessageId)
-              } else {
-                onOpenCrossChannelThread(rootMessageId, parentChannelId)
-              }
-            }}
           />
         )}
       {membersOpen && (
