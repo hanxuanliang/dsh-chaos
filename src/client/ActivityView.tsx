@@ -12,29 +12,27 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useState, type JSX } from 'react'
-import { IconCheckOutline16, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ChannelView } from './ChannelView.tsx'
-import { StatusChip } from './atoms/StatusChip.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
 import { PillTabs } from './atoms/PillTabs.tsx'
-
+import { ActivityCard } from './blocks/ActivityCard.tsx'
+import cardCss from './blocks/ActivityCard.module.css'
 interface ActivityViewProps {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   activeLocale(): string
 }
-
 /**
  * dock 状态: 右栏 **就是那套 channel/thread 内容区**——channel-first,
  * 有 threadRootId 时才在旁边展开 (ChannelChatPane 同一件)。
  */
 interface Dock { channelId: string, threadRootId?: string }
-
 function relativeTime(atMs: number): string {
   const deltaSeconds = Math.max(0, Math.floor((Date.now() - atMs) / 1000))
   if (deltaSeconds < 60) return '1m'
@@ -46,22 +44,18 @@ function relativeTime(atMs: number): string {
   if (days < 7) return `${days}d`
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
-
 export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [dock, setDock] = useState<Dock | undefined>(undefined)
-
   const items = useMemo(
     () => state.activityItems.filter((item) => item.targetKind !== 'direct'),
     [state.activityItems],
   )
-
   const dockThread = dock?.threadRootId !== undefined && dock !== undefined
     ? state.threads.find((x) => x.rootMessageId === dock.threadRootId)
     : undefined
   const dockKey = dock === undefined ? undefined : `${dock.channelId}:${dock.threadRootId ?? ''}`
-
   const open = (item: NativeActivityInboxItem): void => {
     if (item.targetKind === 'channel') {
       void store.hydrateTarget(item.conversationId)
@@ -84,7 +78,6 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       )
     }
   }
-
   const markDone = (item: NativeActivityInboxItem): void => {
     setBusy(item.conversationId)
     setError(undefined)
@@ -94,59 +87,11 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       })
       .finally(() => { setBusy(undefined) })
   }
-
   const isDockSelected = (item: NativeActivityInboxItem): boolean => {
     if (dock === undefined) return false
     if (item.targetKind === 'channel') return dock.channelId === item.conversationId && dock.threadRootId === undefined
     return item.rootMessageId !== undefined && dock.threadRootId === item.rootMessageId
   }
-
-  const rows = (
-    <div className={css.activityList} role="list">
-      {items.map((item) => (
-        <div key={item.conversationId} className={css.activityRow} role="listitem" data-selected={isDockSelected(item) ? 'true' : undefined}>
-          <button type="button" className={css.activityRowMain} onClick={() => { open(item) }}>
-            <span className={css.activityBody}>
-              <span className={css.activityLine1}>
-                <span className={css.activityTarget}>#{item.targetName}</span>
-                <span className={css.activityTime}>{relativeTime(item.lastActivityAtMs)}</span>
-              </span>
-              <span className={css.activityTitleText}>{item.title}</span>
-              {item.latestReply !== undefined && (
-                <span className={css.activityExcerpt}>
-                  {item.latestReply.senderName}: {item.latestReply.excerpt}
-                </span>
-              )}
-              {(item.task !== undefined || item.targetKind === 'thread') && (
-                <span className={css.activityBottomLine}>
-                  {item.task !== undefined && (
-                    <StatusChip
-                      status={item.task.status}
-                      label={item.task.assigneeName !== undefined ? `@${item.task.assigneeName}` : `#${item.task.number}`}
-                    />
-                  )}
-                  {item.targetKind === 'thread' && item.replyCount !== undefined && (
-                    <span className={css.activityReplies}>{t('thread.replies', { count: Number(item.replyCount) })}</span>
-                  )}
-                </span>
-              )}
-            </span>
-          </button>
-          <button
-            type="button"
-            className={css.activityDone}
-            title={t('activity.done')}
-            aria-label={t('activity.done')}
-            disabled={busy === item.conversationId}
-            onClick={() => { markDone(item) }}
-          >
-            <IconCheckOutline16 />
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-
   const filterTabs = (
     <PillTabs
       align="lead"
@@ -158,14 +103,28 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       ]}
     />
   )
-
+  const rows = (
+    <div className={cardCss.list} role="list">
+      {items.map((item) => (
+        <ActivityCard
+          key={item.conversationId}
+          item={item}
+          t={t}
+          timeLabel={relativeTime(item.lastActivityAtMs)}
+          selected={isDockSelected(item)}
+          busy={busy === item.conversationId}
+          onOpen={() => { open(item) }}
+          onDone={() => { markDone(item) }}
+        />
+      ))}
+    </div>
+ )
   const titleBlock = (
     <div className={css.activityHeaderTop}>
       <h2 className={css.activityTitle}>{t('activity.title')}</h2>
       <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
     </div>
   )
-
   if (dock !== undefined) {
     // dock 态 = 两列: 左列 [Activity 头 + 筛行 + 列表全栈]; 右列 [dock 头 + ChannelChatPane body]
     const dockChannel = state.channels.find((c) => c.id === dock.channelId)
@@ -177,7 +136,6 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
           {rows}
         </div>
         <div className={css.activityDetailCol}>
-
           <div className={css.activityDetailPane} key={dockKey}>
             {/* ① channel 行: 右区 = ChannelView 自体(完全铺开, thread 只在里面点了才开)。
                 ② thread 行: 右区 = ThreadPanel 自体平铺(thread 页面一份, 不要 channel 夹带)。 */}
@@ -209,7 +167,6 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       </div>
     )
   }
-
   return (
     <div className={css.activityView}>
       <header className={css.activityHeader}>

@@ -1,0 +1,130 @@
+/* ActivityCard 行卡(原 activityRow* + activityLine1/Target/Time/TitleText/Excerpt/
+ * BottomLine/Replies/Done + hover-selected 态合平); activityList 亦随件。 */
+
+.list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  margin: 0 0 2px;
+}
+
+.row:hover { background: var(--dsw-alias-tertiary); }
+
+.row[data-selected='true'] {
+  border-color: var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 5%);
+}
+
+.rowMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  align-items: flex-start;
+  gap: 0;
+  padding: 9px 34px 9px 10px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.target {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.time {
+  flex: none;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11.5px;
+}
+
+.titleText {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.excerpt {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottomLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.replies {
+  flex: none;
+  margin-top: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11.5px;
+}
+
+.done {
+  position: absolute;
+  right: 8px;
+  top: 10px;
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.row:hover .done { opacity: 1; }
+
+.done:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-state-success-primary);
+}
