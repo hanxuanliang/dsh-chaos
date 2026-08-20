@@ -51,6 +51,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
                   summary={summary}
                   actorNamesById={actorNamesById}
                   onOpen={onOpen}
+                  variant="plain"
                 />
               )}
             </span>

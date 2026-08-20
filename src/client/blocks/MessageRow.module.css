@@ -128,6 +128,21 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* plain 变体(activity 用): 同色温色升 plocaz ref 的白边粗粗 chip, 与 task chip 同 20px 高 */
+.threadPreview[data-plugin='dsh-chaos'][data-variant='plain'] {
+  height: 20px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 0 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--dsw-alias-bg-base);
+}
+
+.threadPreview[data-plugin='dsh-chaos'][data-variant='plain']:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .previewAvatars { display: inline-flex; padding-left: 4px; }
 
 /* hover 回复钮 (原 .panel .msgReplyButton + row hover 揭示) */

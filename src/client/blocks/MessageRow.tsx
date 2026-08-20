@@ -11,17 +11,19 @@ import { MessageBody } from '../MessageStream.tsx'
 import css from './MessageRow.module.css'
 
 /** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
-export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
+export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, variant = 'avatar' }: {
   t: ChaosTranslate
   thread: NativeTarget | undefined
   /** tae thread.summaries 批量投影；未知时回退纯「打开线程」。 */
   summary: NativeThreadSummary | undefined
   actorNamesById: Map<string, string>
   onOpen: (() => void) | undefined
+  /** 'avatar'(默认,流)含小头像组; 'plain'=activity 同排号 task chip 写真相。 */
+  variant?: 'avatar' | 'plain' | undefined
 }): JSX.Element | undefined {
   if (thread === undefined) return undefined
   return (
-    <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" onClick={onOpen} disabled={onOpen === undefined}>
+    <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant} onClick={onOpen} disabled={onOpen === undefined}>
       <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
       </svg>
@@ -29,12 +31,13 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
         t('thread.openThread')
       ) : (
         <>
-          {/* tae/plocal 终局形态：头像组（最近 3 位回复者）+ 计数；不含回复正文。 */}
-          <span className={css.previewAvatars} aria-hidden="true">
-            {summary.recentReplierIds.map(id => (
-              <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} size="xxsmall" title={actorNamesById.get(id) ?? id} />
-            ))}
-          </span>
+          {variant === 'avatar' && (
+            <span className={css.previewAvatars} aria-hidden="true">
+              {summary.recentReplierIds.map(id => (
+                <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} size="xxsmall" title={actorNamesById.get(id) ?? id} />
+              ))}
+            </span>
+          )}
           {t('thread.replies', { count: summary.replyCount })}
         </>
       )}
