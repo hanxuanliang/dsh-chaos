@@ -1976,7 +1976,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* ── P0-6 Activity inbox(plocal InboxMain 形态对齐) ───────────────────── */
 .activityView { display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 12px 16px; gap: 10px; }
-.activityHeader { display: flex; flex: none; align-items: baseline; gap: 8px; }
+.activityHeader { display: flex; flex: none; flex-direction: column; }
 .activityTitle { margin: 0; font-size: 15px; font-weight: 650; }
 .activityCount { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .activityEmpty { padding: 32px 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; text-align: center; }
@@ -2047,9 +2047,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityDetailPane > * { flex: 1; min-height: 0; } /* ThreadPanel root=aside(非 section/div), 内部自管 scroller */
 
 
-/* rc-4 统一性: header 右侧 pill 行 + docked channel */
-.activityHeader { gap: 12px; }
-.activityHeaderRight { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+/* rc-4/rc-7: docked channel */
 .dockedChannel { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .dockedChannel > [class*='messageStream'], .dockedChannel > div:first-of-type { flex: 1; min-height: 0; }
 
@@ -2065,3 +2063,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .activityDockHead .threadClose { margin-left: auto; }
+
+
+/* rc-7: 筛项在 Activity 顶行下独立一行 */
+.activityHeaderTop { display: flex; flex: none; align-items: baseline; gap: 8px; padding: 10px 12px 4px; }
+.activityFilterRow { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }

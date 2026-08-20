@@ -189,12 +189,15 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   return (
     <div className={css.activityView}>
       <header className={css.activityHeader}>
-        <h2 className={css.activityTitle}>{t('activity.title')}</h2>
-        <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
-        <span className={css.activityHeaderRight}>
+        <div className={css.activityHeaderTop}>
+          <h2 className={css.activityTitle}>{t('activity.title')}</h2>
+          <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
+        </div>
+        {/* 筛选行: 在 Activity 文字正下方, pill 靠左 / Mark all read 靠右 */}
+        <div className={css.activityFilterRow}>
           {filterTabs}
           <button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
-        </span>
+        </div>
       </header>
       {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
       {items.length === 0 ? (
