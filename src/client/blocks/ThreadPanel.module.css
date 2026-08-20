@@ -1,0 +1,123 @@
+/* ThreadPanel: threadPanel/head/title/close/body/resize/composerSeat/root 系 (mega 移捣, root scope=.threadPanel) */
+.threadPanel {
+  display: flex;
+  flex: none;
+  width: 360px;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-base);
+}
+.threadPanel .threadHead {
+  display: flex;
+  flex: none;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  padding: 0 12px;
+}
+.threadPanel .threadTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+.threadPanel .threadClose {
+  display: inline-flex;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+.threadPanel .threadClose:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
+.dockedChannel .threadClose { margin-left: auto; }
+
+.threadPanel .threadBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+
+/* ---- thread panel drag divider (user ask: left border must be draggable) --- */
+.threadPanel .threadResizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  z-index: 5;
+  width: 8px;
+  cursor: col-resize;
+}
+.threadPanel .threadResizeHandle:hover, .threadResizeHandle[data-dragging='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 25%, transparent);
+}
+
+/* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
+
+/* Full-width composer seat — plocal truth (ChatComposer root w-full px-2):
+ * the card spans the chat width instead of a centered 780 column. */
+.threadPanel .composerSeat {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 8px 8px;
+}
+.threadPanel .threadRoot {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 12px 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.threadPanel .threadRoot[data-missing='true'] .threadRootText {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: italic;
+}
+.threadPanel .threadRootHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.threadPanel .threadRootAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+.threadPanel .threadRoot[data-missing='true'] .threadRootText {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: italic;
+}
+.threadPanel .threadRootText {
+  /* spec: root 完整重现——不截断、markdown 与主流一致（同一 MessageBody，
+   * 排版不加独立 override，左右两侧像素级同源）。 */
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  word-break: break-word;
+}
+.threadPanel .threadRootLink {
+  cursor: pointer;
+  text-align: left;
+}
+.threadPanel .threadRootLink:hover {
+  border-color: var(--dsw-alias-border-l3);
+}

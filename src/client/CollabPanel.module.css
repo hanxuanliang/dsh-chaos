@@ -582,16 +582,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-size: 12px;
   cursor: pointer;
 }
-/* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
-
-/* Full-width composer seat — plocal truth (ChatComposer root w-full px-2):
- * the card spans the chat width instead of a centered 780 column. */
-.composerSeat {
-  flex: none;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 8px 8px;
-}
 /* --- members dialog (plocal ChannelMembersDialog graft) --- */
 .dlgGroupLabel {
   margin: 10px 0 4px;
@@ -959,109 +949,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   min-height: 0;
   flex-direction: column;
 }
-.threadPanel {
-  display: flex;
-  flex: none;
-  width: 360px;
-  min-height: 0;
-  flex-direction: column;
-  border-left: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-base);
-}
-.threadHead {
-  display: flex;
-  flex: none;
-  height: 40px;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
-  padding: 0 12px;
-}
-.threadTitle {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-.panel .threadClose {
-  display: inline-flex;
-  flex: none;
-  width: 22px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  color: var(--dsw-alias-label-tertiary);
-  background: transparent;
-  cursor: pointer;
-}
-.panel .threadClose:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.threadRoot {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  margin: 10px 12px 0;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--dsw-alias-bg-layer-2);
-}
-.panel .threadRootLink {
-  cursor: pointer;
-  text-align: left;
-}
-.panel .threadRootLink:hover {
-  border-color: var(--dsw-alias-border-l3);
-}
-.threadRoot[data-missing='true'] .threadRootText {
-  color: var(--dsw-alias-label-tertiary);
-  font-style: italic;
-}
-.threadRootHead {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.threadRootAuthor {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-.threadRootText {
-  /* spec: root 完整重现——不截断、markdown 与主流一致（同一 MessageBody，
-   * 排版不加独立 override，左右两侧像素级同源）。 */
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--dsw-alias-label-secondary);
-  text-align: left;
-  word-break: break-word;
-}
-.threadBody {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-}
-
-/* ---- thread panel drag divider (user ask: left border must be draggable) --- */
-.threadResizeHandle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -4px;
-  z-index: 5;
-  width: 8px;
-  cursor: col-resize;
-}
-.threadResizeHandle:hover, .threadResizeHandle[data-dragging='true'] {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 25%, transparent);
-}
-
 /* Title 即锚定跳转链（用户拍板：不需要独立锚定区）。portal → .panel 不生效，用 dialogBody 桥。 */
 .dialogBody .taskDetailTitleLink {
   display: inline-flex;
@@ -1168,10 +1055,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* rc-4/rc-7: docked channel */
 .dockedChannel { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .dockedChannel > [class*='messageStream'], .dockedChannel > div:first-of-type { flex: 1; min-height: 0; }
-
-/* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
-.dockedChannel .threadClose { margin-left: auto; }
-
 /* rc-8: dock 态两列 — 左列全栈(头+筛+list), 右列 [dock 头 + 内容] */
 .activityView[data-docked='true'] { flex-direction: row; gap: 0; }
 .activityListCol { display: flex; width: 320px; flex: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--dsw-alias-border-l1); }

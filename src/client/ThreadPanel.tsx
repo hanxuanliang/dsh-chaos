@@ -28,7 +28,7 @@ import { MessageBody } from './atoms/MessageBody.tsx'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/ThreadPanel.module.css'
 import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
