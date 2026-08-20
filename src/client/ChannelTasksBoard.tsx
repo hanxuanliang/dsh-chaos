@@ -34,6 +34,7 @@ import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { avatarSeed } from './avatar.ts'
 import css from './CollabPanel.module.css'
+import { StatusChip } from './StatusChip.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -114,22 +115,12 @@ function TaskStatusDropdown({ task, t, onMove }: {
   const reachable = ALLOWED[task.status]
   return (
     <span ref={rootRef} className={css.statusDropdown}>
-      <button
-        type="button"
-        className={css.statusChip}
-        data-status={task.status}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t('tasks.statusChange')}
+      <StatusChip
+        status={task.status}
+        label={t(LANE_LABEL_KEY[task.status])}
+        title={t('tasks.statusChange')}
         onClick={() => { setOpen(v => !v) }}
-      >
-        <span className={css.statusDot} data-status={task.status} aria-hidden="true" />
-        {t(LANE_LABEL_KEY[task.status])}
-        <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />
-        </svg>
-        <PencilGlyph />
-      </button>
+      />
       {open && (
         <span role="menu" className={css.statusMenu}>
           {LANES.map((lane) => {

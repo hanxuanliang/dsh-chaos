@@ -74,7 +74,6 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
             store={store}
             state={state}
             activeLocale={activeLocale}
-            onOpenChannel={(channelId) => { setPendingThreadRoot(undefined); setPanelView('collab'); store.setActiveChannel(channelId) }}
             onOpenThreadRoot={(rootMessageId, parentChannelId) => {
               setPendingThreadRoot(rootMessageId)
               setPanelView('collab')

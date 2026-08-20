@@ -1,31 +1,38 @@
 /**
- * Activity inbox view — plocal InboxMain / raft Activity panel 形态:
- * - 列表行卡三段式: ① 小目标行 (@the-name / #channel + 相对时间, 灰);
- *   ② 概要主行 (thread=root 摘录, channel=最新条); ③ 次行 latest reply;
- *   ④ 底行: root 锚了 task → 状态 chip; `N replies`。
- * - 点开 thread 行 = 左侧列收窄 + 右栏挂 ThreadPanel 本体 (与频道内一致),
- *   不跳出来。channel 行跳回频道(plocal 打开行走聊天区对应)。
+ * Activity 视图(rc-4 统一性整改):
+ * - 行卡: 目标小行 → 主标题(粗) → 最新回复 → 底行(task chip+N replies);
+ *   不再有前置 kind 图标(点击自然开右栏)。
+ * - 点击 = 列表收窄 + 右栏 dock,channel/thread 同一套 dock 机制, 不再整页跳:
+ *   channel → DockedChannelPane(header-lite + MessageStream + ChannelComposer);
+ *   thread → ThreadPanel 本体(与频道内同一件)。
+ * - 组件复用: Button pill 与频道 tab 同一 css.tab 族; 状态色块 = StatusChip
+ *   (与看板 toggle 同源); composer = ChannelComposer; 流 = MessageStream。
+ * - 筛选 pill: All 生效; Unread/Mentions disabled(plocal 此刻同样 disabled —
+ *   read vertical 未落地), Mark-all-read 同因 disabled。不做假交互。
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
- * - 工具 pill All/Unread/Mentions: 仅 All 真实生效(plocal 此刻也是 disabled),
- *   且参考图按此形态开放 —— 等 read vertical 上了再开。
- * - Done ✓ = crates inbox_done(done_through_seq per actor, 新活动自动复活)。
  */
 import { useMemo, useState, type JSX } from 'react'
-import type { NativeActivityInboxItem } from '../native.ts'
+import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ThreadPanel } from './ThreadPanel.tsx'
-import { avatarSeed } from './avatar.ts'
+import { MessageStream } from './MessageStream.tsx'
+import { ChannelComposer } from './ChannelComposer.tsx'
+import { StatusChip } from './StatusChip.tsx'
 
 interface ActivityViewProps {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
-  onOpenChannel: (channelId: string) => void
   onOpenThreadRoot: (rootMessageId: string, parentChannelId: string) => void
   activeLocale(): string
 }
+
+/** dock 状态: 会话粒度(item 行) —— 但 channel dock 内部还能下钻一个 thread。 */
+type Dock =
+  | { kind: 'channel'; channelId: string }
+  | { kind: 'thread'; rootMessageId: string; parentChannelId: string }
 
 function relativeTime(atMs: number): string {
   const deltaSeconds = Math.max(0, Math.floor((Date.now() - atMs) / 1000))
@@ -36,42 +43,83 @@ function relativeTime(atMs: number): string {
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d`
-  if (days < 2) return t_const('Yesterday')
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-/** 防止 daily 常量区地方性问题: 相对时间用的今天内默认格式(固定英文,
- * 中文界面也过 plocal 形态)。 */
-function t_const(s: string): string { return s }
+function DockedChannelPane({ t, store, state, channel, activeLocale, onOpenThread, onClose }: {
+  t: ChaosTranslate
+  store: CollabStore
+  state: CollabStoreSnapshot
+  channel: NativeTarget
+  activeLocale(): string
+  onOpenThread(rootMessageId: string): void
+  onClose(): void
+}): JSX.Element {
+  return (
+    <div className={css.dockedChannel}>
+      <header className={css.channelHeader}>
+        <span className={css.channelGlyph} aria-hidden="true">#</span>
+        <div className={css.channelHeading}>
+          <h2 className={css.channelTitle}>{channel.name}</h2>
+        </div>
+        <div className={css.channelHeaderActions}>
+          <button type="button" className={css.channelHeaderClose} title={t('activity.closeDock')} aria-label={t('activity.closeDock')} onClick={onClose}>
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+              <path d="m4.5 4.5 7 7m0-7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </header>
+      <MessageStream
+        t={t} store={store} state={state} channelId={channel.id} activeLocale={activeLocale}
+        onOpenTasks={() => { /* dock 里没有 tasks tab — 诚实不做假入口 */ }}
+        onOpenThread={onOpenThread}
+      />
+      <div className={css.composerSeat}>
+        <ChannelComposer t={t} store={store} state={state} channel={channel} disabled={state.connection !== 'live'} />
+      </div>
+    </div>
+  )
+}
 
-
-export function ActivityView({ t, store, state, onOpenChannel, onOpenThreadRoot, activeLocale }: ActivityViewProps): JSX.Element {
+export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
-  /** 打开的 thread 行 conversationId; undefined = 列表全宽。 */
-  const [openConversationId, setOpenConversationId] = useState<string | undefined>(undefined)
+  const [dock, setDock] = useState<Dock | undefined>(undefined)
 
   const items = useMemo(
     () => state.activityItems.filter((item) => item.targetKind !== 'direct'),
     [state.activityItems],
   )
 
-  const openItem = items.find((item) => item.conversationId === openConversationId)
-  const openThread = openItem !== undefined && openItem.targetKind === 'thread' && openItem.parentTargetId !== undefined
-    ? state.threads.find((thread) => thread.rootMessageId === openItem.rootMessageId)
+  const dockThread = dock?.kind === 'thread'
+    ? state.threads.find((thread) => thread.rootMessageId === dock.rootMessageId)
     : undefined
+
+  const dockKey = dock === undefined
+    ? undefined
+    : dock.kind === 'channel' ? `c:${dock.channelId}` : `t:${dock.rootMessageId}`
 
   const open = (item: NativeActivityInboxItem): void => {
     if (item.targetKind === 'channel') {
-      onOpenChannel(item.conversationId)
+      void store.hydrateTarget(item.conversationId)
+      setDock((cur) =>
+        cur !== undefined && cur.kind === 'channel' && cur.channelId === item.conversationId
+          ? undefined
+          : { kind: 'channel', channelId: item.conversationId },
+      )
       return
     }
     if (item.targetKind === 'thread' && item.rootMessageId !== undefined && item.parentTargetId !== undefined) {
-      // 留在 Activity 视图: 列表收窄 + 右栏 ThreadPanel — plocal/raft 的形态。
-      setOpenConversationId((cur) => (cur === item.conversationId ? undefined : item.conversationId))
-      void store.openThread(item.rootMessageId)
-      // ThreadPanel 的 root 卡取自父观点历史: 若还没加载, 顺带拉 (不影响 active)。
-      void store.hydrateTarget(item.parentTargetId)
+      const rootMessageId = item.rootMessageId
+      const parentChannelId = item.parentTargetId
+      void store.openThread(rootMessageId)
+      void store.hydrateTarget(parentChannelId) // root 卡取自父频道历史
+      setDock((cur) =>
+        cur !== undefined && cur.kind === 'thread' && cur.rootMessageId === rootMessageId
+          ? undefined
+          : { kind: 'thread', rootMessageId, parentChannelId },
+      )
     }
   }
 
@@ -85,23 +133,20 @@ export function ActivityView({ t, store, state, onOpenChannel, onOpenThreadRoot,
       .finally(() => { setBusy(undefined) })
   }
 
+  const isDockSelected = (item: NativeActivityInboxItem): boolean => {
+    if (dock === undefined) return false
+    if (item.targetKind === 'channel') return dock.kind === 'channel' && dock.channelId === item.conversationId
+    return dock.kind === 'thread' && item.rootMessageId !== undefined && dock.rootMessageId === item.rootMessageId
+  }
+
   const rows = (
     <div className={css.activityList} role="list">
       {items.map((item) => (
-        <div key={item.conversationId} className={css.activityRow} role="listitem" data-selected={item.conversationId === openConversationId ? 'true' : undefined}>
+        <div key={item.conversationId} className={css.activityRow} role="listitem" data-selected={isDockSelected(item) ? 'true' : undefined}>
           <button type="button" className={css.activityRowMain} onClick={() => { open(item) }}>
-            <span className={css.activityKindAvatar} aria-hidden="true">
-              {item.targetKind === 'channel'
-                ? <span className={css.avatarXs} style={{ background: avatarSeed(item.targetName, item.targetName).background }}>#</span>
-                : item.targetKind === 'thread'
-                  ? <span className={css.avatarXs} style={{ background: avatarSeed(item.targetName, item.targetName).background }}>↩</span>
-                  : <span className={css.avatarXs} style={{ background: avatarSeed(item.targetName, item.targetName).background }}>@</span>}
-            </span>
             <span className={css.activityBody}>
               <span className={css.activityLine1}>
-                <span className={css.activityTarget}>{
-                  item.targetKind === 'thread' ? `#${item.targetName}` : `#${item.targetName}`
-                }</span>
+                <span className={css.activityTarget}>#{item.targetName}</span>
                 <span className={css.activityTime}>{relativeTime(item.lastActivityAtMs)}</span>
               </span>
               <span className={css.activityTitleText}>{item.title}</span>
@@ -113,10 +158,10 @@ export function ActivityView({ t, store, state, onOpenChannel, onOpenThreadRoot,
               {(item.task !== undefined || item.targetKind === 'thread') && (
                 <span className={css.activityBottomLine}>
                   {item.task !== undefined && (
-                    <span className={css.statusChip} data-status={item.task.status}>
-                      <span className={css.statusDot} data-status={item.task.status} aria-hidden="true" />
-                      {item.task.assigneeName !== undefined ? `@${item.task.assigneeName}` : `#${item.task.number}`}
-                    </span>
+                    <StatusChip
+                      status={item.task.status}
+                      label={item.task.assigneeName !== undefined ? `@${item.task.assigneeName}` : `#${item.task.number}`}
+                    />
                   )}
                   {item.targetKind === 'thread' && item.replyCount !== undefined && (
                     <span className={css.activityReplies}>{t('thread.replies', { count: Number(item.replyCount) })}</span>
@@ -142,36 +187,60 @@ export function ActivityView({ t, store, state, onOpenChannel, onOpenThreadRoot,
     </div>
   )
 
+  const filterTabs = (
+    <span className={css.tabs} role="tablist" aria-label={t('activity.filtersAria')}>
+      <button type="button" role="tab" aria-selected="true" data-active="true" className={css.tab}>{t('activity.filterAll')}</button>
+      <button type="button" role="tab" aria-selected="false" disabled className={css.tab} title={t('activity.filterPending')}>{t('activity.filterUnread')}</button>
+      <button type="button" role="tab" aria-selected="false" disabled className={css.tab} title={t('activity.filterPending')}>{t('activity.filterMentions')}</button>
+    </span>
+  )
+
   return (
     <div className={css.activityView}>
       <header className={css.activityHeader}>
-        <span className={css.activityMark} aria-hidden="true">A</span>
         <h2 className={css.activityTitle}>{t('activity.title')}</h2>
         <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
-        <span className={css.activityFilters} role="tablist" aria-label={t('activity.filtersAria')}>
-          <button type="button" role="tab" aria-selected="true" data-active="true" className={css.activityFilter}>{t('activity.filterAll')}</button>
-          <button type="button" role="tab" aria-selected="false" disabled className={css.activityFilter} title={t('activity.filterPending')}>{t('activity.filterUnread')}</button>
-          <button type="button" role="tab" aria-selected="false" disabled className={css.activityFilter} title={t('activity.filterPending')}>{t('activity.filterMentions')}</button>
+        <span className={css.activityHeaderRight}>
+          {filterTabs}
+          <button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
         </span>
-        <button type="button" className={css.activityMarkAll} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
       </header>
       {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
       {items.length === 0 ? (
         <div className={css.activityEmpty}>{t('activity.empty')}</div>
-      ) : openThread !== undefined && openItem !== undefined && openItem.parentTargetId !== undefined ? (
+      ) : dock !== undefined ? (
         <div className={css.activitySplit}>
           <div className={css.activityListPane}>{rows}</div>
-          <div className={css.activityDetailPane}>
-            <ThreadPanel
-              t={t}
-              store={store}
-              state={state}
-              thread={openThread}
-              parentChannelId={openItem.parentTargetId}
-              activeLocale={activeLocale}
-              onRootJump={() => { onOpenThreadRoot(openItem.rootMessageId as string, openItem.parentTargetId as string) }}
-              onClose={() => { setOpenConversationId(undefined) }}
-            />
+          <div className={css.activityDetailPane} key={dockKey}>
+            {dock.kind === 'channel' ? (
+              <DockedChannelPane
+                t={t}
+                store={store}
+                state={state}
+                channel={state.channels.find((c) => c.id === dock.channelId) as NativeTarget}
+                activeLocale={activeLocale}
+                onOpenThread={(rootMessageId) => {
+                  void store.openThread(rootMessageId)
+                  setDock({ kind: 'thread', rootMessageId, parentChannelId: dock.channelId })
+                }}
+                onClose={() => { setDock(undefined) }}
+              />
+            ) : dockThread !== undefined ? (
+              <ThreadPanel
+                t={t}
+                store={store}
+                state={state}
+                thread={dockThread}
+                parentChannelId={dock.parentChannelId}
+                activeLocale={activeLocale}
+                onRootJump={() => {
+                  if (dock.kind === 'thread') onOpenThreadRoot(dock.rootMessageId, dock.parentChannelId)
+                }}
+                onClose={() => { setDock(undefined) }}
+              />
+            ) : (
+              <div className={css.activityEmpty}>{t('activity.empty')}</div>
+            )}
           </div>
         </div>
       ) : (
