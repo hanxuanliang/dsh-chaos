@@ -1,0 +1,79 @@
+/* TaskCard: `.card[data-plugin]` 同元素 (0-2-0) — 宿主 .panel button 压是拉不而.
+ * 原 `.panel .taskCard` 规则本体平移; status hue 的天 out。 */
+
+.card[draggable='true'] { cursor: grab; }
+
+.card[data-dragging='true'] { opacity: 0.45; }
+
+.card[data-plugin='dsh-chaos'] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.card[data-plugin='dsh-chaos']:hover {
+  border-color: var(--dsw-alias-border-l3);
+  box-shadow: var(--dsw-shadow-lv2);
+  transform: translateY(-1px);
+}
+
+.card[data-plugin='dsh-chaos']:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.card[data-plugin='dsh-chaos'][data-status='in_progress'] {
+  border-color: var(--dsw-alias-state-warn-primary);
+}
+
+.cardTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardExcerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.cardNumber { flex: none; }
+
+.cardAssignee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardTime {
+  flex: none;
+  margin-left: auto;
+}

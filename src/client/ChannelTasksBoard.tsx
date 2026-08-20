@@ -35,6 +35,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import css from './CollabPanel.module.css'
 import { StatusChip } from './atoms/StatusChip.tsx'
 import { AvatarChip } from './atoms/AvatarChip.tsx'
+import { TaskCard } from './blocks/TaskCard.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -213,38 +214,6 @@ function AssigneeFilter({ t, members, value, onChange }: {
   )
 }
 
-function TaskCard({ task, title, excerpt, assigneeLabel, t, dragging, onDragStart, onDragEnd, onOpen }: {
-  task: NativeTask
-  title: string
-  excerpt: string
-  assigneeLabel: string | undefined
-  t: ChaosTranslate
-  dragging: boolean
-  onDragStart: () => void
-  onDragEnd: () => void
-  onOpen: () => void
-}): JSX.Element {
-  return (
-    <button
-      type="button"
-      className={css.taskCard}
-      data-status={task.status}
-      data-dragging={dragging ? 'true' : undefined}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={onOpen}
-    >
-      <span className={css.taskCardTitle}>{title}</span>
-      {excerpt !== '' && <span className={css.taskCardExcerpt}>{excerpt}</span>}
-      <span className={css.taskCardMeta}>
-        <span className={css.taskCardNumber}>#{task.number}</span>
-        <span className={css.taskCardAssignee}>{assigneeLabel ?? t('tasks.unassigned')}</span>
-        <span className={css.taskCardTime}>{formatTime(task.updatedAtMs, t)}</span>
-      </span>
-    </button>
-  )
-}
 
 /** Raft assignee chip: bordered value + pencil, menu offers the few HONEST
  * actions the fixed-principal surface supports — claim (when the pool holds
@@ -577,7 +546,8 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
                       title={title === '' ? `#${task.number}` : title}
                       excerpt={excerpt}
                       assigneeLabel={assigneeLabelOf(task)}
-                      t={t}
+                      unassignedLabel={t('tasks.unassigned')}
+                      timeLabel={formatTime(task.updatedAtMs, t)}
                       dragging={draggingTaskId === task.messageId}
                       onDragStart={() => { setDraggingTaskId(task.messageId) }}
                       onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}

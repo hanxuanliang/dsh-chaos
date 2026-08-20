@@ -295,7 +295,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   line-height: 18px;
 }
 
-
 .main {
   display: flex;
   min-width: 0;
@@ -397,9 +396,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
  * padding, compact 11px buttons; active = primary-fill pair; hover lifts
  * text only. */
-
-
-
 
 /* --- message stream --- */
 
@@ -865,7 +861,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-secondary);
 }
 
-
 .streamEmpty {
   display: flex;
   flex: 1;
@@ -1130,7 +1125,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-
 .memberName {
   flex: none;
   max-width: 46%;
@@ -1332,8 +1326,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-color: var(--dsw-alias-state-business-primary);
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, var(--dsw-alias-bg-layer-2));
 }
-.taskCard[draggable='true'] { cursor: grab; }
-.taskCard[data-dragging='true'] { opacity: 0.45; }
+/* TaskCard 原 panel-scope 已转 blocks/TaskCard.module.css (同元素 [data-plugin] 0-2-0) */
 .taskColumnHeader {
   display: flex;
   flex: none;
@@ -1378,71 +1371,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   text-align: center;
 }
 /* Card = whole-button; must beat .panel button { font: inherit } (S5). */
-.panel .taskCard {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font: inherit;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-base);
-  cursor: pointer;
-  text-align: left;
-  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
-}
-.panel .taskCard:hover {
-  border-color: var(--dsw-alias-border-l3);
-  box-shadow: var(--dsw-shadow-lv2);
-  transform: translateY(-1px);
-}
-.panel .taskCard:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
-}
-.panel .taskCard[data-status='in_progress'] {
-  border-color: var(--dsw-alias-state-warn-primary);
-}
-.taskCardTitle {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.taskCardExcerpt {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--dsw-alias-label-secondary);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-.taskCardMeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
-}
-.taskCardNumber {
-  flex: none;
-}
-.taskCardAssignee {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.taskCardTime {
-  flex: none;
-  margin-left: auto;
-}
+
 /* Detail modal (content lives in .dialogBody — portal, never .panel). */
 .taskDetailHead {
   display: flex;
@@ -1830,11 +1759,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-secondary);
 }
 
-
 /* ── P1 previews: tae 头像组（重叠压一列，面板 token 边界白描） ──────────── */
 .threadPreviewAvatars { display: inline-flex; padding-left: 4px; }
 .threadPreviewAvatars .avatarXs { width: 15px; height: 15px; font-size: 9px; line-height: 15px; margin-left: -4px; box-shadow: 0 0 0 1.5px var(--dsw-alias-message-hover, var(--dsw-alias-tertiary)); }
-
 
 /* ── Assignee popover (raft 参考形态: 标题+搜索+行 avatar+对勾) ───────────── */
 .assigneeMenu {
@@ -1895,7 +1822,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .assigneeMenuItem svg { flex: none; color: var(--dsw-alias-label-secondary); }
 .assigneeMenuEmpty { padding: 4px 8px 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 
-
 /* ── P0-6 Activity inbox(plocal InboxMain 形态对齐) ───────────────────── */
 .activityView { display: flex; height: 100%; min-height: 0; flex: 1; min-width: 0; overflow: hidden; flex-direction: column; padding: 12px 16px; gap: 10px; }
 .activityHeader { display: flex; flex: none; flex-direction: column; }
@@ -1930,8 +1856,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 .activityRow:hover .activityDone { opacity: 1; }
 .activityDone:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-success-primary); }
-
-
 
 /* ── Activity 参考形态回建(raft/ plocal InboxMain) ───────────────────── */.activityFilters { display: inline-flex; margin-left: auto; gap: 4px; }
 .activityFilter {
@@ -1968,14 +1892,12 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityDetailPane { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .activityDetailPane > * { flex: 1; min-height: 0; } /* ThreadPanel root=aside(非 section/div), 内部自管 scroller */
 
-
 /* rc-4/rc-7: docked channel */
 .dockedChannel { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .dockedChannel > [class*='messageStream'], .dockedChannel > div:first-of-type { flex: 1; min-height: 0; }
 
 /* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
 .dockedChannel .threadClose { margin-left: auto; }
-
 
 /* rc-8: dock 态两列 — 左列全栈(头+筛+list), 右列 [dock 头 + 内容] */
 .activityView[data-docked='true'] { flex-direction: row; gap: 0; }
@@ -1991,11 +1913,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityDockClose:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .activityDetailPane { position: relative; }
 
-
 /* rc-7: 筛项在 Activity 顶行下独立一行 */
 .activityHeaderTop { display: flex; flex: none; align-items: baseline; gap: 8px; padding: 10px 12px 4px; }
 .activityFilterRow { display: flex; flex: none; align-items: center; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
-
 
 /* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
