@@ -128,7 +128,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
  )
   const headerRow = (
     <header className={css.activityHeader}>
-      <h2 className={shared.channelTitle}>{t('activity.title')}</h2>
+      <h2 className={css.activityTitle}>{t('activity.title')}</h2>
       <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
       <div className={css.activityHeadTabs}>{filterTabs}</div>
     </header>

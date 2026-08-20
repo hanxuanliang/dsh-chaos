@@ -182,76 +182,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   line-height: 20px;
   text-align: center;
 }
-
-/* --- channel header + tabs (spec §1.2) --- */
-
-.channel {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-/* Channel header v2 (three-repo graft): mnemon pageHeader hairline row
- * rhythm, dsh-context card-title/card-sub baseline meta + segmented-pill
- * idiom, pilot toolbar hit-area discipline. */
-.channelHead {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 10px 9px 16px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
-}
-
-.channelTitle {
-  margin: 0;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 22px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.channelHash {
-  margin-right: 2px;
-  color: var(--dsw-alias-label-tertiary);
-  font-weight: 500;
-}
-
-/* plocal participants-button anatomy (ChannelHeader member count, top-right):
- * bordered paper chip, tertiary icon + bold count — real button opening the
- * members dialog. */
-.panel .memberChip {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  margin-left: 8px;
-  padding: 0 8px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-.panel .memberChip:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.panel .memberChip:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
-}
-.memberCount {
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
 /* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
  * padding, compact 11px buttons; active = primary-fill pair; hover lifts
  * text only. */
@@ -703,23 +633,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 @keyframes dshChaosJumpFlash {
   0% { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 24%, transparent); }
   100% { background: transparent; }
-}
-
-/* Assignee editor chip: bordered value + pencil (raft task panel idiom). */
-
-/* ---- thread panel (P0-5, spec §2.1) -------------------------------------- */
-.channelMainRow {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
-.channelMainCol {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
 }
 /* Title 即锚定跳转链（用户拍板：不需要独立锚定区）。portal → .panel 不生效，用 dialogBody 桥。 */
 .dialogBody .taskDetailTitleLink {

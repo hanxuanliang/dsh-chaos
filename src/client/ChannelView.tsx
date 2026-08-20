@@ -13,7 +13,7 @@ import { ChannelComposer } from './ChannelComposer.tsx'
 import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
-import css from './CollabPanel.module.css'
+import css from './blocks/ChannelView.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
 
 export interface ChannelViewProps {

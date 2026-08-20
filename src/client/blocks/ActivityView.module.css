@@ -31,3 +31,13 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
 .activityView .activityDockClose:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+
+.activityView .activityTitle {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
