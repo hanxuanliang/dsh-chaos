@@ -2052,3 +2052,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityHeaderRight { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 .dockedChannel { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .dockedChannel > [class*='messageStream'], .dockedChannel > div:first-of-type { flex: 1; min-height: 0; }
+
+/* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
+.dockedChannel .threadClose { margin-left: auto; }

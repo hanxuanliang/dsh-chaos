@@ -57,18 +57,17 @@ function DockedChannelPane({ t, store, state, channel, activeLocale, onOpenThrea
 }): JSX.Element {
   return (
     <div className={css.dockedChannel}>
-      <header className={css.channelHeader}>
-        <span className={css.channelGlyph} aria-hidden="true">#</span>
-        <div className={css.channelHeading}>
-          <h2 className={css.channelTitle}>{channel.name}</h2>
-        </div>
-        <div className={css.channelHeaderActions}>
-          <button type="button" className={css.channelHeaderClose} title={t('activity.closeDock')} aria-label={t('activity.closeDock')} onClick={onClose}>
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-              <path d="m4.5 4.5 7 7m0-7-7 7" />
-            </svg>
-          </button>
-        </div>
+      <header className={css.channelHead}>
+        <h3 className={css.channelTitle}>
+          <span className={css.channelHash} aria-hidden="true">#</span>
+          {channel.name}
+        </h3>
+        {/* ✕ 与 ThreadPanel 头部同一件 .threadClose, 不再自造 */}
+        <button type="button" className={css.threadClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={onClose}>
+          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <path d="m4 4 8 8M12 4l-8 8" />
+          </svg>
+        </button>
       </header>
       <MessageStream
         t={t} store={store} state={state} channelId={channel.id} activeLocale={activeLocale}
