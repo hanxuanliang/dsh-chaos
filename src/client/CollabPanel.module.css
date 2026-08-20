@@ -1928,8 +1928,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   padding: 8px 6px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 10px;
-  background: var(--dsw-alias-bg-popover, var(--dsw-alias-window));
-  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+  background: var(--dsw-alias-bg-base); /* popover/window token 不存在 → 透明底 bug (自审)，统一走 statusMenu 同一个 surface */
+  box-shadow: var(--dsw-shadow-lv2);
 }
 .assigneeMenuTitle {
   padding: 2px 8px 6px;
