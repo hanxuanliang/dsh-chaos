@@ -18,6 +18,7 @@ import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ChannelView } from './ChannelView.tsx'
 import { StatusChip } from './StatusChip.tsx'
+import { ThreadPanel } from './ThreadPanel.tsx'
 
 interface ActivityViewProps {
   t: ChaosTranslate
@@ -54,6 +55,9 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     [state.activityItems],
   )
 
+  const dockThread = dock?.threadRootId !== undefined && dock !== undefined
+    ? state.threads.find((x) => x.rootMessageId === dock.threadRootId)
+    : undefined
   const dockKey = dock === undefined ? undefined : `${dock.channelId}:${dock.threadRootId ?? ''}`
 
   const open = (item: NativeActivityInboxItem): void => {
@@ -171,17 +175,28 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
         <div className={css.activityDetailCol}>
 
           <div className={css.activityDetailPane} key={dockKey}>
-            {/* 右区 = ChannelView 自体: channel+thread 组合不该在 activity 重造。
-                ✕ 浮动右上收栏。 */}
-            <ChannelView
-              t={t}
-              store={store}
-              state={state}
-              channel={dockChannel as NativeTarget}
-              activeLocale={activeLocale}
-              pendingThreadRoot={dock.threadRootId}
-              onPendingThreadConsumed={() => { /* 只供 mount 初始值消耗; 不按 dock state 清零 */ }}
-            />
+            {/* ① channel 行: 右区 = ChannelView 自体(完全铺开, thread 只在里面点了才开)。
+                ② thread 行: 右区 = ThreadPanel 自体平铺(thread 页面一份, 不要 channel 夹带)。 */}
+            {dock.threadRootId !== undefined && dockThread !== undefined ? (
+              <ThreadPanel
+                t={t}
+                store={store}
+                state={state}
+                thread={dockThread}
+                parentChannelId={dock.channelId}
+                activeLocale={activeLocale}
+                onRootJump={() => { setDock({ channelId: dock.channelId }) }}
+                onClose={() => { setDock({ channelId: dock.channelId }) }}
+              />
+            ) : (
+              <ChannelView
+                t={t}
+                store={store}
+                state={state}
+                channel={dockChannel as NativeTarget}
+                activeLocale={activeLocale}
+              />
+            )}
             <button type="button" className={css.activityDockClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
               <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="m4 4 8 8M12 4l-8 8" />

@@ -2076,3 +2076,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* tabs 类自ChannelView 搬来带 margin:auto(频道头居中用)——此处贴左 */
 .activityFilterRow .tabs { margin: 0; }
+
+/* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
+.activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
+.activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }

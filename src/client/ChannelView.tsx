@@ -26,7 +26,8 @@ export interface ChannelViewProps {
    * 值消费(不允许 effect/setState 接力——教训实证 2026-08-20)。
    */
   pendingThreadRoot?: string | undefined
-  onPendingThreadConsumed(): void
+  /** 跨层消耗回调: Parent(mount 消费者) 需要烤定 pending state; Activity dock 无此链路。 */
+  onPendingThreadConsumed?(): void
 }
 
 export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed }: ChannelViewProps): JSX.Element {
@@ -42,7 +43,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
     if (pendingThreadRoot === undefined || threadRootId === pendingThreadRoot) return
     setThreadRootId(pendingThreadRoot)
     setJumpMessageId(pendingThreadRoot)
-    onPendingThreadConsumed()
+    onPendingThreadConsumed?.()
   }, [pendingThreadRoot, threadRootId, onPendingThreadConsumed])
   const thread = threadRootId === undefined
     ? undefined
