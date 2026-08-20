@@ -1975,7 +1975,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 
 /* ── P0-6 Activity inbox(plocal InboxMain 形态对齐) ───────────────────── */
-.activityView { display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 12px 16px; gap: 10px; }
+.activityView { display: flex; height: 100%; min-height: 0; flex: 1; min-width: 0; overflow: hidden; flex-direction: column; padding: 12px 16px; gap: 10px; }
 .activityHeader { display: flex; flex: none; flex-direction: column; }
 .activityTitle { margin: 0; font-size: 15px; font-weight: 650; }
 .activityCount { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
