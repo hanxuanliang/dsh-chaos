@@ -303,6 +303,11 @@ export class CollabStore {
   }
 
   /** (Re)load tail history + members for a channel and zero its unread marker. */
+  /** 拉一组 target 的历史+成员不改变 activity selection(Activity 明细 root 预览)。 */
+  async hydrateTarget(targetId: string): Promise<void> {
+    await this.activateChannel(targetId, false)
+  }
+
   private async activateChannel(targetId: string, force: boolean): Promise<void> {
     const generation = this.loadGeneration
     const needHistory = force || this.snapshot.messagesByChannel[targetId] === undefined
