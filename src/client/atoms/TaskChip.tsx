@@ -16,7 +16,7 @@ function StatusIcon({ status }: { status: NativeTask['status'] }): JSX.Element {
 }
 
 export function TaskChip({ task, assignee, onClick }: {
-  task: NativeTask
+  task: Pick<NativeTask, 'number' | 'status'>
   assignee: string | undefined
   onClick(): void
 }): JSX.Element {

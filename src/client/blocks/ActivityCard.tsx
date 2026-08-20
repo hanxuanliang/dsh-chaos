@@ -4,7 +4,7 @@
  * 打开 dock (channel/thread 双类由 caller 分派)。
  */
 import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { StatusChip } from '../atoms/StatusChip.tsx'
+import { TaskChip } from '../atoms/TaskChip.tsx'
 import { ReplyExcerpt } from '../atoms/ReplyExcerpt.tsx'
 import { ThreadPreview } from './MessageRow.tsx'
 import type { NativeActivityInboxItem, NativeTarget, NativeThreadSummary } from '../../native.ts'
@@ -38,9 +38,10 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
           {(item.task !== undefined || item.targetKind === 'thread') && (
             <span className={css.bottomLine}>
               {item.task !== undefined && (
-                <StatusChip
-                  status={item.task.status}
-                  label={item.task.assigneeName !== undefined ? `@${item.task.assigneeName}` : `#${item.task.number}`}
+                <TaskChip
+                  task={item.task}
+                  assignee={item.task.assigneeName}
+                  onClick={onOpen}
                 />
               )}
               {item.targetKind === 'thread' && (
