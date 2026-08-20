@@ -470,20 +470,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-size: 11px;
   line-height: 16px;
 }
-
-/* plocal row anatomy: flex row, mb-1(4px), px-8 py-1 (8/4), hover tint.
- * Full rows add mt-1.5; compact rows swap the 28px avatar for an equal-width
- * empty placeholder so both body columns share one left edge (avatar 28 + gap 8). */
-
-/* Backend messages carry no author kind — it is joined from the actors table;
- * the model suffix comes from runtime.bindings when present (else AGENT alone). */
-
-.msgBody {
-  min-width: 0;
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  line-height: 22px;
-}
 /* plocal TaskChip (truth §5): 20px h, 0 6px padding, r6, 1px gray border,
  * 10px bold, gap 4 — icon + #N (+ @assignee), no "task"/status words.
  * plocal brutal palette → host alias approximation (host has no purple
@@ -532,17 +518,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   margin: 0;
   font-size: 13px;
 }
-
-.streamError {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  color: var(--dsw-alias-state-error-primary);
-  font-size: 12px;
-}
-
 .resyncNote {
   margin: 0;
   padding: 8px 0;
@@ -743,20 +718,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
  * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */
 /* Card = whole-button; must beat .panel button { font: inherit } (S5). */
-
-/* Detail modal (content lives in .dialogBody — portal, never .panel). */
-.taskDetailHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.taskDetailStatus {
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-secondary);
-}
 .taskDetailTitle {
   flex: 1;
   min-width: 0;
@@ -785,37 +746,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   margin: 0;
   color: var(--dsw-alias-label-primary);
 }
-.taskDetailAnchorLabel {
-  margin-bottom: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-tertiary);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-/* the whole bordered anchor box is the jump link (button in a portal —
- * no .panel reset applies; set font explicitly). */
-.taskDetailAnchorLink {
-  display: block;
-  width: 100%;
-  max-height: 260px;
-  overflow-y: auto;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-base);
-  cursor: pointer;
-  text-align: left;
-}
-.taskDetailAnchorText {
-  display: block;
-  font-size: 13px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 /* ---- status dropdown + assignee filter pill (plocal TaskStatusMenu) ------- */
 .panel .filterPill,
 .dialogBody .statusChip,
@@ -906,22 +836,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   display: flex;
   margin-bottom: 12px;
 }
-.taskDetailAnchorGo {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dsw-alias-state-business-primary);
-}
-.taskDetailAnchorLink:hover {
-  border-color: var(--dsw-alias-border-l3);
-}
-.taskDetailAnchorLink:hover .taskDetailAnchorGo {
-  text-decoration: underline;
-}
-
 /* Task-anchor jump flash: warn-tinted wash that fades (paper §3.2 高亮 1s). */
 .msg[data-jump-flash],
 .msgCompact[data-jump-flash] {
@@ -984,77 +898,11 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   padding: 10px 10px 9px 16px; border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .activityHeadTabs { margin-left: auto; }
-
-.activityTitle { margin: 0; font-size: 15px; font-weight: 650; }
 .activityCount { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .activityEmpty { padding: 32px 16px; color: var(--dsw-alias-label-tertiary); font-size: 13px; text-align: center; }
 .activityList { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow-y: auto; }
-.activityRow { position: relative; display: flex; align-items: stretch; border-radius: 10px; }
-.activityRow:hover { background: var(--dsw-alias-tertiary); }
-.activityRowMain {
-  display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: 10px;
-  padding: 8px 34px 8px 8px; border: none; background: transparent;
-  color: var(--dsw-alias-label-primary); cursor: pointer; font: inherit; text-align: left;
-}
-.activityKind {
-  display: inline-grid; flex: none; width: 22px; height: 22px; margin-top: 1px;
-  place-items: center; border-radius: 6px;
-  background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary);
-}
-.activityBody { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
-.activityTitleLine { display: flex; align-items: center; gap: 8px; }
-.activityTitleText { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.activityTime { flex: none; margin-left: auto; color: var(--dsw-alias-label-tertiary); font-size: 11.5px; }
-.activityMeta { display: flex; min-width: 0; align-items: baseline; gap: 8px; font-size: 12px; }
-.activityTarget { flex: none; color: var(--dsw-alias-label-tertiary); }
-.activityExcerpt { overflow: hidden; color: var(--dsw-alias-label-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.activityReplies { flex: none; margin-top: 4px; color: var(--dsw-alias-label-tertiary); font-size: 11.5px; }
-.activityDone {
-  position: absolute; right: 8px; top: 10px; display: inline-grid; width: 20px; height: 20px;
-  place-items: center; border: none; border-radius: 6px; background: transparent;
-  color: var(--dsw-alias-label-tertiary); cursor: pointer; opacity: 0;
-}
-.activityRow:hover .activityDone { opacity: 1; }
-.activityDone:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-success-primary); }
-
-/* ── Activity 参考形态回建(raft/ plocal InboxMain) ───────────────────── */.activityFilters { display: inline-flex; margin-left: auto; gap: 4px; }
-.activityFilter {
-  padding: 4px 10px; border: none; border-radius: 6px; background: transparent;
-  color: var(--dsw-alias-label-secondary); cursor: default; font: inherit; font-size: 12px; font-weight: 600;
-}
-.activityFilter[data-active='true'] { background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-inverted); }
-.activityMarkAll {
-  margin-left: 6px; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 6px;
-  background: transparent; color: var(--dsw-alias-label-tertiary); cursor: default; font: inherit; font-size: 12px; font-weight: 600;
-}
-
-.activityRow { border: 1px solid transparent; margin: 0 0 2px; }
-.activityRow[data-selected='true'] {
-  border-color: var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 5%);
-}
-.activityRowMain { padding: 9px 34px 9px 10px; gap: 0; width: 100%; }
-.activityKindAvatar .avatarXs { width: 22px; height: 22px; font-size: 12px; line-height: 22px; }
-.activityLine1 { display: flex; align-items: baseline; gap: 8px; }
-.activityTarget { color: var(--dsw-alias-label-tertiary); font-size: 11.5px; font-weight: 600; }
-.activityTime { margin-left: auto; }
-.activityTitleText { font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--dsw-alias-label-primary); text-align: left; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.activityExcerpt { font-size: 12px; color: var(--dsw-alias-label-secondary); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.activityBottomLine { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-
-/* 分栏: 列表收窄 + 右栏细节(plocal App shell shell-level 对照) */
-.activitySplit { display: flex; height: 100%; min-height: 0; flex: 1; gap: 0; }
-.activityListPane {
-  width: 320px; flex: none; min-height: 0; overflow-y: auto;
-  border-right: 1px solid var(--dsw-alias-border-l1); padding-right: 2px;
-}
 .activityDetailPane { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .activityDetailPane > * { flex: 1; min-height: 0; } /* ThreadPanel root=aside(非 section/div), 内部自管 scroller */
-
-/* rc-4/rc-7: docked channel */
-.dockedChannel { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-.dockedChannel > [class*='messageStream'], .dockedChannel > div:first-of-type { flex: 1; min-height: 0; }
 /* rc-8: dock 态两列 — 左列全栈(头+筛+list), 右列 [dock 头 + 内容] */
 .activityView[data-docked='true'] { flex-direction: row; gap: 0; }
 .activityListCol { display: flex; width: 320px; flex: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--dsw-alias-border-l1); }
@@ -1068,9 +916,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 .activityDockClose:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .activityDetailPane { position: relative; }
-
-.activityFilterRow { display: flex; flex: none; align-items: center; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
-
 /* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
 .activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }
