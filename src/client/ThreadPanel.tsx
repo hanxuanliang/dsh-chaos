@@ -24,12 +24,11 @@ import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
-import { MessageBody } from './atoms/MessageBody.tsx'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './blocks/ThreadPanel.module.css'
-import { AvatarChip } from './atoms/AvatarChip.tsx'
+import { RootCard } from './blocks/RootCard.tsx'
 
 const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
 const THREAD_WIDTH_MIN = 340
@@ -121,26 +120,14 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
         </button>
       </header>
       {thread.rootMessageId !== undefined && (
-        rootMessage !== undefined ? (
-          <button
-            type="button"
-            className={`${css.threadRoot} ${css.threadRootLink}`}
-            title={t('thread.rootJump')}
-            onClick={() => { onRootJump((rootMessage as NativeMessage).id) }}
-          >
-            <span className={css.threadRootHead}>
-              <AvatarChip seed={seed} aria-hidden="true" />
-              <span className={css.threadRootAuthor}>{rootAuthor?.displayName ?? handle}</span>
-            </span>
-            <div className={css.threadRootText}>
-              <MessageBody t={t} text={(rootMessage as NativeMessage).text} names={rootMentionNames} />
-            </div>
-          </button>
-        ) : (
-          <div className={css.threadRoot} data-missing="true">
-            <span className={css.threadRootText}>{t('thread.rootMissing')}</span>
-          </div>
-        )
+        <RootCard
+          t={t}
+          rootMessage={rootMessage as NativeMessage | undefined}
+          rootAuthor={rootAuthor}
+          seed={seed}
+          mentionNames={rootMentionNames}
+          onJump={(id) => { onRootJump(id) }}
+        />
       )}
       <div className={css.threadBody}>
         <MessageStream

@@ -76,51 +76,6 @@
   box-sizing: border-box;
   padding: 0 8px 8px;
 }
-.threadPanel .threadRoot {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  margin: 10px 12px 0;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--dsw-alias-bg-layer-2);
-}
-.threadPanel .threadRoot[data-missing='true'] .threadRootText {
-  color: var(--dsw-alias-label-tertiary);
-  font-style: italic;
-}
-.threadPanel .threadRootHead {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.threadPanel .threadRootAuthor {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-}
-.threadPanel .threadRoot[data-missing='true'] .threadRootText {
-  color: var(--dsw-alias-label-tertiary);
-  font-style: italic;
-}
-.threadPanel .threadRootText {
-  /* spec: root 完整重现——不截断、markdown 与主流一致（同一 MessageBody，
-   * 排版不加独立 override，左右两侧像素级同源）。 */
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--dsw-alias-label-secondary);
-  text-align: left;
-  word-break: break-word;
-}
-.threadPanel .threadRootLink {
-  cursor: pointer;
-  text-align: left;
-}
-.threadPanel .threadRootLink:hover {
-  border-color: var(--dsw-alias-border-l3);
-}
 /* composerSeat: 迁渡失踪补回 (panel 内宜 12px 侧) */
 .threadPanel .composerSeat {
   flex: none;

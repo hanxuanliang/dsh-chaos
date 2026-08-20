@@ -1,0 +1,46 @@
+/* RootCard: 基自元素 data-plugin[data-plugin] (0-2-0) 与子级 .root 前缀 (root/Head/Author/Text/rootLink), 原 ThreadPanel.module root 组迁出。 */
+.root[data-plugin='dsh-chaos'] {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 12px 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.root[data-missing='true'] .rootText {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: italic;
+}
+.rootHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rootAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+.root[data-missing='true'] .rootText {
+  color: var(--dsw-alias-label-tertiary);
+  font-style: italic;
+}
+.rootText {
+  /* spec: root 完整重现——不截断、markdown 与主流一致（同一 MessageBody，
+   * 排版不加独立 override，左右两侧像素级同源）。 */
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  word-break: break-word;
+}
+.rootLink {
+  cursor: pointer;
+  text-align: left;
+}
+.rootLink:hover {
+  border-color: var(--dsw-alias-border-l3);
+}
