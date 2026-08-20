@@ -7,7 +7,7 @@ import { AvatarChip } from '../atoms/AvatarChip.tsx'
 import { TaskChip } from '../atoms/TaskChip.tsx'
 import type { NativeActor, NativeMessage, NativeTarget, NativeTask, NativeThreadSummary } from '../../native.ts'
 import type { ChaosTranslate } from '../locales.ts'
-import { MessageBody } from '../MessageStream.tsx'
+import { MessageBody } from '../atoms/MessageBody.tsx'
 import css from './MessageRow.module.css'
 
 /** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */

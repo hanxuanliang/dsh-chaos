@@ -1,0 +1,197 @@
+/* MessageBody: markdown 子系规则(mega 移拢) */
+
+.mention {
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 700;
+}
+
+
+/* Dark slab: derived from host tokens by direction inversion, so it stays
+ * self-consistent in both themes (label-primary ≈ ink in light ≈ near-white
+ * in dark) — no fixed #07111f-style literal. */
+.preShell {
+  position: relative;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 10px;
+  --shell-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 94%, var(--dsw-alias-bg-base));
+  --shell-fg: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, var(--dsw-alias-label-primary));
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+}
+.preShell .mdCode {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+.mdPre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: var(--chaos-mono);
+  font-size: inherit;
+  line-height: 1.5;
+}
+
+.codeCopy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--shell-fg) 25%, transparent);
+  border-radius: 6px;
+  background: var(--shell-bg);
+  color: var(--shell-fg);
+  opacity: 0;
+  cursor: pointer;
+}
+.preShell:hover .codeCopy,
+.codeCopy:focus-visible {
+  opacity: 1;
+}
+
+/* --- markdown components map (plocal truth §4 shapes, host tokens) --- */
+
+.mdP {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+}
+.mdP:last-child {
+  margin-bottom: 0;
+}
+
+.mdLink {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: none;
+}
+.mdLink:hover {
+  text-decoration: underline;
+}
+
+.mdCode {
+  border-radius: 4px;
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  font-family: var(--chaos-mono);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
+.preShell .mdCode {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+.mdH1 { font-size: 1.286em; }
+.mdH2 { font-size: 1.143em; }
+.mdH3 { font-size: 1.071em; }
+
+.mdH1,
+.mdH2,
+.mdH3,
+.mdH4 {
+  margin: 8px 0 4px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mdH4 { font-size: 1em; }
+
+.mdUl {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.mdOl {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  list-style: decimal;
+}
+
+.mdLi {
+  margin-bottom: 2px;
+}
+
+.mdBlockquote {
+  margin: 8px 0;
+  border-left: 3px solid var(--dsw-alias-border-l2);
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  color: color-mix(in srgb, var(--dsw-alias-label-primary) 85%, transparent);
+}
+
+.mdHr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.tableWrap {
+  margin: 8px 0;
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.mdTable {
+  border-collapse: collapse;
+  border: 1px solid var(--dsw-alias-border-l1);
+  font-size: 13px;
+}
+
+.mdTh {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mdTd {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+}
+
+.msgText {
+  position: relative;
+  overflow-wrap: anywhere;
+}
+.msgText[data-clamped] {
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.clampFade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(to top, var(--dsw-alias-bg-base), transparent);
+  pointer-events: none;
+}
+
+/* font raised to .panel .clampToggle (0-2-0) so the .panel button { font:inherit }
+.panel .clampToggle {
+  margin-top: 4px;
+  border: none;
+  padding: 0;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.clampToggle:hover {
+  color: var(--dsw-alias-label-primary);
+}
