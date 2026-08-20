@@ -84,6 +84,9 @@
   margin-top: 2px;
 }
 
+/* 两原子原生 margin-top(stream=6/threadPreview=4) 中帘不对齐 — bottomLine 内归零并居顶 */
+.bottomLine button[data-plugin='dsh-chaos'] { margin-top: 0; }
+
 .replies {
   flex: none;
   margin-top: 4px;
