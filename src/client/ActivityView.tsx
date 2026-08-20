@@ -14,7 +14,8 @@
 import { useMemo, useState, type JSX } from 'react'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/ActivityView.module.css'
+import shared from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ChannelView } from './ChannelView.tsx'
@@ -127,7 +128,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
  )
   const headerRow = (
     <header className={css.activityHeader}>
-      <h2 className={css.channelTitle}>{t('activity.title')}</h2>
+      <h2 className={shared.channelTitle}>{t('activity.title')}</h2>
       <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
       <div className={css.activityHeadTabs}>{filterTabs}</div>
     </header>
@@ -139,7 +140,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       <div className={css.activityView} data-docked="true">
         <div className={css.activityListCol}>
           {headerRow}
-          {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
+          {error !== undefined && <div className={shared.taskBoardError} role="alert">{error}</div>}
           {rows}
         </div>
         <div className={css.activityDetailCol}>
@@ -177,7 +178,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   return (
     <div className={css.activityView}>
       {headerRow}
-      {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
+      {error !== undefined && <div className={shared.taskBoardError} role="alert">{error}</div>}
       {items.length === 0 ? <div className={css.activityEmpty}>{t('activity.empty')}</div> : rows}
     </div>
   )

@@ -1,0 +1,33 @@
+/* ActivityView: view/header/count/empty/dock 两列+close+DetailPane, root scope=.activityView, shared channelTitle/tab/taskBoardError 仍住 mega */
+
+/* ── P1 previews: tae 头像组（重叠压一列，面板 token 边界白描） ──────────── */
+
+/* ── Assignee popover (raft 参考形态: 标题+搜索+行 avatar+对勾) ───────────── */
+
+/* ── P0-6 Activity inbox(plocal InboxMain 形态对齐) ───────────────────── */
+.activityView { display: flex; height: 100%; min-height: 0; flex: 1; min-width: 0; overflow: hidden; flex-direction: column; }
+/* rc-8: dock 态两列 — 左列全栈(头+筛+list), 右列 [dock 头 + 内容] */
+.activityView[data-docked='true'] { flex-direction: row; gap: 0; }
+.activityView .activityHeader {
+  display: flex; flex: none; align-items: center; gap: 8px;
+  padding: 10px 10px 9px 16px; border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+.activityView .activityHeadTabs { margin-left: auto; }
+.activityView .activityCount { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.activityView .activityEmpty { padding: 32px 16px; color: var(--dsw-alias-label-tertiary); font-size: 13px; text-align: center; }
+.activityView .activityDetailPane { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
+.activityView .activityDetailPane > * { flex: 1; min-height: 0; }
+.activityView .activityDetailPane { position: relative; }
+/* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
+.activityView .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
+.activityView .activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }
+.activityView .activityDetailCol { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
+.activityView .activityListCol { display: flex; width: 320px; flex: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--dsw-alias-border-l1); }
+/* 右区里 ✕ 收栏浮右上(ChannelView 自头下) */
+.activityView .activityDockClose {
+  position: absolute; top: 12px; right: 12px; z-index: 4;
+  display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-base); cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+.activityView .activityDockClose:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
