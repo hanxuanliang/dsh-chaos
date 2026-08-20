@@ -23,8 +23,8 @@
   padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font-size: 14px; /* pilot SidebarRoot 行文 = 14px/22; .rail 前缀=打败宿主 .panel button(0-1-1) */
-  line-height: 22px;
+  /* font shorthand token 化 (oil-creator 方式) */
+  font: var(--dsw-font-s-14);
   text-align: left;
   cursor: pointer;
 }
@@ -120,8 +120,8 @@
   padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font-size: 14px; /* pilot SidebarRoot 行文 = 14px/22; .rail 前缀=打败宿主 .panel button(0-1-1) */
-  line-height: 22px;
+  /* font shorthand token 化 (oil-creator 方式) */
+  font: var(--dsw-font-s-14);
   text-align: left;
   cursor: pointer;
 }

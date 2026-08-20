@@ -99,8 +99,8 @@
 .rowBody {
   min-width: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  line-height: 22px;
+  /* oil-creator 方式: font shorthand = --dsw-font-s-14 (14px/22 + stack) */
+  font: var(--dsw-font-s-14);
   flex: 1;
   display: flex;
   flex-direction: column;
