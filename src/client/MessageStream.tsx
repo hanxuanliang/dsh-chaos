@@ -19,7 +19,7 @@
  *   keeps the conn-bar/resync faces.
  * P0 still skips virtual scrolling, thread previews, and hover reply.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, type JSX, type UIEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type UIEvent } from 'react'
 import type { NativeActor, NativeMessage, NativeTarget, NativeTask } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
@@ -195,9 +195,20 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     }
   }, [jumpMessageId, state.messagesByChannel, state.totalByChannel, state.olderLoading, channelId, store, onJumpHandled])
 
+  const [atBottom, setAtBottom] = useState(true)
   const onScroll = (event: UIEvent<HTMLDivElement>): void => {
     const el = event.currentTarget
-    pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    const pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+    pinnedRef.current = pinned
+    setAtBottom(pinned)
+  }
+  /** Back-to-bottom: 离底 >60px 显示 (channel+thread 共用), 一键滚回最新。 */
+  const jumpToBottom = (): void => {
+    const el = scrollerRef.current
+    if (el === null) return
+    el.scrollTop = el.scrollHeight
+    pinnedRef.current = true
+    setAtBottom(true)
   }
 
   if (state.connection === 'resyncing') {
@@ -217,6 +228,12 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     <div className={css.streamWrap}>
       {state.connection === 'down' && (
         <div className={css.connBar} role="status">{t('channel.disconnected')}</div>
+      )}
+      {!atBottom && (
+        <button type="button" className={css.backToBottom} title={t('stream.backToBottom')} aria-label={t('stream.backToBottom')} onClick={jumpToBottom}>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3v10M4 9.5 8 13l4-3.5" /></svg>
+          <span>{t('stream.backToBottom')}</span>
+        </button>
       )}
       <div className={css.stream} ref={scrollerRef} onScroll={onScroll}>
         <div className={css.chatCol}>

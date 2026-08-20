@@ -6,6 +6,7 @@
 /* --- message stream --- */
 
 .streamWrap {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1;
@@ -140,4 +141,29 @@
 .streamWrap .listPush {
   flex: 1 1 0;
   min-height: 8px;
+}
+
+/* Back-to-bottom: 悬浮条bottom-center (plocal "Back to bottom" 葡萄), 
+ * 我 76px 距离 (座 composer 上方, 中心 center) */
+.streamWrap .backToBottom {
+  position: absolute;
+  z-index: 5;
+  bottom: 24px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
+}
+.streamWrap .backToBottom:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
