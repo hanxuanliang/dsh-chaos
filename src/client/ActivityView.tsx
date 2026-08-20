@@ -12,6 +12,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useState, type JSX } from 'react'
+import { IconCheckOutline16, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
@@ -138,9 +139,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
             disabled={busy === item.conversationId}
             onClick={() => { markDone(item) }}
           >
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m3.5 8.5 3 3 6-7" />
-            </svg>
+            <IconCheckOutline16 />
           </button>
         </div>
       ))}
@@ -198,9 +197,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
               />
             )}
             <button type="button" className={css.activityDockClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
-              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                <path d="m4 4 8 8M12 4l-8 8" />
-              </svg>
+              <IconCloseOutline16 />
             </button>
           </div>
         </div>

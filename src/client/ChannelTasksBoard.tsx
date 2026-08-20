@@ -28,7 +28,7 @@
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconEditOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -59,9 +59,7 @@ const ALLOWED: Record<TaskStatus, readonly TaskStatus[]> = {
 /** Raft task panel idiom: small pencil = editable affordance cue. */
 function PencilGlyph(): JSX.Element {
   return (
-    <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m10.5 2.5 3 3L6 13H3v-3L10.5 2.5Z" />
-    </svg>
+    <IconEditOutline16 />
   )
 }
 
@@ -138,9 +136,7 @@ function TaskStatusDropdown({ task, t, onMove }: {
                 <span className={css.statusDot} data-status={lane} aria-hidden="true" />
                 <span className={css.statusMenuLabel}>{t(LANE_LABEL_KEY[lane])}</span>
                 {lane === task.status && (
-                  <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="m3.5 8.5 3 3 6-7" />
-                  </svg>
+                  <IconCheckOutline16 />
                 )}
               </button>
             )
@@ -185,9 +181,7 @@ function AssigneeFilter({ t, members, value, onChange }: {
     >
       <span className={css.statusMenuLabel}>{text}</span>
       {value === key && (
-        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="m3.5 8.5 3 3 6-7" />
-        </svg>
+        <IconCheckOutline16 />
       )}
     </button>
   )
@@ -206,9 +200,7 @@ function AssigneeFilter({ t, members, value, onChange }: {
           <path d="M3.5 13.5c.8-2.2 2.5-3.2 4.5-3.2s3.7 1 4.5 3.2" />
         </svg>
         {label}
-        <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />
-        </svg>
+        <IconChevronDownOutline14 />
       </button>
       {open && (
         <span role="menu" className={css.statusMenu}>
@@ -396,9 +388,7 @@ function AssigneeRow({ actor, query, current, onPick }: {
 
 function CheckGlyph(): JSX.Element {
   return (
-    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m3.5 8.5 3 3 6-7" />
-    </svg>
+    <IconCheckOutline16 />
   )
 }
 
@@ -428,9 +418,7 @@ function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor
         {/* 用户拍板：不需要独立锚定区——title 本身就是跳转链。 */}
         <button type="button" className={css.taskDetailTitleLink} title={t('tasks.anchorGo')} onClick={onOpenAnchor}>
           <span className={css.taskDetailTitle}>{title}</span>
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 8h9M8.5 4 12.5 8 8.5 12" />
-          </svg>
+          <IconChevronRightOutline14 />
         </button>
       </div>
       <dl className={css.taskDetailMeta}>

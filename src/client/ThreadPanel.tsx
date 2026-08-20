@@ -20,6 +20,7 @@
  *   channel messages, and thread replies are not top-level.
  */
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
+import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -114,9 +115,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
       <header className={css.threadHead}>
         <span className={css.threadTitle}>{t('thread.title')}</span>
         <button type="button" className={css.threadClose} aria-label={t('thread.close')} onClick={onClose}>
-          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-            <path d="m4 4 8 8M12 4l-8 8" />
-          </svg>
+          <IconCloseOutline16 />
         </button>
       </header>
       {thread.rootMessageId !== undefined && (

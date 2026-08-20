@@ -1,4 +1,5 @@
 import { useState, useSyncExternalStore, type JSX } from 'react'
+import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStore } from './collab-store.ts'
 import { ChannelRail } from './ChannelRail.tsx'
 import { ActivityView } from './ActivityView.tsx'
@@ -62,9 +63,7 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
           title={t('panel.close')}
           onClick={onClose}
         >
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
-            <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
-          </svg>
+          <IconCloseOutline16 />
         </button>
       </header>
       {panelView === 'activity' ? (

@@ -1106,7 +1106,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   /* pilot/plocal 发送钮真值：品牌蓝底 + 反白字形（黑/白 label-primary 在
    * 深色下会变亮白块，观感差）。 */
   background: var(--dsw-alias-state-business-primary);
-  color: var(--dsw-alias-label-primary-inverted, #fff);
+  /* 宿主 button:disabled 全域规则与 :disabled(同级伪类) 晚载覆盖 → !important 镇
+   * 住字色； 宿主 runtime 的 label-primary-inverted 实测=深黑, 所以字面白。 */
+  color: #fff !important;
   cursor: pointer;
   transition: background 100ms, opacity 100ms;
 }

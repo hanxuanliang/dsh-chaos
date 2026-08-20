@@ -10,6 +10,7 @@
  * selector / workspace chip / context strip.
  */
 import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react'
+import { IconSendOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeTarget } from '../native.ts'
 import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -304,9 +305,7 @@ export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask
             disabled={inert || text.trim() === ''}
             onClick={() => { void executeSend(asTask) }}
           >
-            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M8 12.5v-9M4.5 7L8 3.5 11.5 7" />
-            </svg>
+            <IconSendOutline16 />
           </button>
         </div>
       </div>
