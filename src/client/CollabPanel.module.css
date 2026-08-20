@@ -1357,6 +1357,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   padding-bottom: 4px;
 }
 .taskColumn {
+  align-self: flex-start; /* plocal BoardLane: self-start — 列按内容高度走，不撑满整栏 */
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -1365,6 +1366,12 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-2);
 }
+.taskColumn[data-drag-over='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, var(--dsw-alias-bg-layer-2));
+}
+.taskCard[draggable='true'] { cursor: grab; }
+.taskCard[data-dragging='true'] { opacity: 0.45; }
 .taskColumnHeader {
   display: flex;
   flex: none;
@@ -1904,4 +1911,4 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* ── P1 previews: tae 头像组（重叠压一列，面板 token 边界白描） ──────────── */
 .threadPreviewAvatars { display: inline-flex; padding-left: 4px; }
-.threadPreviewAvatars .avatarXs { width: 15px; height: 15px; font-size: 9px; margin-left: -4px; box-shadow: 0 0 0 1.5px var(--dsw-alias-message-hover, var(--dsw-alias-tertiary)); }
+.threadPreviewAvatars .avatarXs { width: 15px; height: 15px; font-size: 9px; line-height: 15px; margin-left: -4px; box-shadow: 0 0 0 1.5px var(--dsw-alias-message-hover, var(--dsw-alias-tertiary)); }

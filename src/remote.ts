@@ -300,7 +300,10 @@ async function dispatchRemote(
     case 'task.create':
       return await api.createTask(requiredString(input, 'messageId'), actorId)
     case 'task.claim':
-      return await api.claimTask(requiredString(input, 'messageId'), actorId)
+      return await api.claimTask(
+        requiredString(input, 'messageId'),
+        optionalString(input, 'actorId') ?? actorId,
+      )
     case 'task.unclaim':
       return await api.unclaimTask(
         requiredString(input, 'messageId'),

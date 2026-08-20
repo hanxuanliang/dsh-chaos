@@ -433,8 +433,8 @@ export class CollabStore {
   }
 
   /** Claim unowned task (todo → in_progress + self assignee, server-fenced). */
-  async claimTask(messageId: string): Promise<NativeTask> {
-    const task = await this.client.taskClaim(messageId)
+  async claimTask(messageId: string, actorId?: string): Promise<NativeTask> {
+    const task = await this.client.taskClaim(messageId, actorId)
     this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [task.messageId]: task } })
     return task
   }

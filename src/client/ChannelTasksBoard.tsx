@@ -229,16 +229,28 @@ function AssigneeFilter({ t, members, value, onChange }: {
   )
 }
 
-function TaskCard({ task, title, excerpt, assigneeLabel, t, onOpen }: {
+function TaskCard({ task, title, excerpt, assigneeLabel, t, dragging, onDragStart, onDragEnd, onOpen }: {
   task: NativeTask
   title: string
   excerpt: string
   assigneeLabel: string | undefined
   t: ChaosTranslate
+  dragging: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
   onOpen: () => void
 }): JSX.Element {
   return (
-    <button type="button" className={css.taskCard} data-status={task.status} onClick={onOpen}>
+    <button
+      type="button"
+      className={css.taskCard}
+      data-status={task.status}
+      data-dragging={dragging ? 'true' : undefined}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={onOpen}
+    >
       <span className={css.taskCardTitle}>{title}</span>
       {excerpt !== '' && <span className={css.taskCardExcerpt}>{excerpt}</span>}
       <span className={css.taskCardMeta}>
@@ -254,12 +266,15 @@ function TaskCard({ task, title, excerpt, assigneeLabel, t, onOpen }: {
  * actions the fixed-principal surface supports — claim (when the pool holds
  * the task) or unclaim self (when I hold it); someone else's claim is
  * read-only. */
-function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: {
+function AssigneeEditor({ task, selfActor, agents, assigneeLabel, t, onClaim, onUnclaim }: {
   task: NativeTask
-  selfId: string | undefined
+  /** 当前用户 actor（fixed-identity RPC 下的 UI 位）。 */
+  selfActor: NativeActor | undefined
+  /** channel members 中的 agent（后端 claim_task 自身会校验被认领方父级成员）。 */
+  agents: NativeActor[]
   assigneeLabel: string | undefined
   t: ChaosTranslate
-  onClaim: () => void
+  onClaim: (actorId?: string) => void
   onUnclaim: () => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
@@ -274,7 +289,7 @@ function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: 
     return () => { document.removeEventListener('mousedown', close) }
   }, [open])
 
-  const mine = task.assigneeId !== undefined && task.assigneeId === selfId
+  const mine = task.assigneeId !== undefined && selfActor !== undefined && task.assigneeId === selfActor.id
   const editable = task.assigneeId === undefined || mine
   if (!editable) {
     return <span className={css.assigneeChipStatic}>{assigneeLabel}</span>
@@ -294,9 +309,24 @@ function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: 
       {open && (
         <span role="menu" className={css.statusMenu}>
           {task.assigneeId === undefined && (
-            <button type="button" role="menuitem" className={css.statusMenuItem} onClick={() => { setOpen(false); onClaim() }}>
-              <span className={css.statusMenuLabel}>{t('tasks.claimSelf')}</span>
-            </button>
+            <>
+              {agents.map(agent => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  role="menuitem"
+                  className={css.statusMenuItem}
+                  onClick={() => { setOpen(false); onClaim(agent.id) }}
+                >
+                  <span className={css.statusMenuLabel}>{t('tasks.claimTo', { handle: agent.handle })}</span>
+                </button>
+              ))}
+              {selfActor !== undefined && (
+                <button type="button" role="menuitem" className={css.statusMenuItem} onClick={() => { setOpen(false); onClaim() }}>
+                  <span className={css.statusMenuLabel}>{t('tasks.claimSelf')}</span>
+                </button>
+              )}
+            </>
           )}
           {mine && (
             <button type="button" role="menuitem" className={css.statusMenuItem} onClick={() => { setOpen(false); onUnclaim() }}>
@@ -309,15 +339,16 @@ function AssigneeEditor({ task, selfId, assigneeLabel, t, onClaim, onUnclaim }: 
   )
 }
 
-function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfId, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
+function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor, agents, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
   task: NativeTask
   title: string
   assigneeLabel: string | undefined
   createdByLabel: string
-  selfId: string | undefined
+  selfActor: NativeActor | undefined
+  agents: NativeActor[]
   t: ChaosTranslate
   onMove: (target: TaskStatus) => void
-  onClaim: () => void
+  onClaim: (actorId?: string) => void
   onUnclaim: () => void
   onOpenAnchor: () => void
   onClose: () => void
@@ -351,7 +382,8 @@ function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfId, t
           <dd>
             <AssigneeEditor
               task={task}
-              selfId={selfId}
+              selfActor={selfActor}
+              agents={agents}
               assigneeLabel={assigneeLabel}
               t={t}
               onClaim={onClaim}
@@ -390,6 +422,9 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
   const [assigneeFilter, setAssigneeFilter] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | undefined>(undefined)
   const [moveError, setMoveError] = useState<string | undefined>(undefined)
+  /** HTML5 dnd (plocal dnd-kit 的最小依赖同义实现): 拖一张 task 卡, 列只在状态机可达时点亮。 */
+  const [draggingTaskId, setDraggingTaskId] = useState<string | undefined>(undefined)
+  const [dragOverLane, setDragOverLane] = useState<TaskStatus | undefined>(undefined)
 
   const tasks = useMemo(() => {
     const list = Object.values(state.tasksByMessage).filter(task => task.targetId === channelId)
@@ -453,8 +488,29 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
       <div className={css.taskColumns}>
         {LANES.map((lane) => {
           const laneTasks = tasks.filter(task => task.status === lane)
+          const draggingTask = draggingTaskId === undefined ? undefined : tasks.find(t => t.messageId === draggingTaskId)
+          const laneAcceptsDrag = draggingTask !== undefined && draggingTask.status !== lane
+            && ALLOWED[draggingTask.status].includes(lane)
           return (
-            <section key={lane} className={css.taskColumn} data-status={lane}>
+            <section
+              key={lane}
+              className={css.taskColumn}
+              data-status={lane}
+              data-drag-over={dragOverLane === lane && laneAcceptsDrag ? 'true' : undefined}
+              onDragOver={(event) => {
+                if (!laneAcceptsDrag) return
+                event.preventDefault()
+                setDragOverLane(lane)
+              }}
+              onDragLeave={() => { setDragOverLane(undefined) }}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDragOverLane(undefined)
+                if (draggingTask === undefined) return
+                setDraggingTaskId(undefined)
+                move(draggingTask, lane)
+              }}
+            >
               <header className={css.taskColumnHeader}>
                 <span className={css.statusDot} data-status={lane} aria-hidden="true" />
                 <h3 className={css.taskColumnTitle}>{t(LANE_LABEL_KEY[lane])}</h3>
@@ -471,6 +527,9 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
                       excerpt={excerpt}
                       assigneeLabel={assigneeLabelOf(task)}
                       t={t}
+                      dragging={draggingTaskId === task.messageId}
+                      onDragStart={() => { setDraggingTaskId(task.messageId) }}
+                      onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
                       onOpen={() => { setMoveError(undefined); setSelectedMessageId(task.messageId) }}
                     />
                   )
@@ -489,10 +548,11 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
           title={(() => { const s = splitAnchor(anchorOf(selected)); return s.title === '' ? `#${selected.number}` : s.title })()}
           assigneeLabel={assigneeLabelOf(selected)}
           createdByLabel={createdByLabelOf(selected)}
-          selfId={state.selfId}
+          selfActor={state.actors.find(a => a.id === state.selfId)}
+          agents={members}
           t={t}
           onMove={(target) => { move(selected, target) }}
-          onClaim={() => { setMoveError(undefined); store.claimTask(selected.messageId).catch(surfaceError) }}
+          onClaim={(actorId) => { setMoveError(undefined); store.claimTask(selected.messageId, actorId).catch(surfaceError) }}
           onUnclaim={() => { setMoveError(undefined); store.unclaimTask(selected.messageId).catch(surfaceError) }}
           onOpenAnchor={() => { setSelectedMessageId(undefined); onOpenMessage(selected.messageId) }}
           onClose={() => { setSelectedMessageId(undefined) }}

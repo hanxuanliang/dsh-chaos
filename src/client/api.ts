@@ -116,9 +116,9 @@ export class ChaosClient {
   }
 
   /** todo → in_progress with an assignee attached (fixed-principal actor). */
-  taskClaim(messageId: string): Promise<NativeTask> {
-    return this.call('task.claim', { messageId })
-  }
+  taskClaim(messageId: string, actorId?: string): Promise<NativeTask> {
+      return this.call('task.claim', actorId === undefined ? { messageId } : { messageId, actorId })
+    }
 
   /** Release own claim back to the pool (fixed-principal, version-fenced). */
   taskUnclaim(messageId: string, expectedVersion: string): Promise<NativeTask> {
