@@ -185,28 +185,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* Bottom growth (plocal MessageScroller truth: an elastic spacer pushes the
    rendered window to the bottom, so fresh replies grow upward — channel and
    thread streams grow identically). */
-.chatCol {
-  display: flex;
-  min-height: 100%;
-  flex-direction: column;
-}
-.listPush {
-  flex: 1 1 0;
-  min-height: 8px;
-}
-
-/* Full-width content column shared by the stream and the composer — plocal
- * truth (MessageScroller container w-full px-2): rows hug the left edge, no
- * centered max-width column. Row px (8) + this px (8) = 16px from panel edge,
- * matching plocal (scroller px-2 + row px-2). */
-.chatCol {
-  display: flex;
-  min-height: 100%;
-  width: 100%;
-  flex-direction: column;
-  box-sizing: border-box;
-  padding: 12px 8px 24px;
-}
+/* stream 内栏 chatCol + listPush 已移交 blocks/MessageStream.module.css (chatCol scope=.streamWrap) */
+/* stream 内栏 chatCol + listPush 已移交 blocks/MessageStream.module.css (chatCol scope=.streamWrap) */
 /* plocal TaskChip (truth §5): 20px h, 0 6px padding, r6, 1px gray border,
  * 10px bold, gap 4 — icon + #N (+ @assignee), no "task"/status words.
  * plocal brutal palette → host alias approximation (host has no purple
@@ -216,18 +196,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
  *   in_review   brutal-lavender #7287fd → color-mix(business 50% + error 50%) ≈ 紫
  *   done        brutal-lime #40a02b → state-success-primary (green)
  * Chip 底 = --chip 15% tint（plocal bg-X/15），glyph/字 = --chip，border = l1 灰。 */
-/* font raised to .panel .taskChip (0-2-0) so the .panel button { font:inherit }
-.panel .olderButton {
-  align-self: center;
-  border: none;
-  padding: 2px 8px;
-  color: var(--dsw-alias-label-tertiary);
-  background: transparent;
-  font-family: var(--chaos-mono);
-  font-size: 11px;
-  line-height: 16px;
-  cursor: pointer;
-}
+/* olderButton 基样式同移交 (scope=.streamWrap) */
 /* TaskCard 原 panel-scope 已转 blocks/TaskCard.module.css (同元素 [data-plugin] 0-2-0) */
 /* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
  * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */

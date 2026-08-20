@@ -73,7 +73,18 @@
   gap: 8px;
 }
 
-/* font raised to .panel .olderButton (0-2-0) so the .panel button { font:inherit }
+/* font raised: 0-2-0 摇摇 .panel button font:inherit */
+.streamWrap .olderButton {
+  align-self: center;
+  border: none;
+  padding: 2px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font-family: var(--chaos-mono);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
 .streamWrap .olderButton:hover {
   color: var(--dsw-alias-label-secondary);
 }
@@ -115,4 +126,18 @@
 @keyframes chaos-skeleton-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
+}
+
+/* chatCol/listPush: mega 移交 (= 快流列内栏, 8 侧 + 24 底 pad + listPush 弹性底) */
+.streamWrap .chatCol {
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 12px 8px 24px;
+}
+.streamWrap .listPush {
+  flex: 1 1 0;
+  min-height: 8px;
 }
