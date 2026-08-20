@@ -4,6 +4,7 @@
  * and the in-panel composer. The tasks tab is a P0-2 placeholder only — the
  * real board lands with P0-4.
  */
+import type { ReactNode } from 'react'
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { NativeTarget } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -69,32 +70,37 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
     .filter(task => task.targetId === channel.id && task.status !== 'done').length
   const composerDisabled = state.connection !== 'live'
 
+  // 头部元在 messages 模式落进主列 mainCol (与 thread 水平; rc 2026-08-20), 在
+  // tasks 模式满铺 (无 thread 并存)。
+  const channelHead = (
+    <header className={css.channelHead}>
+      <h3 className={css.channelTitle}>
+        <span className={css.channelHash} aria-hidden="true">#</span>
+        {channel.name}
+      </h3>
+      <PillTabs
+        items={[
+          { id: 'messages', label: t('channel.tabMessages'), active: tab === 'messages', onClick: () => { setTab('messages') } },
+          { id: 'tasks', label: t('channel.tabTasks', { count: openTasks }), active: tab === 'tasks', onClick: () => { setTab('tasks') } },
+        ]}
+      />
+      {members !== undefined && (
+        <button
+          type="button"
+          className={css.memberChip}
+          aria-haspopup="dialog"
+          onClick={() => { setMembersOpen(true) }}
+         title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
+          <IconMembers />
+          <span className={css.memberCount}>{members.length}</span>
+        </button>
+      )}
+    </header>
+  )
+
   return (
     <section className={css.channel} aria-label={`# ${channel.name}`}>
-      <header className={css.channelHead}>
-        <h3 className={css.channelTitle}>
-          <span className={css.channelHash} aria-hidden="true">#</span>
-          {channel.name}
-        </h3>
-        <PillTabs
-          items={[
-            { id: 'messages', label: t('channel.tabMessages'), active: tab === 'messages', onClick: () => { setTab('messages') } },
-            { id: 'tasks', label: t('channel.tabTasks', { count: openTasks }), active: tab === 'tasks', onClick: () => { setTab('tasks') } },
-          ]}
-        />
-        {/* 成员数 chip 单独挂在头部最右端（用户 2026-08-19 拍板），不与 tab 组并列 */}
-        {members !== undefined && (
-          <button
-            type="button"
-            className={css.memberChip}
-            aria-haspopup="dialog"
-            onClick={() => { setMembersOpen(true) }}
-           title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
-            <IconMembers />
-            <span className={css.memberCount}>{members.length}</span>
-          </button>
-        )}
-      </header>
+      {tab === 'tasks' && channelHead}
       {tab === 'messages'
         ? (
           <ChannelChatPane
@@ -102,6 +108,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             store={store}
             state={state}
             channel={channel}
+            channelHead={channelHead}
             thread={threadRootId !== undefined ? thread : undefined}
             jumpMessageId={jumpMessageId}
             onJumpHandled={() => { setJumpMessageId(undefined) }}
@@ -142,11 +149,13 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
  * 「先展示 channel, 有 thread 才在右侧展开」。ChannelView messages tab 自己用
  * 它; Activity 右栏 dock 也用同一组件, 不再手拼第二套。
  */
-export function ChannelChatPane({ t, store, state, channel, thread, jumpMessageId, onJumpHandled, activeLocale, onOpenTasks, onOpenThread, onCloseThread, onRootJump, composerDisabled }: {
+export function ChannelChatPane({ t, store, state, channel, channelHead, thread, jumpMessageId, onJumpHandled, activeLocale, onOpenTasks, onOpenThread, onCloseThread, onRootJump, composerDisabled }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   channel: NativeTarget
+  /** 头部元 — rc 2026-08-20 messages 模式落主列; **undefined**=不渲头(Activity dock 处于也别给) */
+  channelHead: ReactNode | undefined
   thread: NativeTarget | undefined
   jumpMessageId: string | undefined
   onJumpHandled(): void
@@ -160,6 +169,7 @@ export function ChannelChatPane({ t, store, state, channel, thread, jumpMessageI
   return (
     <div className={css.channelMainRow}>
       <div className={css.channelMainCol}>
+        {channelHead}
         <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={onJumpHandled}
           t={t}
           store={store}
