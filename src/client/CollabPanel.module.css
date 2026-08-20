@@ -2059,14 +2059,15 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .activityView[data-docked='true'] { flex-direction: row; gap: 0; }
 .activityListCol { display: flex; width: 320px; flex: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--dsw-alias-border-l1); }
 .activityDetailCol { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
-.activityDockHead {
-  display: flex; flex: none; align-items: center; gap: 10px;
-  padding: 10px 10px 9px 14px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+/* 右区里 ✕ 收栏浮右上(ChannelView 自头下) */
+.activityDockClose {
+  position: absolute; top: 12px; right: 12px; z-index: 4;
+  display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-base); cursor: pointer;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
-.activityDockHead .threadClose { margin-left: auto; }
-.activityDockHead .tab { margin-left: auto; }
-.activityDockHead .tab + .threadClose { margin-left: 0; }
+.activityDockClose:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.activityDetailPane { position: relative; }
 
 
 /* rc-7: 筛项在 Activity 顶行下独立一行 */

@@ -16,14 +16,13 @@ import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './CollabPanel.module.css'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
-import { ChannelChatPane } from './ChannelView.tsx'
+import { ChannelView } from './ChannelView.tsx'
 import { StatusChip } from './StatusChip.tsx'
 
 interface ActivityViewProps {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
-  onOpenThreadRoot: (rootMessageId: string, parentChannelId: string) => void
   activeLocale(): string
 }
 
@@ -45,42 +44,7 @@ function relativeTime(atMs: number): string {
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function DockedChannelPane({ t, store, state, dock, activeLocale }: {
-  t: ChaosTranslate
-  store: CollabStore
-  state: CollabStoreSnapshot
-  dock: Dock
-  activeLocale(): string
-}): JSX.Element {
-  const channel = state.channels.find((c) => c.id === dock.channelId) as NativeTarget
-  const [threadRootId, setThreadRootId] = useState<string | undefined>(dock.threadRootId)
-  const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
-  const thread = threadRootId !== undefined
-    ? state.threads.find((x) => x.rootMessageId === threadRootId)
-    : undefined
-  return (
-    <div className={css.dockedChannel}>
-      {/* 头部不在此: 提权到 activity 头(stack)之下, 横跨右区 */}
-      <ChannelChatPane
-        t={t}
-        store={store}
-        state={state}
-        channel={channel}
-        thread={thread}
-        jumpMessageId={jumpMessageId}
-        onJumpHandled={() => { setJumpMessageId(undefined) }}
-        activeLocale={activeLocale}
-        onOpenTasks={() => { /* dock 内无 tasks tab — 诚实不开假口 */ }}
-        onOpenThread={(messageId) => { setThreadRootId(messageId); void store.openThread(messageId) }}
-        onCloseThread={() => { setThreadRootId(undefined) }}
-        onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
-        composerDisabled={state.connection !== 'live'}
-      />
-    </div>
-  )
-}
-
-export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }: ActivityViewProps): JSX.Element {
+export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [dock, setDock] = useState<Dock | undefined>(undefined)
@@ -197,9 +161,6 @@ export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }
   if (dock !== undefined) {
     // dock 态 = 两列: 左列 [Activity 头 + 筛行 + 列表全栈]; 右列 [dock 头 + ChannelChatPane body]
     const dockChannel = state.channels.find((c) => c.id === dock.channelId)
-    const dockHeadTitle = dock.threadRootId !== undefined
-      ? t('activity.dockThreadTitle', { name: dockChannel?.name ?? dock.channelId.slice(0, 8) })
-      : `#${dockChannel?.name ?? dock.channelId.slice(0, 8)}`
     return (
       <div className={css.activityView} data-docked="true">
         <div className={css.activityListCol}>
@@ -208,27 +169,24 @@ export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }
           {rows}
         </div>
         <div className={css.activityDetailCol}>
-          <div className={css.activityDockHead}>
-            <h3 className={css.channelTitle}>{dockHeadTitle}</h3>
-            {dock.threadRootId !== undefined && (
-              <button type="button" className={css.tab} onClick={() => { onOpenThreadRoot(dock.threadRootId as string, dock.channelId) }}>
-                {t('activity.viewInChannel')}
-              </button>
-            )}
-            <button type="button" className={css.threadClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
+
+          <div className={css.activityDetailPane} key={dockKey}>
+            {/* 右区 = ChannelView 自体: channel+thread 组合不该在 activity 重造。
+                ✕ 浮动右上收栏。 */}
+            <ChannelView
+              t={t}
+              store={store}
+              state={state}
+              channel={dockChannel as NativeTarget}
+              activeLocale={activeLocale}
+              pendingThreadRoot={dock.threadRootId}
+              onPendingThreadConsumed={() => { /* 只供 mount 初始值消耗; 不按 dock state 清零 */ }}
+            />
+            <button type="button" className={css.activityDockClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
               <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="m4 4 8 8M12 4l-8 8" />
               </svg>
             </button>
-          </div>
-          <div className={css.activityDetailPane} key={dockKey}>
-            <DockedChannelPane
-              t={t}
-              store={store}
-              state={state}
-              dock={dock}
-              activeLocale={activeLocale}
-            />
           </div>
         </div>
       </div>
