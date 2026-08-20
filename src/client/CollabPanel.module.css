@@ -2055,16 +2055,21 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .dockedChannel .threadClose { margin-left: auto; }
 
 
-/* rc-6: dock 头提权到 Activity 头下方, 横跨 dock 右区(list 320+1px 边界 之外) */
+/* rc-8: dock 态两列 — 左列全栈(头+筛+list), 右列 [dock 头 + 内容] */
+.activityView[data-docked='true'] { flex-direction: row; gap: 0; }
+.activityListCol { display: flex; width: 320px; flex: none; min-height: 0; flex-direction: column; border-right: 1px solid var(--dsw-alias-border-l1); }
+.activityDetailCol { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .activityDockHead {
-  display: flex; flex: none; align-items: center; gap: 8px;
-  margin-left: calc(320px + 1px);
-  padding: 9px 10px 8px 14px;
+  display: flex; flex: none; align-items: center; gap: 10px;
+  padding: 10px 10px 9px 14px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .activityDockHead .threadClose { margin-left: auto; }
+.activityDockHead .tab { margin-left: auto; }
+.activityDockHead .tab + .threadClose { margin-left: 0; }
 
 
 /* rc-7: 筛项在 Activity 顶行下独立一行 */
 .activityHeaderTop { display: flex; flex: none; align-items: baseline; gap: 8px; padding: 10px 12px 4px; }
-.activityFilterRow { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.activityFilterRow { display: flex; flex: none; align-items: center; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.activityFilterRow > .tab:last-child { margin-left: auto; }

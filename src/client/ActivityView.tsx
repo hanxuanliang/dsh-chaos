@@ -23,6 +23,7 @@ interface ActivityViewProps {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
+  onOpenThreadRoot: (rootMessageId: string, parentChannelId: string) => void
   activeLocale(): string
 }
 
@@ -79,7 +80,7 @@ function DockedChannelPane({ t, store, state, dock, activeLocale }: {
   )
 }
 
-export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
+export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [dock, setDock] = useState<Dock | undefined>(undefined)
@@ -186,52 +187,65 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     </span>
   )
 
-  return (
-    <div className={css.activityView}>
-      <header className={css.activityHeader}>
-        <div className={css.activityHeaderTop}>
-          <h2 className={css.activityTitle}>{t('activity.title')}</h2>
-          <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
+  const titleBlock = (
+    <div className={css.activityHeaderTop}>
+      <h2 className={css.activityTitle}>{t('activity.title')}</h2>
+      <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
+    </div>
+  )
+
+  if (dock !== undefined) {
+    // dock 态 = 两列: 左列 [Activity 头 + 筛行 + 列表全栈]; 右列 [dock 头 + ChannelChatPane body]
+    const dockChannel = state.channels.find((c) => c.id === dock.channelId)
+    const dockHeadTitle = dock.threadRootId !== undefined
+      ? t('activity.dockThreadTitle', { name: dockChannel?.name ?? dock.channelId.slice(0, 8) })
+      : `#${dockChannel?.name ?? dock.channelId.slice(0, 8)}`
+    return (
+      <div className={css.activityView} data-docked="true">
+        <div className={css.activityListCol}>
+          <header className={css.activityHeader}>{titleBlock}<div className={css.activityFilterRow}>{filterTabs}<button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button></div></header>
+          {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
+          {rows}
         </div>
-        {/* 筛选行: 在 Activity 文字正下方, pill 靠左 / Mark all read 靠右 */}
-        <div className={css.activityFilterRow}>
-          {filterTabs}
-          <button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
-        </div>
-      </header>
-      {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
-      {items.length === 0 ? (
-        <div className={css.activityEmpty}>{t('activity.empty')}</div>
-      ) : dock !== undefined ? (
-        <>
-          {/* dock 头: 和 Activity 头部同列的垂直堆叠(用户拍板), 横跨 dock 右区 */}
+        <div className={css.activityDetailCol}>
           <div className={css.activityDockHead}>
-            <h3 className={css.channelTitle}>
-              <span className={css.channelHash} aria-hidden="true">#</span>
-              {(state.channels.find((c) => c.id === dock.channelId))?.name ?? dock.channelId.slice(0, 8)}
-            </h3>
+            <h3 className={css.channelTitle}>{dockHeadTitle}</h3>
+            {dock.threadRootId !== undefined && (
+              <button type="button" className={css.tab} onClick={() => { onOpenThreadRoot(dock.threadRootId as string, dock.channelId) }}>
+                {t('activity.viewInChannel')}
+              </button>
+            )}
             <button type="button" className={css.threadClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
               <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="m4 4 8 8M12 4l-8 8" />
               </svg>
             </button>
           </div>
-          <div className={css.activitySplit}>
-            <div className={css.activityListPane}>{rows}</div>
-            <div className={css.activityDetailPane} key={dockKey}>
-              <DockedChannelPane
-                t={t}
-                store={store}
-                state={state}
-                dock={dock}
-                activeLocale={activeLocale}
-              />
-            </div>
+          <div className={css.activityDetailPane} key={dockKey}>
+            <DockedChannelPane
+              t={t}
+              store={store}
+              state={state}
+              dock={dock}
+              activeLocale={activeLocale}
+            />
           </div>
-        </>
-      ) : (
-        rows
-      )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={css.activityView}>
+      <header className={css.activityHeader}>
+        {titleBlock}
+        <div className={css.activityFilterRow}>
+          {filterTabs}
+          <button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
+        </div>
+      </header>
+      {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
+      {items.length === 0 ? <div className={css.activityEmpty}>{t('activity.empty')}</div> : rows}
     </div>
   )
 }
