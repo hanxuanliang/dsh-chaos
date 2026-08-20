@@ -1,0 +1,36 @@
+/* TaskChip (原 MessageRow.module.css 内 taskChip 系原样下入 atoms) */
+.chip[data-plugin='dsh-chaos'] {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--chip) 15%, transparent);
+  color: var(--chip);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.chip[data-status='todo'] { --chip: var(--dsw-alias-state-warn-primary); }
+.chip[data-status='in_progress'] { --chip: var(--dsw-alias-state-business-primary); }
+.chip[data-status='in_review'] { --chip: color-mix(in srgb, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-error-primary)); }
+.chip[data-status='done'] { --chip: var(--dsw-alias-state-success-primary); }
+
+.chip:hover { filter: brightness(0.9); }
+
+.chipId { flex: none; }
+
+.chipAssignee {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusIcon { flex: none; }

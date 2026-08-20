@@ -4,32 +4,11 @@
  * 原 MessageStream 内嵌 .msg/.msgCompact 系 20 余条规则全量平移到此。
  */
 import { AvatarChip } from '../atoms/AvatarChip.tsx'
+import { TaskChip } from '../atoms/TaskChip.tsx'
 import type { NativeActor, NativeMessage, NativeTarget, NativeTask, NativeThreadSummary } from '../../native.ts'
 import type { ChaosTranslate } from '../locales.ts'
 import { MessageBody } from '../MessageStream.tsx'
 import css from './MessageRow.module.css'
-
-function StatusIcon({ status }: { status: NativeTask['status'] }): JSX.Element {
-  return (
-    <svg viewBox="0 0 16 16" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={css.statusIcon} data-status={status}>
-      <circle cx="8" cy="8" r="5.5" />
-    </svg>
-  )
-}
-
-function TaskChip({ task, assignee, onOpenTasks }: {
-  task: NativeTask
-  assignee: string | undefined
-  onOpenTasks(): void
-}): JSX.Element {
-  return (
-    <button type="button" className={css.taskChip} data-plugin="dsh-chaos" data-status={task.status} onClick={onOpenTasks}>
-      <StatusIcon status={task.status} />
-      <span className={css.taskChipId}>#{task.number}</span>
-      {assignee !== undefined && <span className={css.taskChipAssignee}>@{assignee}</span>}
-    </button>
-  )
-}
 
 /** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
 export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
@@ -95,7 +74,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   const body = (
     <div className={css.rowBody}>
       <MessageBody t={t} text={message.text} names={mentionNames} />
-      {task !== undefined && <TaskChip task={task} assignee={assigneeHandle} onOpenTasks={onOpenTasks} />}
+      {task !== undefined && <TaskChip task={task} assignee={assigneeHandle} onClick={onOpenTasks} />}
       <ThreadPreview t={t} thread={thread} summary={summary} actorNamesById={actorNamesById} onOpen={onOpenThread} />
     </div>
   )
