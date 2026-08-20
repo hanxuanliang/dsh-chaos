@@ -36,6 +36,7 @@ import css from './CollabPanel.module.css'
 import { StatusChip } from './atoms/StatusChip.tsx'
 import { AvatarChip } from './atoms/AvatarChip.tsx'
 import { TaskCard } from './blocks/TaskCard.tsx'
+import { KanbanLane, KanbanLaneGrid } from './blocks/KanbanLane.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -489,18 +490,20 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
       {moveError !== undefined && (
         <div className={css.taskBoardError} role="alert">{moveError}</div>
       )}
-      <div className={css.taskColumns}>
+      <KanbanLaneGrid>
         {LANES.map((lane) => {
           const laneTasks = tasks.filter(task => task.status === lane)
           const draggingTask = draggingTaskId === undefined ? undefined : tasks.find(t => t.messageId === draggingTaskId)
           const laneAcceptsDrag = draggingTask !== undefined && draggingTask.status !== lane
             && ALLOWED[draggingTask.status].includes(lane)
           return (
-            <section
+            <KanbanLane
               key={lane}
-              className={css.taskColumn}
-              data-status={lane}
-              data-drag-over={dragOverLane === lane && laneAcceptsDrag ? 'true' : undefined}
+              status={lane}
+              label={t(LANE_LABEL_KEY[lane])}
+              count={laneTasks.length}
+              dragOver={dragOverLane === lane && laneAcceptsDrag}
+              emptyLabel={t('tasks.laneEmpty')}
               onDragOver={(event) => {
                 if (!laneAcceptsDrag) return
                 event.preventDefault()
@@ -515,38 +518,28 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
                 move(draggingTask, lane)
               }}
             >
-              <header className={css.taskColumnHeader}>
-                <span className={css.statusDot} data-status={lane} aria-hidden="true" />
-                <h3 className={css.taskColumnTitle}>{t(LANE_LABEL_KEY[lane])}</h3>
-                <span className={css.taskColumnCount}>{laneTasks.length}</span>
-              </header>
-              <div className={css.taskCards}>
-                {laneTasks.map((task) => {
-                  const { title, excerpt } = splitAnchor(anchorOf(task))
-                  return (
-                    <TaskCard
-                      key={task.messageId}
-                      task={task}
-                      title={title === '' ? `#${task.number}` : title}
-                      excerpt={excerpt}
-                      assigneeLabel={assigneeLabelOf(task)}
-                      unassignedLabel={t('tasks.unassigned')}
-                      timeLabel={formatTime(task.updatedAtMs, t)}
-                      dragging={draggingTaskId === task.messageId}
-                      onDragStart={() => { setDraggingTaskId(task.messageId) }}
-                      onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
-                      onOpen={() => { setMoveError(undefined); setSelectedMessageId(task.messageId) }}
-                    />
-                  )
-                })}
-                {laneTasks.length === 0 && (
-                  <div className={css.taskColumnEmpty}>{t('tasks.laneEmpty')}</div>
-                )}
-              </div>
-            </section>
+              {laneTasks.map((task) => {
+                const { title, excerpt } = splitAnchor(anchorOf(task))
+                return (
+                  <TaskCard
+                    key={task.messageId}
+                    task={task}
+                    title={title === '' ? `#${task.number}` : title}
+                    excerpt={excerpt}
+                    assigneeLabel={assigneeLabelOf(task)}
+                    unassignedLabel={t('tasks.unassigned')}
+                    timeLabel={formatTime(task.updatedAtMs, t)}
+                    dragging={draggingTaskId === task.messageId}
+                    onDragStart={() => { setDraggingTaskId(task.messageId) }}
+                    onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
+                    onOpen={() => { setMoveError(undefined); setSelectedMessageId(task.messageId) }}
+                  />
+                )
+              })}
+            </KanbanLane>
           )
         })}
-      </div>
+      </KanbanLaneGrid>
       {selected !== undefined && (
         <TaskDetailModal
           task={selected}

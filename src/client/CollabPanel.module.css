@@ -1301,75 +1301,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-state-error-primary);
   background: var(--dsw-alias-state-error-tertiary, transparent);
 }
-.taskColumns {
-  display: grid;
-  flex: 1;
-  min-height: 0;
-  grid-auto-columns: minmax(220px, 1fr);
-  grid-auto-flow: column;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
-}
-.taskColumn {
-  align-self: flex-start; /* plocal BoardLane: self-start — 列按内容高度走，不撑满整栏 */
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-2);
-}
-.taskColumn[data-drag-over='true'] {
-  border-color: var(--dsw-alias-state-business-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, var(--dsw-alias-bg-layer-2));
-}
 /* TaskCard 原 panel-scope 已转 blocks/TaskCard.module.css (同元素 [data-plugin] 0-2-0) */
-.taskColumnHeader {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 12px;
-}
 /* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
  * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */
-.taskColumnTitle {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--dsw-alias-label-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.taskColumnCount {
-  flex: none;
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.taskCards {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  padding: 2px 8px 10px;
-}
-.taskColumnEmpty {
-  padding: 24px 8px;
-  font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
-  text-align: center;
-}
 /* Card = whole-button; must beat .panel button { font: inherit } (S5). */
 
 /* Detail modal (content lives in .dialogBody — portal, never .panel). */
