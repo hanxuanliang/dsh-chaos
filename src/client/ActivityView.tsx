@@ -203,7 +203,7 @@ export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }
     return (
       <div className={css.activityView} data-docked="true">
         <div className={css.activityListCol}>
-          <header className={css.activityHeader}>{titleBlock}<div className={css.activityFilterRow}>{filterTabs}<button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button></div></header>
+          <header className={css.activityHeader}>{titleBlock}<div className={css.activityFilterRow}>{filterTabs}</div></header>
           {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
           {rows}
         </div>
@@ -241,7 +241,6 @@ export function ActivityView({ t, store, state, onOpenThreadRoot, activeLocale }
         {titleBlock}
         <div className={css.activityFilterRow}>
           {filterTabs}
-          <button type="button" className={css.tab} disabled title={t('activity.filterPending')}>{t('activity.markAllRead')}</button>
         </div>
       </header>
       {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}

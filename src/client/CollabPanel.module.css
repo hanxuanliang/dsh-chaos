@@ -2072,4 +2072,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* rc-7: 筛项在 Activity 顶行下独立一行 */
 .activityHeaderTop { display: flex; flex: none; align-items: baseline; gap: 8px; padding: 10px 12px 4px; }
 .activityFilterRow { display: flex; flex: none; align-items: center; gap: 8px; padding: 2px 12px 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
-.activityFilterRow > .tab:last-child { margin-left: auto; }
+
+/* tabs 类自ChannelView 搬来带 margin:auto(频道头居中用)——此处贴左 */
+.activityFilterRow .tabs { margin: 0; }
