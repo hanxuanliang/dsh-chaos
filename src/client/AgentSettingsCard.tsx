@@ -8,6 +8,7 @@ import { AgentCreateDialog } from './AgentCreateDialog.tsx'
 import { avatarSeed } from './avatar.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './AgentSettingsCard.module.css'
+import streamCss from './blocks/MessageStream.module.css'
 
 export interface AgentSettingsCardProps {
   connection: ConnectionHandle
@@ -149,7 +150,7 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
 
       {phase === 'loading' && (
         <div className={css.skeleton} role="status" aria-label={t('agents.loadingAria')}>
-          {SKELETON_ROWS.map(index => <div key={index} className={css.skeletonRow} />)}
+          {SKELETON_ROWS.map(index => <div key={index} className={streamCss.skeletonRow} />)}
         </div>
       )}
 

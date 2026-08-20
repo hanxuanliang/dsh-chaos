@@ -23,7 +23,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type JSX, type UIEvent } f
 import type { NativeActor, NativeMessage, NativeTarget, NativeTask } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/MessageStream.module.css'
 import { MessageRow } from './blocks/MessageRow.tsx'
 
 export interface MessageStreamProps {

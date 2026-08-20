@@ -1,0 +1,118 @@
+/* MessageStream: wrap/stream/connBar/dayDivider/older/skeleton/resync 系; root scope=.streamWrap; skeleton keyframe 同件迁移 (AgentSettingsCard 另有自己的 skeleton) */
+/* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
+ * padding, compact 11px buttons; active = primary-fill pair; hover lifts
+ * text only. */
+
+/* --- message stream --- */
+
+.streamWrap {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+
+.stream {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+
+.streamWrap .streamEmpty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.streamWrap .streamEmpty > p {
+  margin: 0;
+  font-size: 13px;
+}
+.streamWrap .connBar {
+  display: flex;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+/* plocal day divider: a sticky centered pill, not a hairline. */
+.streamWrap .dayDivider {
+  position: sticky;
+  z-index: 1;
+  top: 12px;
+  align-self: center;
+  margin: 4px 0 8px;
+}
+
+.streamWrap .dayDivider > span {
+  display: inline-block;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, transparent);
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 11px;
+  line-height: 16px;
+}
+/* Head of the column: "load older" trigger / "beginning" hint — plocal keeps
+ * both as centered mono microcopy. */
+.streamWrap .olderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* font raised to .panel .olderButton (0-2-0) so the .panel button { font:inherit }
+.streamWrap .olderButton:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+.streamWrap .resyncNote {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.skeletonStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+
+.skeletonRow {
+  width: 60%;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  animation: chaos-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeletonRow:nth-child(2) { width: 72%; }
+.skeletonRow:nth-child(3) { width: 44%; }
+.streamWrap .retryButton {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 2px 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+@keyframes chaos-skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

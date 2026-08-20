@@ -182,36 +182,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   line-height: 20px;
   text-align: center;
 }
-/* dsh-context segmented pill (.lc-gran): bordered layer-2 track, 1px inset
- * padding, compact 11px buttons; active = primary-fill pair; hover lifts
- * text only. */
-
-/* --- message stream --- */
-
-.streamWrap {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.connBar {
-  display: flex;
-  height: 28px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-}
-
-.stream {
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-}
-
 /* Bottom growth (plocal MessageScroller truth: an elastic spacer pushes the
    rendered window to the bottom, so fresh replies grow upward — channel and
    thread streams grow identically). */
@@ -237,27 +207,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   box-sizing: border-box;
   padding: 12px 8px 24px;
 }
-
-/* plocal day divider: a sticky centered pill, not a hairline. */
-.dayDivider {
-  position: sticky;
-  z-index: 1;
-  top: 12px;
-  align-self: center;
-  margin: 4px 0 8px;
-}
-
-.dayDivider > span {
-  display: inline-block;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 999px;
-  padding: 2px 10px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, transparent);
-  color: var(--dsw-alias-label-tertiary);
-  font-family: var(--chaos-mono);
-  font-size: 11px;
-  line-height: 16px;
-}
 /* plocal TaskChip (truth §5): 20px h, 0 6px padding, r6, 1px gray border,
  * 10px bold, gap 4 — icon + #N (+ @assignee), no "task"/status words.
  * plocal brutal palette → host alias approximation (host has no purple
@@ -268,15 +217,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
  *   done        brutal-lime #40a02b → state-success-primary (green)
  * Chip 底 = --chip 15% tint（plocal bg-X/15），glyph/字 = --chip，border = l1 灰。 */
 /* font raised to .panel .taskChip (0-2-0) so the .panel button { font:inherit }
-/* Head of the column: "load older" trigger / "beginning" hint — plocal keeps
- * both as centered mono microcopy. */
-.olderRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* font raised to .panel .olderButton (0-2-0) so the .panel button { font:inherit }.panel .olderButton {
+.panel .olderButton {
   align-self: center;
   border: none;
   padding: 2px 8px;
@@ -285,64 +226,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-family: var(--chaos-mono);
   font-size: 11px;
   line-height: 16px;
-  cursor: pointer;
-}
-
-.olderButton:hover {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.streamEmpty {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 10px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.streamEmpty > p {
-  margin: 0;
-  font-size: 13px;
-}
-.resyncNote {
-  margin: 0;
-  padding: 8px 0;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  text-align: center;
-}
-
-.skeletonStack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 8px;
-}
-
-@keyframes chaos-skeleton-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-.skeletonRow {
-  width: 60%;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--dsw-alias-bg-layer-2);
-  animation: chaos-skeleton-pulse 1.4s ease-in-out infinite;
-}
-
-.skeletonRow:nth-child(2) { width: 72%; }
-.skeletonRow:nth-child(3) { width: 44%; }
-.panel .retryButton {
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  padding: 2px 8px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font-size: 12px;
   cursor: pointer;
 }
 /* TaskCard 原 panel-scope 已转 blocks/TaskCard.module.css (同元素 [data-plugin] 0-2-0) */
