@@ -28,15 +28,15 @@
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconEditOutline16, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import css from './CollabPanel.module.css'
 import { StatusChip } from './atoms/StatusChip.tsx'
-import { AvatarChip } from './atoms/AvatarChip.tsx'
 import { TaskCard } from './blocks/TaskCard.tsx'
 import { KanbanLane, KanbanLaneGrid } from './blocks/KanbanLane.tsx'
+import { AssigneePopover } from './blocks/AssigneePopover.tsx'
 
 type TaskStatus = NativeTask['status']
 
@@ -59,11 +59,6 @@ const ALLOWED: Record<TaskStatus, readonly TaskStatus[]> = {
 }
 
 /** Raft task panel idiom: small pencil = editable affordance cue. */
-function PencilGlyph(): JSX.Element {
-  return (
-    <IconEditOutline16 />
-  )
-}
 
 /** Compact relative/absolute time label (dsh-task-board TaskCard.formatTime). */
 function formatTime(ms: number, t: ChaosTranslate): string {
@@ -200,152 +195,6 @@ function AssigneeFilter({ t, members, value, onChange }: {
 }
 
 
-/** Raft assignee chip: bordered value + pencil, menu offers the few HONEST
- * actions the fixed-principal surface supports — claim (when the pool holds
- * the task) or unclaim self (when I hold it); someone else's claim is
- * read-only. */
-function AssigneeEditor({ task, selfActor, agents, assigneeLabel, t, onClaim, onUnclaim }: {
-  task: NativeTask
-  /** 当前用户 actor（fixed-identity RPC 下的 UI 位）。 */
-  selfActor: NativeActor | undefined
-  /** channel members 中的 agent（后端 claim_task 自身会校验被认领方父级成员）。 */
-  agents: NativeActor[]
-  assigneeLabel: string | undefined
-  t: ChaosTranslate
-  onClaim: (actorId?: string) => void
-  onUnclaim: () => void
-}): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const rootRef = useRef<HTMLSpanElement>(null)
-  const anchorRef = useRef<HTMLButtonElement>(null)
-  const [anchorRect, setAnchorRect] = useState<{ top: number; left: number } | undefined>(undefined)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (event: MouseEvent): void => {
-      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => { document.removeEventListener('mousedown', close) }
-  }, [open])
-  useEffect(() => { if (open) setQuery('') }, [open])
-
-  const q = query.trim().toLowerCase()
-  const selfHit = selfActor !== undefined && (q === '' || selfActor.handle.toLowerCase().includes(q) || selfActor.displayName.toLowerCase().includes(q))
-  const agentHits = agents.filter(agent => q === '' || agent.handle.toLowerCase().includes(q) || agent.displayName.toLowerCase().includes(q))
-  const filteredEmpty = !selfHit && agentHits.length === 0
-
-  const mine = task.assigneeId !== undefined && selfActor !== undefined && task.assigneeId === selfActor.id
-  const editable = task.assigneeId === undefined || mine
-  if (!editable) {
-    return <span className={css.assigneeChipStatic}>{assigneeLabel}</span>
-  }
-  return (
-    <span ref={rootRef} className={css.statusDropdown}>
-      <button
-        ref={anchorRef}
-        type="button"
-        className={css.assigneeChip}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => {
-          if (!open) {
-            // fixed 定位: S5 派 host Modal overflow 会裁 absolute 下拉, 坐标脱离祖先链
-            const rect = anchorRef.current?.getBoundingClientRect()
-            if (rect !== undefined) setAnchorRect({ top: rect.bottom + 4, left: rect.left })
-          }
-          setOpen(v => !v)
-        }}
-      >
-        {assigneeLabel ?? t('tasks.unassigned')}
-        <PencilGlyph />
-      </button>
-      {open && (
-        <span
-          role="menu"
-          className={css.assigneeMenu}
-          style={anchorRect === undefined ? undefined : { position: 'fixed', top: anchorRect.top, left: anchorRect.left }}
-        >
-          <span className={css.assigneeMenuTitle}>{t('tasks.assigneeMenuTitle')}</span>
-          <input
-            className={css.assigneeMenuSearch}
-            type="search"
-            placeholder={t('tasks.assigneeMenuSearch')}
-            value={query}
-            onChange={(event) => { setQuery(event.target.value) }}
-            autoFocus
-          />
-          {/* raft 形态: Unassigned = 当前值指示行(选中态);仅「已指派且为本人」时可点 → 释放 */}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={task.assigneeId === undefined}
-            className={css.assigneeMenuItem}
-            data-current={task.assigneeId === undefined ? 'true' : undefined}
-            disabled={task.assigneeId === undefined || !mine}
-            onClick={() => { setOpen(false); onUnclaim() }}
-          >
-            <span className={css.assigneeRowLabel}>{t('tasks.unassigned')}</span>
-            {task.assigneeId === undefined && <CheckGlyph />}
-          </button>
-          <AssigneeRow
-            actor={selfActor}
-            t={t}
-            query={query}
-            current={task.assigneeId !== undefined && task.assigneeId === selfActor?.id}
-            disabled={false}
-            onPick={() => { setOpen(false); onClaim() }}
-          />
-          {agentHits.map(agent => (
-            <AssigneeRow
-              key={agent.id}
-              actor={agent}
-              t={t}
-              query={query}
-              current={task.assigneeId === agent.id}
-              disabled={false}
-              onPick={() => { setOpen(false); onClaim(agent.id) }}
-            />
-          ))}
-          {filteredEmpty && (
-            <span className={css.assigneeMenuEmpty}>{t('tasks.assigneeMenuEmpty')}</span>
-          )}
-        </span>
-      )}
-    </span>
-  )
-}
-
-/** raft reference row: avatar + display name + trailing check on the current seat. */
-function AssigneeRow({ actor, query, current, onPick }: {
-  actor: NativeActor | undefined
-  t: ChaosTranslate
-  query: string
-  current: boolean
-  disabled: boolean
-  onPick: () => void
-}): JSX.Element | undefined {
-  if (actor === undefined) return undefined
-  const q = query.trim().toLowerCase()
-  if (q !== '' && !actor.handle.toLowerCase().includes(q) && !actor.displayName.toLowerCase().includes(q)) {
-    return undefined
-  }
-  return (
-    <button type="button" role="menuitemradio" aria-checked={current} className={css.assigneeMenuItem} data-current={current ? 'true' : undefined} onClick={onPick}>
-      <AvatarChip handle={actor.handle} displayName={actor.displayName} />
-      <span className={css.assigneeRowLabel}>{actor.displayName || `@${actor.handle}`}</span>
-      {current && <CheckGlyph />}
-    </button>
-  )
-}
-
-function CheckGlyph(): JSX.Element {
-  return (
-    <IconCheckOutline16 />
-  )
-}
-
 function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor, agents, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
   task: NativeTask
   title: string
@@ -385,7 +234,7 @@ function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor
         <div className={css.taskDetailRow}>
           <dt>{t('tasks.assignee')}</dt>
           <dd>
-            <AssigneeEditor
+            <AssigneePopover
               task={task}
               selfActor={selfActor}
               agents={agents}
