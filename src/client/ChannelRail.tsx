@@ -9,7 +9,7 @@ import { useState, type JSX } from 'react'
 import { IconPlusOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/ChannelRail.module.css'
 
 export interface ChannelRailProps {
   t: ChaosTranslate
