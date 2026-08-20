@@ -250,7 +250,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font-size: 13px;
+  font-size: 14px; /* pilot SidebarRoot 行文 = 14px/22 */
+  line-height: 22px;
   text-align: left;
   cursor: pointer;
 }

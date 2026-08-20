@@ -15,7 +15,7 @@
 
 .tabs[data-align='lead'] { margin-left: 0; }
 
-.tab {
+.tabs .tab {
   border: none;
   border-radius: 5px;
   padding: 3px 8px;
@@ -27,14 +27,14 @@
   cursor: pointer;
 }
 
-.tab:hover:not([disabled]) {
+.tabs .tab:hover:not([disabled]) {
   color: var(--dsw-alias-label-primary);
 }
 
-.tab[data-active] {
+.tabs .tab[data-active] {
   color: var(--dsw-alias-label-primary-foreground, #fff);
   background: var(--dsw-alias-button-primary-fill);
   font-weight: 500;
 }
 
-.tab[disabled] { cursor: default; }
+.tabs .tab[disabled] { cursor: default; }
