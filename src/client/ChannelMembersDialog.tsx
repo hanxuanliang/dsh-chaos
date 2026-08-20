@@ -81,7 +81,7 @@ export function ChannelMembersDialog({ t, store, state, channelId, onClose }: Ch
       contentClassName={css.dialogBody as string}
       footer={stage === 'list'
         ? (
-          <Button variant="primary" className={css.dialogWideButton as string} onClick={() => { setStage('add') }}>
+          <Button variant="primary" size="sm" className={css.dialogWideButton as string} onClick={() => { setStage('add') }}>
             {t('members.add')}
           </Button>
         )
