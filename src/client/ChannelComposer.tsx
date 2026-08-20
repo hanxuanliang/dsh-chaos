@@ -15,7 +15,7 @@ import type { NativeActor, NativeTarget } from '../native.ts'
 import { avatarSeed } from './avatar.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/ComposerBar.module.css'
 import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface ChannelComposerProps {

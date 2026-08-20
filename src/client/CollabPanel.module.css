@@ -571,8 +571,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 .skeletonRow:nth-child(2) { width: 72%; }
 .skeletonRow:nth-child(3) { width: 44%; }
-
-/* font raised to .panel .retryButton (0-2-0) so the .panel button { font:inherit }.panel .retryButton {
+.panel .retryButton {
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   padding: 2px 8px;
@@ -581,12 +580,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   font-size: 12px;
   cursor: pointer;
 }
-
-.retryButton:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
 /* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
 
 /* Full-width composer seat — plocal truth (ChatComposer root w-full px-2):
@@ -597,171 +590,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   box-sizing: border-box;
   padding: 0 8px 8px;
 }
-
-.composerWrap {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.composerError {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px;
-  color: var(--dsw-alias-state-error-primary);
-  font-size: 12px;
-}
-
-.composer {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* pilot 真值: border-l2-darkmode-thin（输入框描边比按钮弱一档） */
-  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin, var(--dsw-alias-border-l2, var(--dsw-alias-border-l1)));
-  border-radius: 14px;
-  padding-top: 8px;
-  background: var(--dsw-specific-input-major, var(--dsw-alias-bg-base));
-  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
-  font-size: 14px;
-  line-height: 22px;
-  transition: border-color 160ms, box-shadow 160ms;
-}
-
-/* pilot InputBar: 描边加深 l4 + 3px label-primary 8% 灰环 —— 不是蓝环；
- * business 蓝只留给链接/@高亮（见 .mdLink/.mention）。 */
-.composer:focus-within {
-  border-color: var(--dsw-alias-border-l4);
-  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08)),
-    0 0 0 3px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
-}
-
-.composer[data-inert] {
-  opacity: 0.72;
-}
-
-.composerScroll {
-  max-height: 336px;
-  overflow-y: auto;
-}
-
-.composerInput {
-  display: block;
-  width: 100%;
-  border: none;
-  outline: none;
-  padding: 4px 12px 0 16px;
-  color: var(--dsw-alias-label-primary);
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-  line-height: 24px;
-  overflow-wrap: anywhere;
-  resize: none;
-  white-space: pre-wrap;
-}
-
-.composerInput::placeholder {
-  color: var(--dsw-alias-label-caption);
-  user-select: none;
-}
-
-.composerInput:disabled {
-  color: var(--dsw-alias-label-tertiary);
-  cursor: not-allowed;
-}
-
-/* pilot .row: padding 0 6 6, 左右两组 gap 6/4（此处左右各一控件，gap 留给
- * 行内恒定间距即可），28px 控件一律 r8。 */
-.composerRow {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 6px 6px;
-}
-
-/* As-task 是行内唯一左列件：无条件的 margin-right:auto 既保住频道双列
- * 布局，也让 thread 无 As-task 时发送钮仍钉在右缘（space-between 会把
- * 单键孩子甩到左边）。 */
-.asTask { margin-right: auto; }
-
-/* pilot chip 选择钮（PermissionSelect 同款）：28px 高 r8 透明底，
- * 13/20 w500 secondary 字，hover 浅灰底。 */
-.asTask {
-  display: inline-flex;
-  height: 28px;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  padding: 0 8px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-  cursor: pointer;
-}
-
-.asTask:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.asTask input {
-  width: 13px;
-  height: 13px;
-  margin: 0;
-  accent-color: var(--dsw-alias-label-primary);
-}
-
-.sendButton {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 8px;
-  /* pilot/plocal 发送钮真值：品牌蓝底 + 反白字形（黑/白 label-primary 在
-   * 深色下会变亮白块，观感差）。 */
-  background: var(--dsw-alias-state-business-primary);
-  /* 宿主 button:disabled 全域规则与 :disabled(同级伪类) 晚载覆盖 → !important 镇
-   * 住字色； 宿主 runtime 的 label-primary-inverted 实测=深黑, 所以字面白。 */
-  color: #fff !important;
-  cursor: pointer;
-  transition: background 100ms, opacity 100ms;
-}
-
-.sendButton:hover:not(:disabled) {
-  filter: brightness(0.92);
-}
-
-.sendButton:disabled {
-  /* plocal ChatComposer 禁用真值：只 opacity 30%，不换灰暗色块。 */
-  opacity: 0.3;
-  cursor: default;
-}
-.memberName {
-  flex: none;
-  max-width: 46%;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.memberHandle {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* --- members dialog (plocal ChannelMembersDialog graft) --- */
 .dlgGroupLabel {
   margin: 10px 0 4px;
@@ -1361,51 +1189,22 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* thread 行 dock: ThreadPanel 平铺(不侧格,把 thread 页面直接开满) */
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: none !important; }
 .activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }
+/* dialogs 接触清两君 avatar 旁 member 名/handle (原 0-2-0 scope 原位重修) */
+.dialogBody .memberName {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* composer mention popover(atom MessageBody 拉错归回) */
-
-/* composer mention popover(atom MessageBody 拉错归回) */
-.mentionPop {
-  position: absolute;
-  z-index: 20;
-  bottom: calc(100% + 4px);
-  left: 0;
-  display: flex;
-  width: 280px;
-  max-height: 320px;
-  flex-direction: column;
-  overflow-y: auto;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  padding: 4px;
-  background: var(--dsw-alias-bg-menu, var(--dsw-alias-bg-layer-2));
-  box-shadow: var(--dsw-shadow-lv3, 0 8px 24px rgb(0 0 0 / 0.16));
-}
-.mentionItem {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-.mentionItem:hover,
-.mentionItem[data-active] {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.mentionItem {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
+.dialogBody .memberHandle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
