@@ -16,12 +16,12 @@ export function AvatarChip({ handle, displayName, seed, size = 'xs', title }: {
   displayName?: string
   /** 调用方已有 seed(avatarSeed 已算了) 就传它; 否则由 handle/displayName 现场算。 */
   seed?: AvatarSeed
-  size?: 'xs' | 'md'
+  size?: 'xs' | 'md' | 'lg' | 'xxsmall'
   title?: string | undefined
 }): JSX.Element {
   const s: AvatarSeed = seed ?? avatarSeed(handle ?? '', displayName ?? handle ?? '')
   return (
-    <span className={`${css.avatar} ${size === 'xs' ? css.xs : css.md}`} style={{ background: s.background }} title={title} data-avatar-chip aria-hidden="true">
+    <span className={`${css.avatar} ${size === 'xs' ? css.xs : size === 'md' ? css.md : size === 'lg' ? css.lg : css.xxsmall}`} style={{ background: s.background }} title={title} data-avatar-chip aria-hidden="true">
       {s.initial}
     </span>
   )

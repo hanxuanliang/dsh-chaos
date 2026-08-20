@@ -24,12 +24,11 @@ import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { NativeActor, NativeMessage, NativeTarget, NativeTask, NativeThreadSummary } from '../native.ts'
-import { avatarSeed } from './avatar.ts'
+import type { NativeActor, NativeMessage, NativeTarget, NativeTask } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
-import { AvatarChip } from './atoms/AvatarChip.tsx'
+import { MessageRow } from './blocks/MessageRow.tsx'
 
 export interface MessageStreamProps {
   t: ChaosTranslate
@@ -259,56 +258,7 @@ export function MessageBody({ t, text, names }: { t: ChaosTranslate; text: strin
   )
 }
 
-function StatusIcon({ status }: { status: NativeTask['status'] }): JSX.Element {
-  // 10×10 stroke glyphs, hand-drawn per plocal's set (Circle / Play / Eye /
-  // CircleCheck); no icon library on purpose.
-  let shape: ReactNode
-  switch (status) {
-    case 'todo':
-      shape = <circle cx="5" cy="5" r="3.2" />
-      break
-    case 'in_progress':
-      shape = <path d="M3.2 1.8 8 5 3.2 8.2Z" />
-      break
-    case 'in_review':
-      shape = (
-        <>
-          <path d="M1 5c1.2-1.8 2.5-2.7 4-2.7s2.8.9 4 2.7c-1.2 1.8-2.5 2.7-4 2.7s-2.8-.9-4-2.7Z" />
-          <circle cx="5" cy="5" r="1" />
-        </>
-      )
-      break
-    case 'done':
-      shape = (
-        <>
-          <circle cx="5" cy="5" r="3.2" />
-          <path d="m3.4 5.1 1.1 1.1 2.1-2.3" />
-        </>
-      )
-      break
-  }
-  return (
-    <svg viewBox="0 0 10 10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {shape}
-    </svg>
-  )
-}
-
 /** plocal chip: icon + #N (+ @assignee) — no "task" prefix, no status word. */
-function TaskChip({ task, assignee, onOpenTasks }: {
-  task: NativeTask
-  assignee: string | undefined
-  onOpenTasks(): void
-}): JSX.Element {
-  return (
-    <button type="button" className={css.taskChip} data-status={task.status} onClick={onOpenTasks}>
-      <StatusIcon status={task.status} />
-      <span className={css.taskChipId}>#{task.number}</span>
-      {assignee !== undefined && <span className={css.taskChipAssignee}>@{assignee}</span>}
-    </button>
-  )
-}
-
 interface StreamItem {
   kind: 'divider' | 'message'
   key: string
@@ -336,49 +286,6 @@ function buildItems(messages: NativeMessage[], t: ChaosTranslate, activeLocale: 
     previous = message
   }
   return items
-}
-
-/** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
-function ThreadPreview({ t, thread, summary, actorNamesById, onOpen }: {
-  t: ChaosTranslate
-  thread: NativeTarget | undefined
-  /** tae thread.summaries 批量投影；未知时回退纯「打开线程」。 */
-  summary: NativeThreadSummary | undefined
-  actorNamesById: Map<string, string>
-  onOpen: (() => void) | undefined
-}): JSX.Element | undefined {
-  if (thread === undefined) return undefined
-  return (
-    <button type="button" className={css.threadPreview} onClick={onOpen} disabled={onOpen === undefined}>
-      <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
-      </svg>
-      {summary === undefined ? (
-        t('thread.openThread')
-      ) : (
-        <>
-          {/* tae/plocal 终局形态：头像组（最近 3 位回复者）+ 计数；不含回复正文。 */}
-          <span className={css.threadPreviewAvatars} aria-hidden="true">
-            {summary.recentReplierIds.map(id => (
-              <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} title={actorNamesById.get(id) ?? id} />
-            ))}
-          </span>
-          {t('thread.replies', { count: summary.replyCount })}
-        </>
-      )}
-    </button>
-  )
-}
-
-/** Hover reply affordance on the row's right edge (spec §2.1 incl. hover "回复"). */
-function ReplyButton({ t, onClick }: { t: ChaosTranslate; onClick: () => void }): JSX.Element {
-  return (
-    <button type="button" className={css.msgReplyButton} title={t('thread.reply')} aria-label={t('thread.reply')} onClick={onClick}>
-      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6 11 2.5 7.5 6 4M2.5 7.5h6a3.5 3.5 0 0 1 3.5 3.5v2" />
-      </svg>
-    </button>
-  )
 }
 
 export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled, onOpenThread }: MessageStreamProps): JSX.Element {
@@ -532,47 +439,26 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
             const assignee = showTask && task.assigneeId !== undefined
               ? actorsById.get(task.assigneeId)?.handle
               : undefined
-            if (item.compact === true) {
-              return (
-                <div key={item.key} className={css.msgCompact} data-message-id={message.id}>
-                  <div className={css.msgAvatarPlaceholder} aria-hidden="true" />
-                  <div className={css.msgBody}>
-                    <MessageBody t={t} text={message.text} names={mentionNames} />
-                    {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
-                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} summary={state.threadSummariesByRoot[message.id]} actorNamesById={actorNamesById} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
-                  </div>
-                  {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}
-                  <span className={css.msgGutterTime} title={fullTimeTitle(message.createdAtMs, activeLocale)}>
-                    {timeLabel(message.createdAtMs)}
-                  </span>
-                </div>
-              )
-            }
-            const handle = author?.handle ?? message.authorId
-            const displayName = author?.displayName ?? message.authorId
-            const seed = avatarSeed(handle, displayName)
             const binding = author === undefined ? undefined : state.bindingsByAgent[author.id]
             return (
-              <div key={item.key} className={css.msg} data-message-id={message.id}>
-                <span className={css.avatar} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
-                <div className={css.msgMain}>
-                  <div className={css.msgHead}>
-                    <span className={css.msgName}>{displayName}</span>
-                    <span className={css.msgTime}>{timeLabel(message.createdAtMs)}</span>
-                    {author?.kind === 'agent' && (
-                      <span className={css.msgBadge}>
-                        AGENT{binding !== undefined ? ` · ${binding.model}` : ''}
-                      </span>
-                    )}
-                  </div>
-                  <div className={css.msgBody}>
-                    <MessageBody t={t} text={message.text} names={mentionNames} />
-                    {showTask && <TaskChip task={task} assignee={assignee} onOpenTasks={onOpenTasks} />}
-                    <ThreadPreview t={t} thread={threadsByRoot.get(message.id)} summary={state.threadSummariesByRoot[message.id]} actorNamesById={actorNamesById} onOpen={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }} />
-                  </div>
-                </div>
-                {onOpenThread !== undefined && <ReplyButton t={t} onClick={() => { onOpenThread(message.id) }} />}
-              </div>
+              <MessageRow
+                key={item.key}
+                t={t}
+                message={message}
+                compact={item.compact === true}
+                author={author}
+                bindingModel={binding?.model}
+                task={showTask ? task : undefined}
+                assigneeHandle={assignee}
+                thread={threadsByRoot.get(message.id)}
+                summary={state.threadSummariesByRoot[message.id]}
+                actorNamesById={actorNamesById}
+                mentionNames={mentionNames}
+                timeText={timeLabel(message.createdAtMs)}
+                fullTimeTitle={fullTimeTitle(message.createdAtMs, activeLocale)}
+                onOpenTasks={onOpenTasks}
+                onOpenThread={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }}
+              />
             )
           })}
         </div>

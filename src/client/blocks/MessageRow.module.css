@@ -1,0 +1,196 @@
+/* MessageRow (原 .msg/.msgCompact/.msgMain/.msgHead/.msgName/.msgTime/.msgBadge/
+ * .msgAvatarPlaceholder/.msgGutterTime/.threadPreview/.threadPreviewAvatars/
+ * .taskChip/.msgReplyButton 平移; taskChip/replyButton 原 .panel 前缀→[data-plugin] 同元素) */
+
+.row {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.row:hover,
+.rowCompact:hover {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
+}
+
+.row:active,
+.rowCompact:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent);
+}
+
+.rowCompact {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.avatarPlaceholder {
+  flex: none;
+  width: 28px;
+  align-self: stretch;
+}
+
+.gutterTime {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 40px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-family: var(--chaos-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  user-select: none;
+}
+
+.rowCompact:hover .gutterTime {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.main {
+  min-width: 0;
+  flex: 1;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.name {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.name:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.time {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--chaos-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.rowBody {
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* task chip: 原 .panel .taskChip (0-2-0) → [data-plugin] 同元素 */
+.taskChip[data-plugin='dsh-chaos'] {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--chip) 15%, transparent);
+  color: var(--chip);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.taskChip[data-status='todo'] { --chip: var(--dsw-alias-state-warn-primary); }
+.taskChip[data-status='in_progress'] { --chip: var(--dsw-alias-state-business-primary); }
+.taskChip[data-status='in_review'] { --chip: color-mix(in srgb, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-error-primary)); }
+.taskChip[data-status='done'] { --chip: var(--dsw-alias-state-success-primary); }
+
+.taskChip:hover { filter: brightness(0.9); }
+
+.taskChipId { flex: none; }
+
+.taskChipAssignee {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusIcon { flex: none; }
+
+/* thread 预览泡 (原 .panel .threadPreview) */
+.threadPreview[data-plugin='dsh-chaos'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-business-primary);
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.threadPreview[data-plugin='dsh-chaos']:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.previewAvatars { display: inline-flex; padding-left: 4px; }
+
+/* hover 回复钮 (原 .panel .msgReplyButton + row hover 揭示) */
+.row, .rowCompact { position: relative; }
+
+.replyButton[data-plugin='dsh-chaos'] {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.row:hover .replyButton, .rowCompact:hover .replyButton { opacity: 1; }
+
+.replyButton[data-plugin='dsh-chaos']:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l3);
+}

@@ -473,118 +473,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* plocal row anatomy: flex row, mb-1(4px), px-8 py-1 (8/4), hover tint.
  * Full rows add mt-1.5; compact rows swap the 28px avatar for an equal-width
  * empty placeholder so both body columns share one left edge (avatar 28 + gap 8). */
-.msg {
-  position: relative;
-  display: flex;
-  gap: 8px;
-  margin-top: 6px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-.msg:hover,
-.msgCompact:hover {
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
-}
-
-.msg:active,
-.msgCompact:active {
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent);
-}
-
-.msgCompact {
-  position: relative;
-  display: flex;
-  gap: 8px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  padding: 4px 8px;
-}
-
-.msgAvatarPlaceholder {
-  flex: none;
-  width: 28px;
-  align-self: stretch;
-}
-
-/* Compact gutter time: absolute right, invisible until row hover, mono 10px. */
-.msgGutterTime {
-  /* plocal 真值：compact 行 hover 时时间进左 gutter（avatar 占位区）居中，
-   * 不动右缘（右缘留给 hover 回复钮，互不重叠）。 */
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  width: 40px;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  color: transparent;
-  font-family: var(--chaos-mono);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  line-height: 14px;
-  user-select: none;
-}
-
-.msgCompact:hover .msgGutterTime {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.avatar {
-  display: inline-grid;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  margin-top: 2px;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--dsw-alias-label-primary-foreground, #fff);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.msgMain {
-  min-width: 0;
-  flex: 1;
-}
-
-.msgHead {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.msgName {
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 22px;
-}
-
-.msgName:hover {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 2px;
-}
-
-.msgTime {
-  color: var(--dsw-alias-label-tertiary);
-  font-family: var(--chaos-mono);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
 
 /* Backend messages carry no author kind — it is joined from the actors table;
  * the model suffix comes from runtime.bindings when present (else AGENT alone). */
-.msgBadge {
-  color: var(--dsw-alias-label-tertiary);
-  font-family: var(--chaos-mono);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
 
 .msgBody {
   min-width: 0;
@@ -797,44 +688,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
  *   done        brutal-lime #40a02b → state-success-primary (green)
  * Chip 底 = --chip 15% tint（plocal bg-X/15），glyph/字 = --chip，border = l1 灰。 */
 /* font raised to .panel .taskChip (0-2-0) so the .panel button { font:inherit } reset does not nuke it (mnemon .shell precedent) */
-.panel .taskChip {
-  display: inline-flex;
-  height: 20px;
-  align-items: center;
-  gap: 4px;
-  margin-top: 6px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  padding: 0 6px;
-  background: color-mix(in srgb, var(--chip) 15%, transparent);
-  color: var(--chip);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.taskChip[data-status='todo'] { --chip: var(--dsw-alias-state-warn-primary); }
-.taskChip[data-status='in_progress'] { --chip: var(--dsw-alias-state-business-primary); }
-.taskChip[data-status='in_review'] {
-  --chip: color-mix(in srgb, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-state-error-primary));
-}
-.taskChip[data-status='done'] { --chip: var(--dsw-alias-state-success-primary); }
-
-.taskChip:hover {
-  filter: brightness(0.9);
-}
-
-.taskChipId {
-  flex: none;
-}
-
-.taskChipAssignee {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* Head of the column: "load older" trigger / "beginning" hint — plocal keeps
  * both as centered mono microcopy. */
@@ -1599,49 +1452,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   min-height: 0;
   flex-direction: column;
 }
-.panel .threadPreview {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  border: none;
-  border-radius: 6px;
-  padding: 1px 6px;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dsw-alias-state-business-primary);
-  background: transparent;
-  cursor: pointer;
-}
-.panel .threadPreview:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.msg, .msgCompact { position: relative; }
-.panel .msgReplyButton {
-  position: absolute;
-  top: 6px;
-  right: 4px;
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  color: var(--dsw-alias-label-tertiary);
-  background: var(--dsw-alias-bg-base);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 100ms ease;
-}
-.msg:hover .msgReplyButton, .msgCompact:hover .msgReplyButton {
-  opacity: 1;
-}
-.panel .msgReplyButton:hover {
-  color: var(--dsw-alias-label-primary);
-  border-color: var(--dsw-alias-border-l3);
-}
 
 /* ---- thread panel drag divider (user ask: left border must be draggable) --- */
 .threadResizeHandle {
@@ -1682,8 +1492,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 
 /* ── P1 previews: tae 头像组（重叠压一列，面板 token 边界白描） ──────────── */
-.threadPreviewAvatars { display: inline-flex; padding-left: 4px; }
-.threadPreviewAvatars .avatarXs { width: 15px; height: 15px; font-size: 9px; line-height: 15px; margin-left: -4px; box-shadow: 0 0 0 1.5px var(--dsw-alias-message-hover, var(--dsw-alias-tertiary)); }
 
 /* ── Assignee popover (raft 参考形态: 标题+搜索+行 avatar+对勾) ───────────── */
 
