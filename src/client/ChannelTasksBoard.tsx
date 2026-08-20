@@ -32,7 +32,7 @@ import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/TaskBoard.module.css'
 import { StatusChip } from './atoms/StatusChip.tsx'
 import { TaskCard } from './blocks/TaskCard.tsx'
 import { KanbanLane, KanbanLaneGrid } from './blocks/KanbanLane.tsx'

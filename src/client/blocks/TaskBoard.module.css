@@ -1,0 +1,113 @@
+/* TaskBoard: 看板+filterPill+状态 Menu+taskDetail 详情弹层 系 */
+/* ---- tasks board (P0-4) -------------------------------------------------- */
+/* Anatomy: dsh-web-ui/packages/dsh-task-board board.module.css remapped to the
+ * panel's padding/scale. .panel prefixes per S5 (taskCard is a button). */
+.taskBoard {
+  --dsh-chaos-lane-review: #7287fd;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 12px 12px;
+}
+.taskBoardHeader {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+.taskBoard .taskBoardError {
+  flex: none;
+  border: 1px solid var(--dsw-alias-state-error-secondary);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-state-error-tertiary, transparent);
+}
+/* ---- status dropdown + assignee filter pill (plocal TaskStatusMenu) ------- */
+.taskBoard .filterPill,
+.taskBoard .filterPill {
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+}
+/* filterPill 型状补列(此前从未写 base→UA 默认 2px outset / radius 0): 24px
+ * 胶囊 + border-l2 + secondary 字, pilot Pill(tertiary) 粒径。 */
+.taskBoard .filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.taskBoard .filterPill:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.taskBoard .filterPill.filterPillActive {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+}
+.statusMenu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv2);
+}
+.statusMenuLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.taskDetailTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+/* Detail: head row is the title only; status lives in meta rows now. */
+.taskDetailTitleRow {
+  display: flex;
+  margin-bottom: 12px;
+}
+.taskDetailMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.taskDetailRow {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.taskDetailRow > dt {
+  flex: none;
+  width: 104px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.taskDetailRow > dd {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+}
+/* Task-anchor jump flash: warn-tinted wash that fades (paper §3.2 高亮 1s). */

@@ -13,7 +13,7 @@ import type { NativeActor } from '../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { avatarSeed } from './avatar.ts'
-import css from './CollabPanel.module.css'
+import css from './blocks/DialogSkin.module.css'
 import { AvatarChip } from './atoms/AvatarChip.tsx'
 
 export interface ChannelMembersDialogProps {

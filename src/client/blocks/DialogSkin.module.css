@@ -1,0 +1,199 @@
+/* DialogSkin: 弹可共子系 — dialogBody 容器+box-reset+field/label/hint/input/error 表单
+ * 解剖 + memberPick/memberRow/addRow/dlgGroup/MemberList/MemberBadge/memberName/handle
+ * +dialogWideButton。 根 scope=.dialogBody (portal 防 .panel 旋) */
+/* plocal AddAgentList: the whole row is the button — flat row, hover tint,
+ * right-edge host plus icon. */
+.dialogBody .addRow {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.dialogBody .addRow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dialogBody .addRow:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+.dialogBody .addRow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- create-channel dialog (Modal chrome reuses the AgentCreateDialog fixes) --- */
+
+.dialogBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dialogBody > *:last-child { margin-top: 0; }
+.dialogBody > *:first-child { padding-bottom: 0; }
+.dialogBody *, .dialogBody *::before, .dialogBody *::after { box-sizing: border-box; }
+
+.panel .statusMenuItem,
+.dialogBody .statusMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.panel .statusMenuItem:hover:not(:disabled),
+.dialogBody .statusMenuItem:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.panel .statusMenuItem:disabled,
+.dialogBody .statusMenuItem:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* Title 即锚定跳转链（用户拍板：不需要独立锚定区）。portal → .panel 不生效，用 dialogBody 桥。 */
+.dialogBody .taskDetailTitleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+}
+/* 用户拍板：title 不要链接观感——hover 不再变蓝加下划线，只有箭头点亮
+ * 作为"可跳转"的独行 affordance。 */
+.dialogBody .taskDetailTitleLink svg {
+  color: var(--dsw-alias-label-tertiary);
+  transition: color 120ms;
+}
+.dialogBody .taskDetailTitleLink:hover svg {
+  color: var(--dsw-alias-label-secondary);
+}
+/* dialogs 接触清两君 avatar 旁 member 名/handle (原 0-2-0 scope 原位重修) */
+.dialogBody .memberName {
+  flex: none;
+  max-width: 46%;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogBody .memberHandle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialogBody .field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.dialogBody .labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
+.dialogBody .req { margin-left: 2px; color: var(--dsw-alias-state-error-primary); font-style: normal; }
+.dialogBody .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
+.dialogBody .error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.dialogBody .input { display: block; }
+.dialogBody .input input { width: 100%; }
+
+.dialogBody .memberPick {
+  display: flex;
+  max-height: 220px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+/* list-stage rows are not interactive — no pointer affordance (member.remove
+ * does not exist on the host RPC). */
+.dialogBody .dlgMemberList > .memberRow {
+  cursor: default;
+}
+.dialogBody .memberRow {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.dialogBody .memberRow input {
+  margin: 0;
+  flex: none;
+}
+
+.dialogBody .memberRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dialogBody .addRowIcon {
+  display: inline-grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+.dialogBody .dialogWideButton {
+  width: 100%;
+}
+/* --- members dialog (plocal ChannelMembersDialog graft) --- */
+.dialogBody .dlgGroupLabel {
+  margin: 10px 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.dialogBody .dlgGroupLabel:first-child {
+  margin-top: 2px;
+}
+.dialogBody .dlgMemberList {
+  display: flex;
+  max-height: 300px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  padding: 4px;
+}
+.dialogBody .memberBadge {
+  flex: none;
+  margin-left: auto;
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 15%, transparent);
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+}
