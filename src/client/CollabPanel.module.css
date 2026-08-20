@@ -1456,12 +1456,29 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-secondary);
   background: transparent;
 }
+/* filterPill 型状补列(此前从未写 base→UA 默认 2px outset / radius 0): 24px
+ * 胶囊 + border-l2 + secondary 字, pilot Pill(tertiary) 粒径。 */
+.panel .filterPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
 .panel .filterPill:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 .panel .filterPill.filterPillActive {
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
 }
 .statusChip:hover {
   filter: brightness(0.97);

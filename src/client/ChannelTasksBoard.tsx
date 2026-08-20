@@ -28,7 +28,7 @@
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconEditOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconEditOutline16, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -148,7 +148,9 @@ function TaskStatusDropdown({ task, t, onMove }: {
   )
 }
 
-/** plocal assignee pill: All / Unassigned / channel members. */
+/** plocal assignee pill → 宿主 Menu + Pill: 重写(P0-4.1); 原自手 dropdown
+ * 被拍"非常丑"——直接借鉴 pilot 原语(anchor=trigger pill, portal 开局不被
+ * overflow 裁, selectedId 自带对勾)。 */
 function AssigneeFilter({ t, members, value, onChange }: {
   t: ChaosTranslate
   members: NativeActor[]
@@ -156,61 +158,41 @@ function AssigneeFilter({ t, members, value, onChange }: {
   onChange: (value: string) => void
 }): JSX.Element {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (event: MouseEvent): void => {
-      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => { document.removeEventListener('mousedown', close) }
-  }, [open])
 
   const label = value === ''
     ? t('tasks.filterAssignee')
     : value === 'unassigned'
       ? t('tasks.unassigned')
       : `@${members.find(m => m.id === value)?.handle ?? '?'}`
-  const item = (key: string, text: string): JSX.Element => (
-    <button
-      key={key === '' ? 'all' : key}
-      type="button"
-      role="menuitem"
-      className={css.statusMenuItem}
-      onClick={() => { onChange(key); setOpen(false) }}
-    >
-      <span className={css.statusMenuLabel}>{text}</span>
-      {value === key && (
-        <IconCheckOutline16 />
-      )}
-    </button>
-  )
+  const selectedId = value === '' ? 'all' : value
 
   return (
-    <span ref={rootRef} className={css.statusDropdown}>
-      <button
-        type="button"
-        className={`${css.filterPill} ${value !== '' ? css.filterPillActive : ''}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => { setOpen(v => !v) }}
-      >
-        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="8" cy="5.5" r="2.5" />
-          <path d="M3.5 13.5c.8-2.2 2.5-3.2 4.5-3.2s3.7 1 4.5 3.2" />
-        </svg>
-        {label}
-        <IconChevronDownOutline14 />
-      </button>
-      {open && (
-        <span role="menu" className={css.statusMenu}>
-          {item('', t('tasks.filterAll'))}
-          {item('unassigned', t('tasks.unassigned'))}
-          {members.map(m => item(m.id, `@${m.handle}`))}
-        </span>
-      )}
-    </span>
+    <Menu
+      open={open}
+      portal
+      onClose={() => { setOpen(false) }}
+      onSelect={(id) => { onChange(id === 'all' ? '' : id); setOpen(false) }}
+      selectedId={selectedId}
+      items={[
+        { id: 'all', label: t('tasks.filterAll') },
+        { id: 'unassigned', label: t('tasks.unassigned') },
+        { type: 'separator', id: 'sep' },
+        ...members.map(m => ({ id: m.id, label: `@${m.handle}` })),
+      ]}
+      anchor={
+        <button
+          type="button"
+          className={`${css.filterPill} ${value !== '' ? css.filterPillActive : ''}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => { setOpen(v => !v) }}
+        >
+          <IconUserOutline16 aria-hidden="true" />
+          {label}
+          <IconChevronDownOutline14 />
+        </button>
+      }
+    />
   )
 }
 
