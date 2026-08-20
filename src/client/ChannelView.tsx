@@ -115,41 +115,21 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
       </header>
       {tab === 'messages'
         ? (
-          <div className={css.channelMainRow}>
-            <div className={css.channelMainCol}>
-              <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={() => { setJumpMessageId(undefined) }}
-                t={t}
-                store={store}
-                state={state}
-                channelId={channel.id}
-                activeLocale={activeLocale}
-                onOpenTasks={() => { setTab('tasks') }}
-                onOpenThread={(messageId) => { setThreadRootId(messageId) }}
-              />
-              {/* The composer hangs on the same centered 780px column as the stream. */}
-              <div className={css.composerSeat}>
-                <ChannelComposer
-                  t={t}
-                  store={store}
-                  state={state}
-                  channel={channel}
-                  disabled={composerDisabled}
-                />
-              </div>
-            </div>
-            {threadRootId !== undefined && thread !== undefined && (
-              <ThreadPanel
-                t={t}
-                store={store}
-                state={state}
-                thread={thread}
-                parentChannelId={channel.id}
-                activeLocale={activeLocale}
-                onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
-                onClose={() => { setThreadRootId(undefined) }}
-              />
-            )}
-          </div>
+          <ChannelChatPane
+            t={t}
+            store={store}
+            state={state}
+            channel={channel}
+            thread={threadRootId !== undefined ? thread : undefined}
+            jumpMessageId={jumpMessageId}
+            onJumpHandled={() => { setJumpMessageId(undefined) }}
+            activeLocale={activeLocale}
+            onOpenTasks={() => { setTab('tasks') }}
+            onOpenThread={(messageId) => { setThreadRootId(messageId) }}
+            onCloseThread={() => { setThreadRootId(undefined) }}
+            onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
+            composerDisabled={composerDisabled}
+          />
         )
         : (
           <ChannelTasksBoard
@@ -170,5 +150,66 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         />
       )}
     </section>
+  )
+}
+
+
+/**
+ * ChannelChatPane — channel 内容区唯一来源(plocal shell main 对照):
+ * [ .channelMainRow: .channelMainCol(MessageStream + composer) | ThreadPanel? ]
+ * 「先展示 channel, 有 thread 才在右侧展开」。ChannelView messages tab 自己用
+ * 它; Activity 右栏 dock 也用同一组件, 不再手拼第二套。
+ */
+export function ChannelChatPane({ t, store, state, channel, thread, jumpMessageId, onJumpHandled, activeLocale, onOpenTasks, onOpenThread, onCloseThread, onRootJump, composerDisabled }: {
+  t: ChaosTranslate
+  store: CollabStore
+  state: CollabStoreSnapshot
+  channel: NativeTarget
+  thread: NativeTarget | undefined
+  jumpMessageId: string | undefined
+  onJumpHandled(): void
+  activeLocale(): string
+  onOpenTasks(): void
+  onOpenThread(messageId: string): void
+  onCloseThread(): void
+  onRootJump(messageId: string): void
+  composerDisabled: boolean
+}): JSX.Element {
+  return (
+    <div className={css.channelMainRow}>
+      <div className={css.channelMainCol}>
+        <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={onJumpHandled}
+          t={t}
+          store={store}
+          state={state}
+          channelId={channel.id}
+          activeLocale={activeLocale}
+          onOpenTasks={onOpenTasks}
+          onOpenThread={onOpenThread}
+        />
+        {/* The composer hangs on the same centered 780px column as the stream. */}
+        <div className={css.composerSeat}>
+          <ChannelComposer
+            t={t}
+            store={store}
+            state={state}
+            channel={channel}
+            disabled={composerDisabled}
+          />
+        </div>
+      </div>
+      {thread !== undefined && (
+        <ThreadPanel
+          t={t}
+          store={store}
+          state={state}
+          thread={thread}
+          parentChannelId={channel.id}
+          activeLocale={activeLocale}
+          onRootJump={onRootJump}
+          onClose={onCloseThread}
+        />
+      )}
+    </div>
   )
 }
