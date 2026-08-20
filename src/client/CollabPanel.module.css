@@ -2055,3 +2055,13 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
 .dockedChannel .threadClose { margin-left: auto; }
+
+
+/* rc-6: dock 头提权到 Activity 头下方, 横跨 dock 右区(list 320+1px 边界 之外) */
+.activityDockHead {
+  display: flex; flex: none; align-items: center; gap: 8px;
+  margin-left: calc(320px + 1px);
+  padding: 9px 10px 8px 14px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+.activityDockHead .threadClose { margin-left: auto; }

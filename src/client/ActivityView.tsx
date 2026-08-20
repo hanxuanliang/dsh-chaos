@@ -44,13 +44,12 @@ function relativeTime(atMs: number): string {
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function DockedChannelPane({ t, store, state, dock, activeLocale, onClose }: {
+function DockedChannelPane({ t, store, state, dock, activeLocale }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   dock: Dock
   activeLocale(): string
-  onClose(): void
 }): JSX.Element {
   const channel = state.channels.find((c) => c.id === dock.channelId) as NativeTarget
   const [threadRootId, setThreadRootId] = useState<string | undefined>(dock.threadRootId)
@@ -60,17 +59,7 @@ function DockedChannelPane({ t, store, state, dock, activeLocale, onClose }: {
     : undefined
   return (
     <div className={css.dockedChannel}>
-      <header className={css.channelHead}>
-        <h3 className={css.channelTitle}>
-          <span className={css.channelHash} aria-hidden="true">#</span>
-          {channel.name}
-        </h3>
-        <button type="button" className={css.threadClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={onClose}>
-          <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-            <path d="m4 4 8 8M12 4l-8 8" />
-          </svg>
-        </button>
-      </header>
+      {/* 头部不在此: 提权到 activity 头(stack)之下, 横跨右区 */}
       <ChannelChatPane
         t={t}
         store={store}
@@ -211,19 +200,32 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       {items.length === 0 ? (
         <div className={css.activityEmpty}>{t('activity.empty')}</div>
       ) : dock !== undefined ? (
-        <div className={css.activitySplit}>
-          <div className={css.activityListPane}>{rows}</div>
-          <div className={css.activityDetailPane} key={dockKey}>
-            <DockedChannelPane
-              t={t}
-              store={store}
-              state={state}
-              dock={dock}
-              activeLocale={activeLocale}
-              onClose={() => { setDock(undefined) }}
-            />
+        <>
+          {/* dock 头: 和 Activity 头部同列的垂直堆叠(用户拍板), 横跨 dock 右区 */}
+          <div className={css.activityDockHead}>
+            <h3 className={css.channelTitle}>
+              <span className={css.channelHash} aria-hidden="true">#</span>
+              {(state.channels.find((c) => c.id === dock.channelId))?.name ?? dock.channelId.slice(0, 8)}
+            </h3>
+            <button type="button" className={css.threadClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="m4 4 8 8M12 4l-8 8" />
+              </svg>
+            </button>
           </div>
-        </div>
+          <div className={css.activitySplit}>
+            <div className={css.activityListPane}>{rows}</div>
+            <div className={css.activityDetailPane} key={dockKey}>
+              <DockedChannelPane
+                t={t}
+                store={store}
+                state={state}
+                dock={dock}
+                activeLocale={activeLocale}
+              />
+            </div>
+          </div>
+        </>
       ) : (
         rows
       )}
