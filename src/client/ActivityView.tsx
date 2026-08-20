@@ -47,6 +47,9 @@ function relativeTime(atMs: number): string {
 export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
+  const actorNamesById = new Map<string, string>()
+  for (const a of state.actors) actorNamesById.set(a.id, a.displayName)
+
   const [dock, setDock] = useState<Dock | undefined>(undefined)
   const items = useMemo(
     () => state.activityItems.filter((item) => item.targetKind !== 'direct'),
@@ -113,6 +116,9 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
           timeLabel={relativeTime(item.lastActivityAtMs)}
           selected={isDockSelected(item)}
           busy={busy === item.conversationId}
+          thread={item.rootMessageId === undefined ? undefined : state.threads.find(th => th.rootMessageId === item.rootMessageId)}
+          summary={item.rootMessageId === undefined ? undefined : state.threadSummariesByRoot[item.rootMessageId]}
+          actorNamesById={actorNamesById}
           onOpen={() => { open(item) }}
           onDone={() => { markDone(item) }}
         />

@@ -6,17 +6,21 @@
 import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { StatusChip } from '../atoms/StatusChip.tsx'
 import { ReplyExcerpt } from '../atoms/ReplyExcerpt.tsx'
-import type { NativeActivityInboxItem } from '../../native.ts'
+import { ThreadPreview } from './MessageRow.tsx'
+import type { NativeActivityInboxItem, NativeTarget, NativeThreadSummary } from '../../native.ts'
 import type { ChaosTranslate } from '../locales.ts'
 import css from './ActivityCard.module.css'
 
-export function ActivityCard({ item, t, timeLabel, selected, busy, onOpen, onDone }: {
+export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summary, actorNamesById, onOpen, onDone }: {
   item: NativeActivityInboxItem
   t: ChaosTranslate
   /** 相对时间文案由 caller 组好(relativeTime)。 */
   timeLabel: string
   selected: boolean
   busy: boolean
+  thread: NativeTarget | undefined
+  summary: NativeThreadSummary | undefined
+  actorNamesById: Map<string, string>
   onOpen: () => void
   onDone: () => void
 }) {
@@ -39,8 +43,14 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, onOpen, onDon
                   label={item.task.assigneeName !== undefined ? `@${item.task.assigneeName}` : `#${item.task.number}`}
                 />
               )}
-              {item.targetKind === 'thread' && item.replyCount !== undefined && (
-                <span className={css.replies}>{t('thread.replies', { count: Number(item.replyCount) })}</span>
+              {item.targetKind === 'thread' && (
+                <ThreadPreview
+                  t={t}
+                  thread={thread}
+                  summary={summary}
+                  actorNamesById={actorNamesById}
+                  onOpen={onOpen}
+                />
               )}
             </span>
           )}
