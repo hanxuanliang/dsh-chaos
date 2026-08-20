@@ -5,6 +5,7 @@
  */
 import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { StatusChip } from '../atoms/StatusChip.tsx'
+import { ReplyExcerpt } from '../atoms/ReplyExcerpt.tsx'
 import type { NativeActivityInboxItem } from '../../native.ts'
 import type { ChaosTranslate } from '../locales.ts'
 import css from './ActivityCard.module.css'
@@ -29,9 +30,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, onOpen, onDon
           </span>
           <span className={css.titleText}>{item.title}</span>
           {item.latestReply !== undefined && (
-            <span className={css.excerpt}>
-              {item.latestReply.senderName}: {item.latestReply.excerpt}
-            </span>
+            <ReplyExcerpt senderName={item.latestReply.senderName} excerpt={item.latestReply.excerpt} />
           )}
           {(item.task !== undefined || item.targetKind === 'thread') && (
             <span className={css.bottomLine}>

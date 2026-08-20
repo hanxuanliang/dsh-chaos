@@ -119,11 +119,12 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       ))}
     </div>
  )
-  const titleBlock = (
-    <div className={css.activityHeaderTop}>
-      <h2 className={css.activityTitle}>{t('activity.title')}</h2>
+  const headerRow = (
+    <header className={css.activityHeader}>
+      <h2 className={css.channelTitle}>{t('activity.title')}</h2>
       <span className={css.activityCount}>{t('activity.activeSummary', { count: state.activityCount })}</span>
-    </div>
+      <div className={css.activityHeadTabs}>{filterTabs}</div>
+    </header>
   )
   if (dock !== undefined) {
     // dock 态 = 两列: 左列 [Activity 头 + 筛行 + 列表全栈]; 右列 [dock 头 + ChannelChatPane body]
@@ -131,7 +132,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     return (
       <div className={css.activityView} data-docked="true">
         <div className={css.activityListCol}>
-          <header className={css.activityHeader}>{titleBlock}<div className={css.activityFilterRow}>{filterTabs}</div></header>
+          {headerRow}
           {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
           {rows}
         </div>
@@ -169,12 +170,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   }
   return (
     <div className={css.activityView}>
-      <header className={css.activityHeader}>
-        {titleBlock}
-        <div className={css.activityFilterRow}>
-          {filterTabs}
-        </div>
-      </header>
+      {headerRow}
       {error !== undefined && <div className={css.taskBoardError} role="alert">{error}</div>}
       {items.length === 0 ? <div className={css.activityEmpty}>{t('activity.empty')}</div> : rows}
     </div>
