@@ -1972,3 +1972,40 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .assigneeRowLabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assigneeMenuItem svg { flex: none; color: var(--dsw-alias-label-secondary); }
 .assigneeMenuEmpty { padding: 4px 8px 8px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+
+
+/* ── P0-6 Activity inbox(plocal InboxMain 形态对齐) ───────────────────── */
+.activityView { display: flex; height: 100%; min-height: 0; flex-direction: column; padding: 12px 16px; gap: 10px; }
+.activityHeader { display: flex; flex: none; align-items: baseline; gap: 8px; }
+.activityTitle { margin: 0; font-size: 15px; font-weight: 650; }
+.activityCount { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.activityEmpty { padding: 32px 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; text-align: center; }
+.activityList { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow-y: auto; }
+.activityRow { position: relative; display: flex; align-items: stretch; border-radius: 10px; }
+.activityRow:hover { background: var(--dsw-alias-tertiary); }
+.activityRowMain {
+  display: flex; flex: 1; min-width: 0; align-items: flex-start; gap: 10px;
+  padding: 8px 34px 8px 8px; border: none; background: transparent;
+  color: var(--dsw-alias-label-primary); cursor: pointer; font: inherit; text-align: left;
+}
+.activityKind {
+  display: inline-grid; flex: none; width: 22px; height: 22px; margin-top: 1px;
+  place-items: center; border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary);
+}
+.activityBody { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.activityTitleLine { display: flex; align-items: center; gap: 8px; }
+.activityTitleText { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.activityTime { flex: none; margin-left: auto; color: var(--dsw-alias-label-tertiary); font-size: 11.5px; }
+.activityMeta { display: flex; min-width: 0; align-items: baseline; gap: 8px; font-size: 12px; }
+.activityTarget { flex: none; color: var(--dsw-alias-label-tertiary); }
+.activityExcerpt { overflow: hidden; color: var(--dsw-alias-label-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.activityReplies { flex: none; margin-top: 4px; color: var(--dsw-alias-label-tertiary); font-size: 11.5px; }
+.activityDone {
+  position: absolute; right: 8px; top: 10px; display: inline-grid; width: 20px; height: 20px;
+  place-items: center; border: none; border-radius: 6px; background: transparent;
+  color: var(--dsw-alias-label-tertiary); cursor: pointer; opacity: 0;
+}
+.activityRow:hover .activityDone { opacity: 1; }
+.activityDone:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-success-primary); }
+

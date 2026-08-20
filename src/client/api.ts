@@ -10,6 +10,7 @@ import type {
   NativeTarget,
   NativeTask,
   NativeThreadSummary,
+  NativeActivityInboxPage,
 } from '../native.ts'
 
 /** RPC channel exposed by the host half (COLLAB_RPC_CHANNEL in src/remote.ts). */
@@ -105,6 +106,16 @@ export class ChaosClient {
   /** tae 等价物的 batch 预览：≤100 root → 计数+最近 3 个回复者（含头像组人面）。 */
   threadSummaries(rootMessageIds: string[]): Promise<NativeThreadSummary[]> {
     return this.call('thread.summaries', { rootMessageIds })
+  }
+
+  /** crates inbox_list: 活动会话(page)——Done 是 per-actor done_through_seq 语义,新来活动自动复活。 */
+  inboxList(limit = 30, cursor?: string): Promise<NativeActivityInboxPage> {
+    return this.call('inbox.list', cursor === undefined ? { limit } : { limit, cursor })
+  }
+
+  /** inbox_done(targetId + throughSeq 由行上的 lastActivitySeq 给定——按页面拍时结构调用,不取最新)。 */
+  inboxDone(targetId: string, throughSeq: string): Promise<null> {
+    return this.call('inbox.done', { targetId, throughSeq })
   }
 
   taskCreate(messageId: string): Promise<NativeTask> {

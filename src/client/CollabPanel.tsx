@@ -23,6 +23,8 @@ export interface CollabPanelProps {
 export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProps): JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [createOpen, setCreateOpen] = useState(false)
+  /** Activity tab 里跨频道的 thread 行点击: 新 ChannelView mount initializer 一次性消费。 */
+  const [pendingThreadRoot, setPendingThreadRoot] = useState<string | undefined>(undefined)
   const active = state.channels.find(channel => channel.id === state.activeChannelId)
 
   return (
@@ -45,7 +47,7 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
         <ChannelRail
           t={t}
           state={state}
-          onSelect={(targetId) => { store.setActiveChannel(targetId) }}
+          onSelect={(targetId) => { setPendingThreadRoot(undefined); store.setActiveChannel(targetId) }}
           onCreate={() => { setCreateOpen(true) }}
         />
         <main className={css.main}>
@@ -85,6 +87,13 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
               state={state}
               channel={active}
               activeLocale={activeLocale}
+              pendingThreadRoot={pendingThreadRoot}
+              onPendingThreadConsumed={() => { setPendingThreadRoot(undefined) }}
+              onSwitchChannel={(channelId) => { setPendingThreadRoot(undefined); store.setActiveChannel(channelId) }}
+              onOpenCrossChannelThread={(rootMessageId, parentChannelId) => {
+                setPendingThreadRoot(rootMessageId)
+                store.setActiveChannel(parentChannelId)
+              }}
             />
           )}
         </main>

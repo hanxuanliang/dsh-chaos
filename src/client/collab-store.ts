@@ -22,6 +22,7 @@ import type {
   NativeTarget,
   NativeTask,
   NativeThreadSummary,
+  NativeActivityInboxItem,
 } from '../native.ts'
 import type { ChaosClient } from './api.ts'
 import { CollabEvents } from './collab-events.ts'
@@ -37,6 +38,9 @@ export interface CollabStoreSnapshot {
   threads: NativeTarget[]
   /** tae thread-summaries 投影 (keyed by rootMessageId): 计数+最近 3 位回复者。 */
   threadSummariesByRoot: Record<string, NativeThreadSummary>
+  /** crates activity inbox(会话粒度,新活动自动复活) */
+  activityItems: NativeActivityInboxItem[]
+  activityCount: number
   actors: NativeActor[]
   activeChannelId: string | undefined
   /** Spec §1.3: the active channel vanished (membership loss) — linger, then empty. */
@@ -138,6 +142,8 @@ export class CollabStore {
     channels: [],
     threads: [],
     threadSummariesByRoot: {},
+    activityItems: [],
+    activityCount: 0,
     actors: [],
     activeChannelId: undefined,
     removedNotice: false,
@@ -216,6 +222,7 @@ export class CollabStore {
         .filter((id): id is string => id !== undefined)
       await this.refreshThreadSummaries(threadRootIds)
       if (this.loadGeneration !== generation) return
+      void this.refreshActivity()
       if (this.loadGeneration !== generation) return
       const bindingsByAgent: Record<string, NativeRuntimeBinding> = {}
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
@@ -501,6 +508,9 @@ export class CollabStore {
   // --- SSE invalidation handling (invalidation-only frames; bodies via RPC) ---
 
   private handleChange(change: NativeChangeEvent): void {
+    // activity 收件箱语义跨越所有消息/任务/目标类别: 任何面向变化都可能
+    // 影响它,统一 debounce 后台重取 (crates 自己保 done_through_seq 语义)。
+    this.scheduleActivityRefresh()
     switch (change.kind) {
       case 'message_created':
         void this.handleMessageCreated(change)
@@ -620,6 +630,32 @@ export class CollabStore {
     for (const root of unique) delete next[root]
     for (const [root, summary] of Object.entries(merged)) next[root] = summary
     this.set({ threadSummariesByRoot: next })
+  }
+
+  async refreshActivity(): Promise<void> {
+    const generation = this.loadGeneration
+    try {
+      const page = await this.client.inboxList(30)
+      if (this.loadGeneration !== generation) return
+      this.set({
+        activityItems: page.items,
+        activityCount: Number(page.activeCount),
+      })
+    } catch { /* 下一次 SSE 会回来摘; activity 失败不炸页 */ }
+  }
+
+  async markActivityDone(conversationId: string, throughSeq: string): Promise<void> {
+    await this.client.inboxDone(conversationId, throughSeq)
+    await this.refreshActivity()
+  }
+
+  private activityRefreshTimer: ReturnType<typeof setTimeout> | undefined
+  private scheduleActivityRefresh(): void {
+    if (this.activityRefreshTimer !== undefined) return
+    this.activityRefreshTimer = setTimeout(() => {
+      this.activityRefreshTimer = undefined
+      void this.refreshActivity()
+    }, 280)
   }
 
   private readonly unknownTargetTimers = new Map<string, ReturnType<typeof setTimeout>>()

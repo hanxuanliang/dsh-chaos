@@ -10,6 +10,7 @@ import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import type { ChaosTranslate } from './locales.ts'
 import { MessageStream } from './MessageStream.tsx'
 import { ChannelComposer } from './ChannelComposer.tsx'
+import { ActivityView } from './ActivityView.tsx'
 import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from './ChannelTasksBoard.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
@@ -21,15 +22,30 @@ export interface ChannelViewProps {
   state: CollabStoreSnapshot
   channel: NativeTarget
   activeLocale(): string
+  /**
+   * Activity 行点跨频道 thread 的一次性入口: mount 时经 useState 初始
+   * 值消费(不允许 effect/setState 接力——教训实证 2026-08-20)。
+   */
+  pendingThreadRoot?: string | undefined
+  onPendingThreadConsumed(): void
+  onSwitchChannel(channelId: string): void
+  onOpenCrossChannelThread(rootMessageId: string, parentChannelId: string): void
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale }: ChannelViewProps): JSX.Element {
-  const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, onSwitchChannel, onOpenCrossChannelThread }: ChannelViewProps): JSX.Element {
+  const [tab, setTab] = useState<'messages' | 'tasks' | 'activity'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
   const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
-  /** Open thread root (message id); the target resolves via state.threads (spec §2.1). */
-  const [threadRootId, setThreadRootId] = useState<string | undefined>(undefined)
+  /** Open thread root —— 初始值吃 pendingThreadRoot mount 时一次性消费。 */
+  const [threadRootId, setThreadRootId] = useState<string | undefined>(pendingThreadRoot ?? undefined)
+  const pendingConsumedOnce = useRef(false)
+  useEffect(() => {
+    if (pendingThreadRoot === undefined || pendingConsumedOnce.current) return
+    pendingConsumedOnce.current = true
+    setJumpMessageId(pendingThreadRoot)
+    onPendingThreadConsumed()
+  }, [pendingThreadRoot, onPendingThreadConsumed])
   const thread = threadRootId === undefined
     ? undefined
     : state.threads.find(t => t.rootMessageId === threadRootId)
@@ -43,8 +59,8 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
       threadOpeningRef.current = undefined
     })
   }, [threadRootId, thread, state.messagesByChannel, store])
-  useEffect(() => { setThreadRootId(undefined) }, [channel.id])
-  useEffect(() => { setTab('messages') }, [channel.id])
+  // (无重置 effect: ChannelView 以 channel.id 作 key 整树重挂, mount effect
+  // 会误伤 useState 初始化器——此前的 threadRootId 曾被这样子抹掉两次。)
   useEffect(() => { setMembersOpen(false) }, [channel.id])
 
   const members = state.membersByChannel[channel.id]
@@ -79,6 +95,16 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
             onClick={() => { setTab('tasks') }}
           >
             {t('channel.tabTasks', { count: openTasks })}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'activity'}
+            data-active={tab === 'activity' || undefined}
+            className={css.tab}
+            onClick={() => { setTab('activity') }}
+          >
+            {t('channel.tabActivity', { count: state.activityCount })}
           </button>
         </div>
         {/* 成员数 chip 单独挂在头部最右端（用户 2026-08-19 拍板），不与 tab 组并列 */}
@@ -137,13 +163,32 @@ export function ChannelView({ t, store, state, channel, activeLocale }: ChannelV
             )}
           </div>
         )
-        : (
+        : tab === 'tasks'
+        ? (
           <ChannelTasksBoard
             t={t}
             store={store}
             state={state}
             channelId={channel.id}
             onOpenMessage={(messageId) => { setTab('messages'); setJumpMessageId(messageId) }}
+          />
+        )
+        : (
+          <ActivityView
+            t={t}
+            store={store}
+            state={state}
+            onOpenChannel={(channelId) => { onSwitchChannel(channelId) }}
+            onOpenThreadRoot={(rootMessageId, parentChannelId) => {
+              if (parentChannelId === channel.id) {
+                setTab('messages')
+                setThreadRootId(rootMessageId)
+                setJumpMessageId(rootMessageId)
+                void store.openThread(rootMessageId)
+              } else {
+                onOpenCrossChannelThread(rootMessageId, parentChannelId)
+              }
+            }}
           />
         )}
       {membersOpen && (
