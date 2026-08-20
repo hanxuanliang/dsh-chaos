@@ -90,3 +90,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* composerSeat: 迁渡失踪补回 + pilot figma Input_Bottom 侧 clearance=16/底 8
+ * (--dsh-composer-side-clearance); 原为 px-2 侧可餱可餱。 */
+.channel .composerSeat {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 16px 12px;
+}

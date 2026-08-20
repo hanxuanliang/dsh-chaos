@@ -121,3 +121,10 @@
 .threadPanel .threadRootLink:hover {
   border-color: var(--dsw-alias-border-l3);
 }
+/* composerSeat: 迁渡失踪补回 (panel 内宜 12px 侧) */
+.threadPanel .composerSeat {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 12px 12px;
+}
