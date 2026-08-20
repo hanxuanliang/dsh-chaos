@@ -177,7 +177,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 
 /* plocal ChatSidebar section header: uppercase wide-tracked toggle label,
  * chevron + count; hover lifts toward secondary label. */
-/* font raised to .panel .railTitle (0-2-0) so the .panel button { font:inherit }.panel .railTitle {
+/* font raised to .panel .railTitle (0-2-0) so the .panel button { font:inherit }
+ * reset does not nuke it (mnemon .shell precedent) */
+.panel .railTitle {
   display: inline-flex;
   flex: 1;
   min-width: 0;
