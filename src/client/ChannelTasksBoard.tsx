@@ -277,13 +277,18 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
   onOpenMessage: (messageId: string) => void
 }): JSX.Element {
   const [assigneeFilter, setAssigneeFilter] = useState('')
-  const [focusedMessageId, setFocusedMessageId] = useState<string | undefined>(undefined)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | undefined>(undefined)
   const [selectedMessageId, setSelectedMessageId] = useState<string | undefined>(undefined)
   const [moveError, setMoveError] = useState<string | undefined>(undefined)
   /** HTML5 dnd (plocal dnd-kit 的最小依赖同义实现): 拖一张 task 卡, 列只在状态机可达时点亮。 */
   const [draggingTaskId, setDraggingTaskId] = useState<string | undefined>(undefined)
   const [dragOverLane, setDragOverLane] = useState<TaskStatus | undefined>(undefined)
   const cardRefs = useRef(new Map<string, HTMLButtonElement>())
+  const highlightTimerRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current !== undefined) window.clearTimeout(highlightTimerRef.current)
+  }, [])
 
   const tasks = useMemo(() => {
     const list = Object.values(state.tasksByMessage).filter(task => task.targetId === channelId)
@@ -300,8 +305,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
 
   // Message → Task is an identity jump, not merely a tab switch. If the
   // current assignee filter hides the target, clear it first; then scroll the
-  // exact card to the center, give it keyboard focus, and retain a visible
-  // current-card ring until the user selects another Task.
+  // exact card to the center, give it keyboard focus, and briefly mark it.
   useEffect(() => {
     if (focusMessageId === undefined) return
     const task = state.tasksByMessage[focusMessageId]
@@ -315,11 +319,19 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
       setAssigneeFilter('')
       return
     }
-    setFocusedMessageId(focusMessageId)
+    if (highlightTimerRef.current !== undefined) window.clearTimeout(highlightTimerRef.current)
+    // Commit an off frame first so an immediate repeat to the same Task
+    // restarts the CSS marker instead of inheriting its previous timeline.
+    setHighlightedMessageId(undefined)
     const frame = window.requestAnimationFrame(() => {
       const card = cardRefs.current.get(focusMessageId)
       card?.scrollIntoView({ block: 'center', inline: 'nearest' })
       card?.focus({ preventScroll: true })
+      setHighlightedMessageId(focusMessageId)
+      highlightTimerRef.current = window.setTimeout(() => {
+        setHighlightedMessageId(current => current === focusMessageId ? undefined : current)
+        highlightTimerRef.current = undefined
+      }, 2200)
       onFocusHandled()
     })
     return () => { window.cancelAnimationFrame(frame) }
@@ -415,10 +427,10 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
                     unassignedLabel={t('tasks.unassigned')}
                     timeLabel={formatTime(task.updatedAtMs, t)}
                     dragging={draggingTaskId === task.messageId}
-                    selected={focusedMessageId === task.messageId}
+                    highlighted={highlightedMessageId === task.messageId}
                     onDragStart={() => { setDraggingTaskId(task.messageId) }}
                     onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
-                    onOpen={() => { setMoveError(undefined); setFocusedMessageId(task.messageId); setSelectedMessageId(task.messageId) }}
+                    onOpen={() => { setMoveError(undefined); setSelectedMessageId(task.messageId) }}
                   />
                 )
               })}

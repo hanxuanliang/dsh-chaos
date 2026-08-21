@@ -18,11 +18,11 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
   unassignedLabel: string
   timeLabel: string
   dragging: boolean
-  selected: boolean
+  highlighted: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onOpen: () => void
-}>(function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel, timeLabel, dragging, selected, onDragStart, onDragEnd, onOpen }, ref) {
+}>(function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel, timeLabel, dragging, highlighted, onDragStart, onDragEnd, onOpen }, ref) {
   return (
     <button
       ref={ref}
@@ -32,8 +32,7 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
       data-surface="kanban-task-card"
       data-status={task.status}
       data-dragging={dragging ? 'true' : undefined}
-      data-selected={selected ? 'true' : undefined}
-      aria-current={selected ? 'true' : undefined}
+      data-highlighted={highlighted ? 'true' : undefined}
       aria-haspopup="dialog"
       draggable
       onDragStart={onDragStart}

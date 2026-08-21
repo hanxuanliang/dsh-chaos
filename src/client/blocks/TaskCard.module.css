@@ -35,9 +35,18 @@
   border-color: var(--dsw-alias-state-warn-primary);
 }
 
-.card[data-plugin='dsh-chaos'][data-selected='true'] {
-  border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent), var(--dsw-shadow-lv2);
+.card[data-plugin='dsh-chaos'][data-highlighted='true'] {
+  animation: taskCardJumpFlash 2.2s ease-out 1;
+}
+
+@keyframes taskCardJumpFlash {
+  0%, 24% {
+    border-color: var(--dsw-alias-state-business-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 24%, transparent), var(--dsw-shadow-lv2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 .cardTitle {
