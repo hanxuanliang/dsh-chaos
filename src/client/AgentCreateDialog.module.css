@@ -49,20 +49,6 @@
 .input { display: block; }
 .input input { width: 100%; }
 
-.handleInput {
-  display: flex;
-  height: 38px;
-  align-items: center;
-  gap: 3px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  padding: 0 10px;
-  background: var(--dsw-alias-bg-layer-2);
-}
-.handleInput:focus-within { box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
-.handleInput span { color: var(--dsw-alias-label-tertiary); font-size: 12px; }
-.handleInput input { min-width: 0; flex: 1; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; font-size: 12px; }
-
 .textarea {
   width: 100%;
   min-height: 92px;

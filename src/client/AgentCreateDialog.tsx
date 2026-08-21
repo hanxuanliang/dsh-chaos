@@ -22,15 +22,11 @@ function generatedHandle(name: string): string {
   return (handle === '' ? 'agent' : handle).slice(0, 40)
 }
 
-const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
-
 /** One-page identity-first creation; runtime failure still returns the durable Profile. */
 export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
   const { connection, presets, presetsLoading, presetsError, onPresetsRetry, onClose, onCreated, t } = props
   const client = useMemo(() => new ChaosClient(connection), [connection])
   const [displayName, setDisplayName] = useState('')
-  const [handle, setHandle] = useState('agent')
-  const [handleEdited, setHandleEdited] = useState(false)
   const [description, setDescription] = useState('')
   const [presetId, setPresetId] = useState('')
   const [provider, setProvider] = useState('')
@@ -41,10 +37,6 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const catalogRequest = useRef(0)
-
-  useEffect(() => {
-    if (!handleEdited) setHandle(generatedHandle(displayName))
-  }, [displayName, handleEdited])
 
   useEffect(() => {
     if (presetId !== '' || presets === null) return
@@ -74,8 +66,8 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
   }, [loadCatalog])
 
   const models = catalog?.groups.find(group => group.id === provider)?.models ?? []
+  const handle = generatedHandle(displayName)
   const canSubmit = displayName.trim() !== ''
-    && HANDLE.test(handle)
     && description.trim() !== ''
     && provider !== ''
     && model !== ''
@@ -129,14 +121,6 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
           <Input id="chaos-agent-create-name" className={css.input as string} value={displayName}
             onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
             placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
-        </label>
-        <label className={css.field} htmlFor="chaos-agent-create-handle">
-          <span className={css.labelText}>{t('create.handle')}<em className={css.req}>*</em></span>
-          <div className={css.handleInput}><span aria-hidden="true">@</span><input id="chaos-agent-create-handle"
-            value={handle} onChange={event => { setHandleEdited(true); setHandle(event.target.value.toLowerCase()); setFailure(null) }}
-            maxLength={40} autoComplete="off" spellCheck={false} disabled={submitting} /></div>
-          {!HANDLE.test(handle) && <small className={css.error}>{t('create.handleInvalid')}</small>}
-          <small className={css.hint}>{t('create.handleHint')}</small>
         </label>
         <label className={css.field} htmlFor="chaos-agent-create-charter">
           <span className={css.labelText}>{t('create.charter')}<em className={css.req}>*</em></span>
