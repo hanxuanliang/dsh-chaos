@@ -1,6 +1,9 @@
 use crate::ids::{ActorId, ThreadId};
-use crate::{CollabError, Result};
+use crate::membership::Membership;
+use crate::target::TargetRoute;
+use crate::{Actor, CollabError, Result, TargetKind};
 use serde::{Deserialize, Serialize};
+use turso::Connection;
 
 /// Batch Thread preview for one root Message: count plus recent distinct repliers.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -116,10 +119,60 @@ impl ThreadSubscription {
     }
 }
 
+/// A `TargetRoute` proven to describe an active Thread, with the permission
+/// target resolved once at construction.
+#[derive(Clone, Debug)]
+pub(crate) struct ThreadRoute {
+    permission_target_id: String,
+}
+
+impl ThreadRoute {
+    /// Certify that `thread_id` is an active Thread and resolve the target
+    /// whose membership governs it.
+    pub(crate) async fn require(connection: &Connection, thread_id: &ThreadId) -> Result<Self> {
+        let route = TargetRoute::require(connection, thread_id.as_str()).await?;
+        if route.kind != TargetKind::Thread {
+            return Err(CollabError::InvalidArgument(
+                "expected a Thread target".into(),
+            ));
+        }
+        Ok(Self {
+            permission_target_id: route.permission_target_id(thread_id.as_str()).to_owned(),
+        })
+    }
+
+    pub(crate) fn permission_target_id(&self) -> &str {
+        &self.permission_target_id
+    }
+
+    fn into_permission_target_id(self) -> String {
+        self.permission_target_id
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ThreadAccess {
     pub(crate) thread_id: ThreadId,
     pub(crate) permission_target_id: String,
+}
+
+impl ThreadAccess {
+    /// Certify that one Actor may act in one Thread: the actor exists, the
+    /// target is an active Thread, and the actor is an active member of the
+    /// Thread's permission target.
+    pub(crate) async fn require(
+        connection: &Connection,
+        actor_id: &ActorId,
+        thread_id: &ThreadId,
+    ) -> Result<Self> {
+        let actor = Actor::require(connection, actor_id).await?;
+        let route = ThreadRoute::require(connection, thread_id).await?;
+        Membership::require(connection, route.permission_target_id(), &actor).await?;
+        Ok(Self {
+            thread_id: thread_id.clone(),
+            permission_target_id: route.into_permission_target_id(),
+        })
+    }
 }
 
 #[cfg(test)]

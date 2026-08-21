@@ -1,13 +1,15 @@
 use turso::transaction::TransactionBehavior;
 
-use crate::actor::require_actor;
 use crate::changefeed::insert_change;
 use crate::ids::{ActorId, ThreadId};
-use crate::membership::active_member_ids;
+use crate::membership::{Membership, active_member_ids};
 use crate::message::message_target_author;
-use crate::target::{find_target, is_active_member, require_active_member, require_target};
-use crate::{ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms};
+use crate::target::{find_target, is_active_member, require_target};
+use crate::{
+    Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
+};
 
+use super::model::ThreadAccess;
 use super::store::ThreadStore;
 
 impl CollabCore {
@@ -22,7 +24,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_actor(&transaction, actor_id.as_str()).await?;
+        let actor = Actor::require(&transaction, &actor_id).await?;
         let (parent_target_id, root_author_id) =
             message_target_author(&transaction, root_message_id).await?;
         if require_target(&transaction, &parent_target_id).await? == TargetKind::Thread {
@@ -30,13 +32,7 @@ impl CollabCore {
                 "Threads cannot be nested under Thread messages".into(),
             ));
         }
-        require_active_member(
-            &transaction,
-            &parent_target_id,
-            actor_id.as_str(),
-            "create Thread in",
-        )
-        .await?;
+        Membership::require(&transaction, &parent_target_id, &actor).await?;
 
         let mut rows = transaction
             .query(
@@ -105,67 +101,57 @@ impl CollabCore {
 
     /// Follow one Thread after rechecking access to its parent target.
     pub async fn follow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
-        self.assert_open()?;
         let thread_id = ThreadId::parse(thread_target_id)?;
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
-        let mut connection = self.connection.lock().await;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .await?;
-        let store = ThreadStore::new(&transaction);
-        let scope = store
-            .load_accessible(&thread_id, &actor_id, "follow")
-            .await?;
-        let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
-        let outcome = subscription.follow();
-        store.save_subscription(&subscription, outcome, now).await?;
-        if outcome.changed() {
-            let recipients = active_member_ids(&transaction, &scope.permission_target_id).await?;
-            insert_change(
-                &transaction,
-                ChangeKind::ThreadFollowChanged,
-                Some(scope.thread_id.as_str()),
-                actor_id.as_str(),
-                &recipients,
-                now,
-            )
-            .await?;
-        }
-        transaction.commit().await?;
-        Ok(())
+        self.write(async |connection| {
+            let store = ThreadStore::new(connection);
+            let scope = ThreadAccess::require(connection, &actor_id, &thread_id).await?;
+            let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
+            let outcome = subscription.follow();
+            store.save_subscription(&subscription, outcome, now).await?;
+            if outcome.changed() {
+                let recipients = active_member_ids(connection, &scope.permission_target_id).await?;
+                insert_change(
+                    connection,
+                    ChangeKind::ThreadFollowChanged,
+                    Some(scope.thread_id.as_str()),
+                    actor_id.as_str(),
+                    &recipients,
+                    now,
+                )
+                .await?;
+            }
+            Ok(())
+        })
+        .await
     }
 
     /// Stop future ordinary Thread delivery for one current parent member.
     pub async fn unfollow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
-        self.assert_open()?;
         let thread_id = ThreadId::parse(thread_target_id)?;
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
-        let mut connection = self.connection.lock().await;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .await?;
-        let store = ThreadStore::new(&transaction);
-        let scope = store
-            .load_accessible(&thread_id, &actor_id, "unfollow")
-            .await?;
-        let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
-        let outcome = subscription.unfollow();
-        store.save_subscription(&subscription, outcome, now).await?;
-        if outcome.changed() {
-            let recipients = active_member_ids(&transaction, &scope.permission_target_id).await?;
-            insert_change(
-                &transaction,
-                ChangeKind::ThreadFollowChanged,
-                Some(scope.thread_id.as_str()),
-                actor_id.as_str(),
-                &recipients,
-                now,
-            )
-            .await?;
-        }
-        transaction.commit().await?;
-        Ok(())
+        self.write(async |connection| {
+            let store = ThreadStore::new(connection);
+            let scope = ThreadAccess::require(connection, &actor_id, &thread_id).await?;
+            let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
+            let outcome = subscription.unfollow();
+            store.save_subscription(&subscription, outcome, now).await?;
+            if outcome.changed() {
+                let recipients = active_member_ids(connection, &scope.permission_target_id).await?;
+                insert_change(
+                    connection,
+                    ChangeKind::ThreadFollowChanged,
+                    Some(scope.thread_id.as_str()),
+                    actor_id.as_str(),
+                    &recipients,
+                    now,
+                )
+                .await?;
+            }
+            Ok(())
+        })
+        .await
     }
 }

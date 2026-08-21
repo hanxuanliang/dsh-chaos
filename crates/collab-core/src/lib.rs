@@ -44,7 +44,6 @@ use turso::{Connection, Row};
 use actor::*;
 use changefeed::*;
 use core::*;
-use db::rows::*;
 use membership::*;
 use message::*;
 use profile::*;

@@ -70,6 +70,20 @@ impl CollabCore {
         transaction.commit().await?;
         Ok(value)
     }
+
+    pub(crate) async fn write<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'connection> AsyncFnOnce(&'connection Connection) -> Result<T>,
+    {
+        self.assert_open()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let value = f(&transaction).await?;
+        transaction.commit().await?;
+        Ok(value)
+    }
 }
 
 pub(crate) fn require_non_empty(name: &str, value: &str) -> Result<()> {

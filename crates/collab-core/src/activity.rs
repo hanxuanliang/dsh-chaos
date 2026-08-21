@@ -213,9 +213,7 @@ impl CollabCore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
         require_actor(&transaction, actor_id).await?;
-        let route =
-            require_target_access(&transaction, target_id, actor_id, "mark Activity Done in")
-                .await?;
+        let route = require_target_access(&transaction, target_id, actor_id).await?;
         if route.kind == TargetKind::Thread
             && !ThreadStore::new(&transaction)
                 .is_following(target_id, actor_id)
