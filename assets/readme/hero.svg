@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
   <title id="title">dsh-chaos</title>
-  <desc id="desc">A neobrutalist banner for durable peer collaboration, with a C-shaped chaos route, a channel hash, and a Channel timeline opening into a Thread panel.</desc>
+  <desc id="desc">A neobrutalist banner for durable peer collaboration, with a C-shaped message route converging on a flame and a Channel timeline opening into a Thread panel.</desc>
 
   <rect x="18" y="22" width="1164" height="320" rx="26" fill="#111111"/>
   <rect x="8" y="8" width="1164" height="320" rx="26" fill="#FFF6DF" stroke="#111111" stroke-width="8"/>
 
-  <!-- C + # + reply branch emblem. -->
+  <!-- C-shaped collaboration route converging on a flame. -->
   <g transform="translate(42 41)">
     <rect x="8" y="12" width="248" height="248" rx="34" fill="#111111"/>
     <rect width="248" height="248" rx="34" fill="#FFFDF4" stroke="#111111" stroke-width="8"/>
@@ -13,17 +13,20 @@
           fill="none" stroke="#111111" stroke-width="31" stroke-linecap="round"/>
     <path d="M177 70C160 51 134 43 108 49C68 58 43 94 43 133C43 178 77 213 121 216C150 218 176 206 194 185"
           fill="none" stroke="#37DDF5" stroke-width="18" stroke-linecap="round"/>
-    <g fill="none" stroke-linecap="square">
-      <path d="M113 87L102 177M151 87L140 177M86 115H164M81 148H159" stroke="#111111" stroke-width="21"/>
-      <path d="M113 87L102 177M151 87L140 177M86 115H164M81 148H159" stroke="#FFD60A" stroke-width="11"/>
-    </g>
-    <path d="M159 133H184M184 133V103M184 133V172M184 103H195M184 172H195"
-          fill="none" stroke="#111111" stroke-width="7" stroke-linecap="square"/>
     <g stroke="#111111" stroke-width="6" stroke-linejoin="round">
-      <path d="M194 84H229V112H214L202 121V112H194Z" fill="#FF4F9A"/>
-      <path d="M194 154H229V182H214L202 191V182H194Z" fill="#FFFDF4"/>
-      <path d="M21 116H59V149H42L29 160V149H21Z" fill="#FF4F9A"/>
+      <path d="M37 65H82V99H62L48 112V99H37Z" fill="#FF4F9A"/>
+      <path d="M22 141H67V175H47L33 188V175H22Z" fill="#FFD60A"/>
+      <path d="M131 199H176V233H156L142 246V233H131Z" fill="#FF4F9A"/>
     </g>
+    <g fill="none" stroke="#111111" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M74 86L111 112L135 127"/>
+      <path d="M60 158L105 149L134 140"/>
+      <path d="M153 207L155 173L146 148"/>
+    </g>
+    <path d="M148 86C152 109 176 115 182 136C188 160 171 184 147 186C122 189 103 170 107 146C111 127 128 119 129 98C140 106 146 117 147 128C154 118 157 102 148 86Z"
+          fill="#FF4F9A" stroke="#111111" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M148 125C153 136 164 142 163 153C162 165 154 173 143 172C132 172 124 163 126 152C128 144 135 139 138 130C143 134 146 139 146 145C151 141 152 133 148 125Z"
+          fill="#FFD60A" stroke="#111111" stroke-width="5" stroke-linejoin="round"/>
   </g>
 
   <g font-family="Arial Black, Arial, Helvetica, sans-serif" fill="#111111">
