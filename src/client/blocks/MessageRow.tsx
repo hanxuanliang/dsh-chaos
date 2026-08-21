@@ -62,13 +62,13 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   mentionNames: ReadonlySet<string>
   timeText: string
   fullTimeTitle: string
-  onOpenTasks: () => void
+  onOpenTasks: (messageId: string) => void
   onOpenThread: (() => void) | undefined
 }): JSX.Element {
   const body = (
     <div className={css.rowBody}>
       <MessageBody t={t} text={message.text} names={mentionNames} />
-      {task !== undefined && <TaskChip task={task} assignee={assigneeHandle} onClick={onOpenTasks} />}
+      {task !== undefined && <TaskChip task={task} assignee={assigneeHandle} onClick={() => { onOpenTasks(message.id) }} />}
       <ThreadPreview t={t} thread={thread} summary={summary} actorNamesById={actorNamesById} onOpen={onOpenThread} />
     </div>
   )

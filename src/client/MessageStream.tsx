@@ -33,7 +33,7 @@ export interface MessageStreamProps {
   state: CollabStoreSnapshot
   channelId: string
   activeLocale(): string
-  onOpenTasks(): void
+  onOpenTasks(messageId: string): void
   /** One-shot jump target (task anchor link → land + flash the row). */
   jumpMessageId?: string | undefined
   onJumpHandled?: (() => void) | undefined

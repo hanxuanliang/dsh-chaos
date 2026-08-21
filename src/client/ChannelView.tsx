@@ -38,6 +38,8 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
   const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
+  /** One-shot inverse jump: message Task chip → reveal that exact board card. */
+  const [focusedTaskMessageId, setFocusedTaskMessageId] = useState<string | undefined>(undefined)
   /** Open thread root —— 初始值吃 pendingThreadRoot mount 时一次性消费。 */
   const [threadRootId, setThreadRootId] = useState<string | undefined>(pendingThreadRoot ?? undefined)
   // mount 初始值已吃 pendingThreadRoot; 这个 effect 只管「同频道 lifetime
@@ -113,7 +115,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             jumpMessageId={jumpMessageId}
             onJumpHandled={() => { setJumpMessageId(undefined) }}
             activeLocale={activeLocale}
-            onOpenTasks={() => { setTab('tasks') }}
+            onOpenTasks={(messageId) => { setFocusedTaskMessageId(messageId); setTab('tasks') }}
             onOpenThread={(messageId) => { setThreadRootId(messageId) }}
             onCloseThread={() => { setThreadRootId(undefined) }}
             onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
@@ -126,6 +128,8 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             store={store}
             state={state}
             channelId={channel.id}
+            focusMessageId={focusedTaskMessageId}
+            onFocusHandled={() => { setFocusedTaskMessageId(undefined) }}
             onOpenMessage={(messageId) => { setTab('messages'); setJumpMessageId(messageId) }}
           />
         )}
@@ -160,7 +164,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
   jumpMessageId: string | undefined
   onJumpHandled(): void
   activeLocale(): string
-  onOpenTasks(): void
+  onOpenTasks(messageId: string): void
   onOpenThread(messageId: string): void
   onCloseThread(): void
   onRootJump(messageId: string): void

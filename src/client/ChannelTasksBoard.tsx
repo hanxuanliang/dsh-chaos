@@ -28,7 +28,7 @@
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline16, IconChevronDownOutline14, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeTask } from '../native.ts'
 import type { ChaosKey, ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -222,7 +222,6 @@ function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor
         {/* 用户拍板：不需要独立锚定区——title 本身就是跳转链。 */}
         <button type="button" className={css.taskDetailTitleLink} title={t('tasks.anchorGo')} onClick={onOpenAnchor}>
           <span className={css.taskDetailTitle}>{title}</span>
-          <IconChevronRightOutline14 />
         </button>
       </div>
       <dl className={css.taskDetailMeta}>
@@ -266,20 +265,25 @@ function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor
   )
 }
 
-export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }: {
+export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, onFocusHandled, onOpenMessage }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   channelId: string
+  /** One-shot request from a message Task chip: reveal and focus its card. */
+  focusMessageId: string | undefined
+  onFocusHandled: () => void
   /** Close modal + switch to messages + scroll-flash the anchor row. */
   onOpenMessage: (messageId: string) => void
 }): JSX.Element {
   const [assigneeFilter, setAssigneeFilter] = useState('')
+  const [focusedMessageId, setFocusedMessageId] = useState<string | undefined>(undefined)
   const [selectedMessageId, setSelectedMessageId] = useState<string | undefined>(undefined)
   const [moveError, setMoveError] = useState<string | undefined>(undefined)
   /** HTML5 dnd (plocal dnd-kit 的最小依赖同义实现): 拖一张 task 卡, 列只在状态机可达时点亮。 */
   const [draggingTaskId, setDraggingTaskId] = useState<string | undefined>(undefined)
   const [dragOverLane, setDragOverLane] = useState<TaskStatus | undefined>(undefined)
+  const cardRefs = useRef(new Map<string, HTMLButtonElement>())
 
   const tasks = useMemo(() => {
     const list = Object.values(state.tasksByMessage).filter(task => task.targetId === channelId)
@@ -293,6 +297,33 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
 
   // 用户拍板：认领人筛选只列 channel 内 agents（人侧认领面不放进筛选 pill）。
   const members = (state.membersByChannel[channelId] ?? []).filter(m => m.kind === 'agent')
+
+  // Message → Task is an identity jump, not merely a tab switch. If the
+  // current assignee filter hides the target, clear it first; then scroll the
+  // exact card to the center, give it keyboard focus, and retain a visible
+  // current-card ring until the user selects another Task.
+  useEffect(() => {
+    if (focusMessageId === undefined) return
+    const task = state.tasksByMessage[focusMessageId]
+    if (task === undefined || task.targetId !== channelId) return
+    const hiddenByFilter = assigneeFilter !== '' && (
+      assigneeFilter === 'unassigned'
+        ? task.assigneeId !== undefined
+        : task.assigneeId !== assigneeFilter
+    )
+    if (hiddenByFilter) {
+      setAssigneeFilter('')
+      return
+    }
+    setFocusedMessageId(focusMessageId)
+    const frame = window.requestAnimationFrame(() => {
+      const card = cardRefs.current.get(focusMessageId)
+      card?.scrollIntoView({ block: 'center', inline: 'nearest' })
+      card?.focus({ preventScroll: true })
+      onFocusHandled()
+    })
+    return () => { window.cancelAnimationFrame(frame) }
+  }, [focusMessageId, state.tasksByMessage, channelId, assigneeFilter, onFocusHandled])
 
   const assigneeLabelOf = (task: NativeTask): string | undefined => {
     if (task.assigneeId === undefined) return undefined
@@ -373,6 +404,10 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
                 return (
                   <TaskCard
                     key={task.messageId}
+                    ref={(node) => {
+                      if (node === null) cardRefs.current.delete(task.messageId)
+                      else cardRefs.current.set(task.messageId, node)
+                    }}
                     task={task}
                     title={title === '' ? `#${task.number}` : title}
                     excerpt={excerpt}
@@ -380,9 +415,10 @@ export function ChannelTasksBoard({ t, store, state, channelId, onOpenMessage }:
                     unassignedLabel={t('tasks.unassigned')}
                     timeLabel={formatTime(task.updatedAtMs, t)}
                     dragging={draggingTaskId === task.messageId}
+                    selected={focusedMessageId === task.messageId}
                     onDragStart={() => { setDraggingTaskId(task.messageId) }}
                     onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
-                    onOpen={() => { setMoveError(undefined); setSelectedMessageId(task.messageId) }}
+                    onOpen={() => { setMoveError(undefined); setFocusedMessageId(task.messageId); setSelectedMessageId(task.messageId) }}
                   />
                 )
               })}

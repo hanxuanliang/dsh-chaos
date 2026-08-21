@@ -69,17 +69,43 @@
   white-space: nowrap;
 }
 .taskDetailTitle {
-  flex: 1;
+  display: block;
   min-width: 0;
   overflow: hidden;
   font-size: 14px;
   font-weight: 700;
   text-overflow: ellipsis;
+  text-decoration: underline transparent;
+  text-underline-offset: 3px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
 }
 /* Detail: head row is the title only; status lives in meta rows now. */
 .taskDetailTitleRow {
   display: flex;
   margin-bottom: 12px;
+}
+.taskDetailTitleLink {
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.taskDetailTitleLink:hover .taskDetailTitle {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration-color: currentColor;
+}
+.taskDetailTitleLink:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 .taskDetailMeta {
   display: flex;

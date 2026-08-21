@@ -6,10 +6,11 @@
  *             taskCardNumber/taskCardAssignee/taskCardTime (独有 taskCardTime 的
  *             margin-left:auto + 性指定使分解)。
  */
+import { forwardRef } from 'react'
 import type { NativeTask } from '../../native.ts'
 import css from './TaskCard.module.css'
 
-export function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel, timeLabel, dragging, onDragStart, onDragEnd, onOpen }: {
+export const TaskCard = forwardRef<HTMLButtonElement, {
   task: NativeTask
   title: string
   excerpt: string
@@ -17,18 +18,23 @@ export function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel,
   unassignedLabel: string
   timeLabel: string
   dragging: boolean
+  selected: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onOpen: () => void
-}) {
+}>(function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel, timeLabel, dragging, selected, onDragStart, onDragEnd, onOpen }, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       className={css.card}
       data-plugin="dsh-chaos"
       data-surface="kanban-task-card"
       data-status={task.status}
       data-dragging={dragging ? 'true' : undefined}
+      data-selected={selected ? 'true' : undefined}
+      aria-current={selected ? 'true' : undefined}
+      aria-haspopup="dialog"
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -43,4 +49,4 @@ export function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel,
       </span>
     </button>
   )
-}
+})
