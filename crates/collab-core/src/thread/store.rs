@@ -4,9 +4,18 @@ use turso::{Connection, Row};
 
 use crate::db::{FromRow, QueryRows, placeholders};
 use crate::ids::{ActorId, ThreadId};
-use crate::{Actor, CollabError, Result};
+use crate::target::find_target;
+use crate::{Actor, CollabError, Result, Target};
 
 use super::model::{FollowOutcome, FollowState, RootMessageIds, ThreadSubscription, ThreadSummary};
+
+struct TargetIdRow(String);
+
+impl FromRow for TargetIdRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self(row.get(0)?))
+    }
+}
 
 struct ThreadCountRow {
     thread_id: String,
@@ -164,15 +173,28 @@ impl<'connection> ThreadStore<'connection> {
         Ok(())
     }
 
+    /// Return the active Thread rooted at one Message, when it exists.
+    pub(crate) async fn find_by_root(&self, root_message_id: &str) -> Result<Option<Target>> {
+        let Some(TargetIdRow(target_id)) = self
+            .connection
+            .query_row::<TargetIdRow>(
+                "SELECT id FROM targets WHERE root_message_id = ?1",
+                [root_message_id],
+            )
+            .await?
+        else {
+            return Ok(None);
+        };
+        find_target(self.connection, &target_id).await.map(Some)
+    }
+
     pub(crate) async fn ensure_following(
         &self,
-        thread_target_id: &str,
-        actor_id: &str,
+        thread_id: &ThreadId,
+        actor_id: &ActorId,
         changed_at_ms: i64,
     ) -> Result<FollowOutcome> {
-        let thread_id = ThreadId::parse(thread_target_id)?;
-        let actor_id = ActorId::parse(actor_id)?;
-        let mut subscription = self.load_subscription(&thread_id, &actor_id).await?;
+        let mut subscription = self.load_subscription(thread_id, actor_id).await?;
         let outcome = subscription.follow();
         self.save_subscription(&subscription, outcome, changed_at_ms)
             .await?;
@@ -181,12 +203,10 @@ impl<'connection> ThreadStore<'connection> {
 
     pub(crate) async fn is_following(
         &self,
-        thread_target_id: &str,
-        actor_id: &str,
+        thread_id: &ThreadId,
+        actor_id: &ActorId,
     ) -> Result<bool> {
-        let thread_id = ThreadId::parse(thread_target_id)?;
-        let actor_id = ActorId::parse(actor_id)?;
-        let subscription = self.load_subscription(&thread_id, &actor_id).await?;
+        let subscription = self.load_subscription(thread_id, actor_id).await?;
         Ok(subscription.state() == FollowState::Following)
     }
 

@@ -1,6 +1,7 @@
 //! Immutable Message writes, recipient snapshots, and authorized history reads.
 
 use super::*;
+use crate::ids::{ActorId, ThreadId};
 use crate::thread::store::ThreadStore;
 
 impl CollabCore {
@@ -169,7 +170,11 @@ impl CollabCore {
 
         if route.kind == TargetKind::Thread {
             ThreadStore::new(&transaction)
-                .ensure_following(&request.target_id, &request.author_id, now)
+                .ensure_following(
+                    &ThreadId::parse(&request.target_id)?,
+                    &ActorId::parse(&request.author_id)?,
+                    now,
+                )
                 .await?;
         }
 
