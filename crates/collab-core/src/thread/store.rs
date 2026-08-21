@@ -240,25 +240,26 @@ impl<'connection> ThreadStore<'connection> {
              GROUP BY thread.id, thread.root_message_id
              ORDER BY thread.root_message_id, thread.id"
         );
-        let mut count_parameters = roots.as_slice().to_vec();
-        count_parameters.push(actor_id.as_str().to_owned());
-        let counts: Vec<ThreadCountRow> = self
+        let count_parameters: Vec<&str> = roots
+            .as_slice()
+            .iter()
+            .map(String::as_str)
+            .chain([actor_id.as_str()])
+            .collect();
+        let summaries: Vec<ThreadSummary> = self
             .connection
             .query_rows(&counts_sql, count_parameters)
-            .await?;
-        let mut summaries: Vec<ThreadSummary> = Vec::new();
-        let mut index_by_thread = HashMap::new();
-        for count in counts.into_iter().filter(|count| count.reply_count > 0) {
-            let thread_id = count.thread_id.clone();
-            index_by_thread.insert(thread_id, summaries.len());
-            summaries.push(count.into_summary());
-        }
+            .await?
+            .into_iter()
+            .filter(|count: &ThreadCountRow| count.reply_count > 0)
+            .map(ThreadCountRow::into_summary)
+            .collect();
         if summaries.is_empty() {
             return Ok(summaries);
         }
-        let visible_thread_ids: Vec<String> = summaries
+        let visible_thread_ids: Vec<&str> = summaries
             .iter()
-            .map(|summary| summary.thread_id.clone())
+            .map(|summary| summary.thread_id.as_str())
             .collect();
         let replier_sql = format!(
             "SELECT target_id, author_id, MAX(seq) AS latest_seq
@@ -268,19 +269,26 @@ impl<'connection> ThreadStore<'connection> {
              ORDER BY target_id, latest_seq DESC, author_id",
             placeholders(visible_thread_ids.len()),
         );
-        let repliers: Vec<ThreadReplierRow> = self
+        let mut recent_by_thread: HashMap<String, Vec<String>> = HashMap::new();
+        for replier in self
             .connection
-            .query_rows(&replier_sql, visible_thread_ids)
-            .await?;
-        for replier in repliers {
-            if let Some(&index) = index_by_thread.get(&replier.thread_id) {
-                let recent = &mut summaries[index].recent_replier_ids;
-                if recent.len() < 3 {
-                    recent.push(replier.author_id);
-                }
+            .query_rows::<ThreadReplierRow>(&replier_sql, visible_thread_ids)
+            .await?
+        {
+            let recent = recent_by_thread.entry(replier.thread_id).or_default();
+            if recent.len() < 3 {
+                recent.push(replier.author_id);
             }
         }
-        Ok(summaries)
+        Ok(summaries
+            .into_iter()
+            .map(|mut summary| {
+                if let Some(recent) = recent_by_thread.remove(&summary.thread_id) {
+                    summary.recent_replier_ids = recent;
+                }
+                summary
+            })
+            .collect())
     }
 
     pub(crate) async fn followed_thread_ids(&self, actor_id: &ActorId) -> Result<Vec<String>> {
