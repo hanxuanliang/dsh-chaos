@@ -668,10 +668,9 @@ impl CollabCore {
                 if let Some(summary) = summaries
                     .iter_mut()
                     .find(|summary| summary.thread_id == target_id)
+                    .filter(|summary| summary.recent_replier_ids.len() < 3)
                 {
-                    if summary.recent_replier_ids.len() < 3 {
-                        summary.recent_replier_ids.push(author_id);
-                    }
+                    summary.recent_replier_ids.push(author_id);
                 }
             }
         }
