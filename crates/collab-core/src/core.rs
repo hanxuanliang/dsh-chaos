@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tokio::sync::Mutex;
+use turso::transaction::TransactionBehavior;
 use turso::Connection;
 use uuid::Uuid;
 
@@ -54,6 +55,20 @@ impl CollabCore {
         } else {
             Ok(())
         }
+    }
+
+    pub(crate) async fn read<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'connection> AsyncFnOnce(&'connection Connection) -> Result<T>,
+    {
+        self.assert_open()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .await?;
+        let value = f(&transaction).await?;
+        transaction.commit().await?;
+        Ok(value)
     }
 }
 
