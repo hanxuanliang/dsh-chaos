@@ -76,33 +76,43 @@ function fullTimeTitle(ms: number, activeLocale: () => string): string {
   return new Date(ms).toLocaleString(activeLocale() === 'zh' ? 'zh-CN' : 'en-US')
 }
 
-interface StreamItem {
-  kind: 'divider' | 'message'
+interface StreamMessage {
   key: string
-  label?: string
-  message?: NativeMessage
-  compact?: boolean
+  message: NativeMessage
+  compact: boolean
 }
 
-function buildItems(messages: NativeMessage[], t: ChaosTranslate, activeLocale: () => string): StreamItem[] {
-  const items: StreamItem[] = []
+interface StreamDayGroup {
+  key: string
+  label: string
+  messages: StreamMessage[]
+}
+
+function buildDayGroups(messages: NativeMessage[], t: ChaosTranslate, activeLocale: () => string): StreamDayGroup[] {
+  const groups: StreamDayGroup[] = []
   let previousDay = ''
   let previous: NativeMessage | undefined
+  let currentGroup: StreamDayGroup | undefined
   for (const message of messages) {
     const date = new Date(message.createdAtMs)
     const day = `${String(date.getFullYear())}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
     if (day !== previousDay) {
-      items.push({ kind: 'divider', key: `day-${day}`, label: dividerLabel(message.createdAtMs, t, activeLocale) })
+      currentGroup = {
+        key: `day-${day}`,
+        label: dividerLabel(message.createdAtMs, t, activeLocale),
+        messages: [],
+      }
+      groups.push(currentGroup)
       previousDay = day
       previous = undefined
     }
     const compact = previous !== undefined
       && previous.authorId === message.authorId
       && message.createdAtMs - previous.createdAtMs <= COMPACT_WINDOW_MS
-    items.push({ kind: 'message', key: message.id, message, compact })
+    currentGroup?.messages.push({ key: message.id, message, compact })
     previous = message
   }
-  return items
+  return groups
 }
 
 export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled, onOpenThread }: MessageStreamProps): JSX.Element {
@@ -126,8 +136,8 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     }
     return names
   }, [state.actors])
-  const items = useMemo(
-    () => buildItems(messages ?? [], t, activeLocale),
+  const dayGroups = useMemo(
+    () => buildDayGroups(messages ?? [], t, activeLocale),
     [messages, t, activeLocale],
   )
   /** Thread target per root message, when one exists. */
@@ -260,39 +270,41 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
             </div>
           )}
             <div className={css.listPush} aria-hidden="true" />
-          {items.map((item) => {
-            if (item.kind === 'divider') {
-              return <div key={item.key} className={css.dayDivider}><span>{item.label}</span></div>
-            }
-            const message = item.message as NativeMessage
-            const author = actorsById.get(message.authorId)
-            const task: NativeTask | undefined = state.tasksByMessage[message.id]
-            const showTask = task !== undefined && task.targetId === channelId
-            const assignee = showTask && task.assigneeId !== undefined
-              ? actorsById.get(task.assigneeId)?.handle
-              : undefined
-            const binding = author === undefined ? undefined : state.bindingsByAgent[author.id]
-            return (
-              <MessageRow
-                key={item.key}
-                t={t}
-                message={message}
-                compact={item.compact === true}
-                author={author}
-                bindingModel={binding?.model}
-                task={showTask ? task : undefined}
-                assigneeHandle={assignee}
-                thread={threadsByRoot.get(message.id)}
-                summary={state.threadSummariesByRoot[message.id]}
-                actorNamesById={actorNamesById}
-                mentionNames={mentionNames}
-                timeText={timeLabel(message.createdAtMs)}
-                fullTimeTitle={fullTimeTitle(message.createdAtMs, activeLocale)}
-                onOpenTasks={onOpenTasks}
-                onOpenThread={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }}
-              />
-            )
-          })}
+          {dayGroups.map(group => (
+            <div key={group.key} className={css.dayGroup}>
+              <div className={css.dayDivider} role="separator" aria-label={group.label}><span>{group.label}</span></div>
+              {group.messages.map(item => {
+                const message = item.message
+                const author = actorsById.get(message.authorId)
+                const task: NativeTask | undefined = state.tasksByMessage[message.id]
+                const showTask = task !== undefined && task.targetId === channelId
+                const assignee = showTask && task.assigneeId !== undefined
+                  ? actorsById.get(task.assigneeId)?.handle
+                  : undefined
+                const binding = author === undefined ? undefined : state.bindingsByAgent[author.id]
+                return (
+                  <MessageRow
+                    key={item.key}
+                    t={t}
+                    message={message}
+                    compact={item.compact}
+                    author={author}
+                    bindingModel={binding?.model}
+                    task={showTask ? task : undefined}
+                    assigneeHandle={assignee}
+                    thread={threadsByRoot.get(message.id)}
+                    summary={state.threadSummariesByRoot[message.id]}
+                    actorNamesById={actorNamesById}
+                    mentionNames={mentionNames}
+                    timeText={timeLabel(message.createdAtMs)}
+                    fullTimeTitle={fullTimeTitle(message.createdAtMs, activeLocale)}
+                    onOpenTasks={onOpenTasks}
+                    onOpenThread={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }}
+                  />
+                )
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>

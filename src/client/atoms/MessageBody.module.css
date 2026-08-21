@@ -182,6 +182,7 @@
 /* plocal 原样: text-2xs(11px) font-black ink/60 underline offset-2, hover→ink 。
  * specificity 双双 .clampToggle.clampToggle(0-2-0)压宿主 .panel button{font:inherit}(0-1-1)。 */
 .clampToggle.clampToggle {
+  align-self: flex-start;
   margin-top: 4px;
   border: none;
   padding: 0;

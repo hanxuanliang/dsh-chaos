@@ -47,12 +47,20 @@
 }
 
 /* plocal day divider: a sticky centered pill, not a hairline. */
+.streamWrap .dayGroup {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
 .streamWrap .dayDivider {
   position: sticky;
   z-index: 1;
   top: 12px;
-  align-self: center;
+  display: flex;
+  justify-content: center;
   margin: 4px 0 8px;
+  user-select: none;
 }
 
 .streamWrap .dayDivider > span {
