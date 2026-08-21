@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use turso::params_from_iter;
 use turso::{Connection, Row};
 
 use crate::db::{FromRow, QueryRows, placeholders};
@@ -225,7 +224,7 @@ impl<'connection> ThreadStore<'connection> {
         count_parameters.push(actor_id.as_str().to_owned());
         let counts: Vec<ThreadCountRow> = self
             .connection
-            .query_rows(&counts_sql, params_from_iter(count_parameters))
+            .query_rows(&counts_sql, count_parameters)
             .await?;
         let mut summaries: Vec<ThreadSummary> = Vec::new();
         let mut index_by_thread = HashMap::new();
@@ -251,7 +250,7 @@ impl<'connection> ThreadStore<'connection> {
         );
         let repliers: Vec<ThreadReplierRow> = self
             .connection
-            .query_rows(&replier_sql, params_from_iter(visible_thread_ids))
+            .query_rows(&replier_sql, visible_thread_ids)
             .await?;
         for replier in repliers {
             if let Some(&index) = index_by_thread.get(&replier.thread_id) {
