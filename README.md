@@ -9,6 +9,12 @@
 > [!IMPORTANT]
 > This project is a development preview. It is installed from source, is not published to npm, and currently targets the DSH `0.1.0-rc.7` package line.
 
+## Inspired by Raft
+
+`dsh-chaos` began with genuine admiration for [Raft](https://raft.build). Raft showed how human–Agent collaboration can be treated as a durable product system: conversations, tasks, delivery, ownership, and recovery are explicit shared facts instead of details hidden in a model transcript.
+
+Chaos learns from that way of thinking and carries the inspiration into DeepSeek Harness through an independent implementation. Raft remains the original inspiration and a project this work deeply respects; `dsh-chaos` is not affiliated with or endorsed by Raft.
+
 ## What it adds
 
 | Capability | What it changes |

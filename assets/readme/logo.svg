@@ -1,36 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">dsh-chaos logo</title>
-  <desc id="desc">A neobrutalist C-shaped collaboration route with three connected message nodes converging on a bright flame.</desc>
+  <desc id="desc">Three equal message nodes divide a C-shaped route into three arcs around an outward-shifted concentric collaboration target.</desc>
 
   <rect x="36" y="42" width="436" height="436" rx="54" fill="#111111"/>
   <rect x="24" y="24" width="436" height="436" rx="54" fill="#FFF6DF" stroke="#111111" stroke-width="12"/>
 
-  <!-- C = Chaos: an open route that can accept another collaborator. -->
-  <path d="M354 142C322 103 269 84 218 94C143 108 91 176 91 253C91 339 157 410 242 416C300 420 354 396 389 352"
-        fill="none" stroke="#111111" stroke-width="58" stroke-linecap="round"/>
-  <path d="M354 142C322 103 269 84 218 94C143 108 91 176 91 253C91 339 157 410 242 416C300 420 354 396 389 352"
-        fill="none" stroke="#37DDF5" stroke-width="36" stroke-linecap="round"/>
+  <!-- A mathematically even C: three 90-degree arcs, open on the right. -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M367 133A165 165 0 0 0 133 133" stroke="#111111" stroke-width="58"/>
+    <path d="M133 133A165 165 0 0 0 133 367" stroke="#111111" stroke-width="58"/>
+    <path d="M133 367A165 165 0 0 0 367 367" stroke="#111111" stroke-width="58"/>
+    <path d="M367 133A165 165 0 0 0 133 133" stroke="#37DDF5" stroke-width="36"/>
+    <path d="M133 133A165 165 0 0 0 133 367" stroke="#37DDF5" stroke-width="36"/>
+    <path d="M133 367A165 165 0 0 0 367 367" stroke="#37DDF5" stroke-width="36"/>
+  </g>
 
-  <!-- Three Messages converge on the same collaboration fire. -->
+  <!-- Each equal arc is owned by one equal Message node. -->
+  <g fill="none" stroke="#111111" stroke-width="11" stroke-linecap="round">
+    <path d="M250 118L276 169"/>
+    <path d="M118 250H206"/>
+    <path d="M250 382L276 331"/>
+  </g>
   <g stroke="#111111" stroke-width="10" stroke-linejoin="round">
-    <path d="M93 127H169V187H133L110 207V187H93Z" fill="#FF4F9A"/>
-    <path d="M62 274H138V334H102L79 354V334H62Z" fill="#FFD60A"/>
-    <path d="M260 380H336V440H300L277 460V440H260Z" fill="#FF4F9A"/>
+    <path d="M210 60H290V120H254L230 140V120H210Z" fill="#FF4F9A"/>
+    <path d="M50 220H130V280H94L70 300V280H50Z" fill="#FFD60A"/>
+    <path d="M210 380H290V440H254L230 460V440H210Z" fill="#FF4F9A"/>
   </g>
-  <g fill="none" stroke="#111111" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M153 165L222 215L264 242"/>
-    <path d="M126 305L204 287L264 268"/>
-    <path d="M298 393L303 321L288 283"/>
+  <g fill="#111111">
+    <circle cx="232" cy="90" r="7"/>
+    <circle cx="268" cy="90" r="7"/>
+    <circle cx="72" cy="250" r="7"/>
+    <circle cx="108" cy="250" r="7"/>
+    <circle cx="232" cy="410" r="7"/>
+    <circle cx="268" cy="410" r="7"/>
   </g>
 
-  <!-- Fire replaces the earlier abstract sun: conversation ignites action. -->
-  <path d="M279 168C286 210 329 221 340 260C352 303 322 347 278 352C231 357 196 321 204 277C211 242 242 226 244 187C263 201 275 221 278 240C291 223 296 197 279 168Z"
-        fill="#FF4F9A" stroke="#111111" stroke-width="14" stroke-linejoin="round"/>
-  <path d="M278 237C287 257 307 268 305 290C303 311 288 325 269 324C247 323 234 306 238 286C241 270 255 261 260 244C270 252 276 261 277 273C284 264 286 250 278 237Z"
-        fill="#FFD60A" stroke="#111111" stroke-width="9" stroke-linejoin="round"/>
-
-  <circle cx="123" cy="157" r="7" fill="#111111"/>
-  <circle cx="151" cy="157" r="7" fill="#111111"/>
-  <path d="M91 305H108M118 305H127" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
-  <path d="M290 410H307" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
+  <!-- The shared target sits toward the open edge: collaboration creates outward motion. -->
+  <circle cx="290" cy="250" r="84" fill="#FF4F9A" stroke="#111111" stroke-width="13"/>
+  <circle cx="290" cy="250" r="55" fill="#FFD60A" stroke="#111111" stroke-width="11"/>
+  <circle cx="290" cy="250" r="27" fill="#37DDF5" stroke="#111111" stroke-width="9"/>
 </svg>
