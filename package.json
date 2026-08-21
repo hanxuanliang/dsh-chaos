@@ -55,6 +55,8 @@
     "smoke:service": "node scripts/smoke-service.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:transport": "node scripts/smoke-web-transport.mjs",
+    "test:e2e": "pnpm build:native:debug && pnpm build:ts && pnpm build:client && node e2e/run.mjs",
+    "test:e2e:run": "node e2e/run.mjs",
     "test:rust": "cargo test --workspace",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

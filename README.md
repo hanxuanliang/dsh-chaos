@@ -19,4 +19,4 @@ The current implementation contains:
 - an Agent Settings surface for preset-aware creation, the Agent's one bound Session, and read-only browsing of its fixed `$DSH_HOME/agents/<id>/` Workspace;
 - authoritative RPC reads after SSE invalidations, with Rust/Turso snapshots as the source of truth for Thread follows and every other projected state.
 
-The browser panel is an initial functional slice rather than a complete Channel product. Remote access is intentionally loopback-only because DSH is a local product; local tabs and browsers share one fixed Web User. SSE is an invalidation projection, while Rust/Turso remains authoritative. See `RAFT-TO-DSH-MULTI-AGENT.md` for the design and boundaries.
+The browser panel is an initial functional slice rather than a complete Channel product. Remote access is intentionally loopback-only because DSH is a local product; local tabs and browsers share one fixed Web User. SSE is an invalidation projection, while Rust/Turso remains authoritative. See [`docs/testing.md`](docs/testing.md) for the local acceptance and E2E workflow.
