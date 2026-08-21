@@ -1,44 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
   <title id="title">dsh-chaos</title>
-  <desc id="desc">A neobrutalist banner for durable peer collaboration in DeepSeek Harness, with connected message nodes converging on a chaos spark.</desc>
+  <desc id="desc">A neobrutalist banner for durable peer collaboration, with a C-shaped chaos route, a channel hash, and a Channel timeline opening into a Thread panel.</desc>
 
-  <!-- Hard-shadow paper canvas. -->
   <rect x="18" y="22" width="1164" height="320" rx="26" fill="#111111"/>
   <rect x="8" y="8" width="1164" height="320" rx="26" fill="#FFF6DF" stroke="#111111" stroke-width="8"/>
 
-  <!-- Standalone collaboration mark, redrawn as a compact hero emblem. -->
+  <!-- C + # + reply branch emblem. -->
   <g transform="translate(42 41)">
     <rect x="8" y="12" width="248" height="248" rx="34" fill="#111111"/>
     <rect width="248" height="248" rx="34" fill="#FFFDF4" stroke="#111111" stroke-width="8"/>
-    <path d="M184 75C166 53 136 43 109 49C69 57 43 93 43 132C43 177 76 213 120 216C151 218 180 205 198 182"
-          fill="none" stroke="#111111" stroke-width="32" stroke-linecap="round"/>
-    <path d="M184 75C166 53 136 43 109 49C69 57 43 93 43 132C43 177 76 213 120 216C151 218 180 205 198 182"
-          fill="none" stroke="#37DDF5" stroke-width="19" stroke-linecap="round"/>
+    <path d="M177 70C160 51 134 43 108 49C68 58 43 94 43 133C43 178 77 213 121 216C150 218 176 206 194 185"
+          fill="none" stroke="#111111" stroke-width="31" stroke-linecap="round"/>
+    <path d="M177 70C160 51 134 43 108 49C68 58 43 94 43 133C43 178 77 213 121 216C150 218 176 206 194 185"
+          fill="none" stroke="#37DDF5" stroke-width="18" stroke-linecap="round"/>
+    <g fill="none" stroke-linecap="square">
+      <path d="M113 87L102 177M151 87L140 177M86 115H164M81 148H159" stroke="#111111" stroke-width="21"/>
+      <path d="M113 87L102 177M151 87L140 177M86 115H164M81 148H159" stroke="#FFD60A" stroke-width="11"/>
+    </g>
+    <path d="M159 133H184M184 133V103M184 133V172M184 103H195M184 172H195"
+          fill="none" stroke="#111111" stroke-width="7" stroke-linecap="square"/>
     <g stroke="#111111" stroke-width="6" stroke-linejoin="round">
-      <path d="M37 65H82V99H62L48 112V99H37Z" fill="#FF4F9A"/>
-      <path d="M22 141H67V175H47L33 188V175H22Z" fill="#FFD60A"/>
-      <path d="M131 199H176V233H156L142 246V233H131Z" fill="#FF4F9A"/>
+      <path d="M194 84H229V112H214L202 121V112H194Z" fill="#FF4F9A"/>
+      <path d="M194 154H229V182H214L202 191V182H194Z" fill="#FFFDF4"/>
+      <path d="M21 116H59V149H42L29 160V149H21Z" fill="#FF4F9A"/>
     </g>
-    <g fill="none" stroke="#111111" stroke-width="7" stroke-linecap="round">
-      <path d="M74 86L111 112L137 126"/>
-      <path d="M60 158L105 149L137 139"/>
-      <path d="M153 207L155 173L148 149"/>
-    </g>
-    <path d="M146 91L158 113L183 103L177 128L202 135L178 145L186 169L161 162L151 186L140 163L116 173L122 148L97 141L121 131L113 107L138 114Z"
-          fill="#111111" stroke="#111111" stroke-width="7" stroke-linejoin="round"/>
-    <path d="M147 105L155 120L170 114L166 130L182 135L166 141L172 157L156 152L150 168L143 152L127 158L131 142L115 137L131 131L126 115L142 120Z"
-          fill="#FFD60A" stroke="#111111" stroke-width="5" stroke-linejoin="round"/>
-    <circle cx="149" cy="136" r="11" fill="#FFF6DF" stroke="#111111" stroke-width="5"/>
   </g>
 
-  <!-- Wordmark and promise. -->
   <g font-family="Arial Black, Arial, Helvetica, sans-serif" fill="#111111">
     <text x="338" y="78" font-size="16" font-weight="800" letter-spacing="2.6">DEEPSEEK HARNESS · PEER COLLABORATION</text>
     <text x="332" y="158" font-size="70" font-weight="900" letter-spacing="-3">dsh-chaos</text>
     <text x="336" y="202" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">Agents coordinate. The ledger remembers.</text>
   </g>
 
-  <!-- Product truths as hard-edged neobrutalist labels. -->
   <g font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800" fill="#111111" stroke="#111111" stroke-width="4">
     <rect x="336" y="240" width="150" height="42" rx="5" fill="#FFD60A"/>
     <rect x="498" y="240" width="140" height="42" rx="5" fill="#37DDF5"/>
@@ -52,10 +45,41 @@
     </g>
   </g>
 
-  <!-- An open route exits the frame: collaboration remains extensible. -->
-  <path d="M1001 69L1054 109L1019 145L1096 187L1057 231L1137 278" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter"/>
-  <circle cx="1001" cy="69" r="18" fill="#FF4F9A" stroke="#111111" stroke-width="7"/>
-  <rect x="1037" y="91" width="34" height="34" fill="#FFD60A" stroke="#111111" stroke-width="7" transform="rotate(12 1054 108)"/>
-  <circle cx="1096" cy="187" r="19" fill="#37DDF5" stroke="#111111" stroke-width="7"/>
-  <path d="M1112 247L1140 261L1120 282L1093 266Z" fill="#FF4F9A" stroke="#111111" stroke-width="7" stroke-linejoin="round"/>
+  <!-- Channel timeline with a docked Thread panel. -->
+  <g transform="translate(976 47)" stroke="#111111" stroke-linejoin="round">
+    <rect x="8" y="10" width="132" height="224" rx="12" fill="#111111" stroke-width="7"/>
+    <rect width="132" height="224" rx="12" fill="#FFFDF4" stroke-width="7"/>
+    <rect x="0" y="0" width="132" height="45" rx="12" fill="#FFD60A" stroke-width="7"/>
+    <path d="M0 45H132" stroke-width="7"/>
+    <g fill="none" stroke-linecap="square">
+      <path d="M22 13L18 33M39 13L35 33M13 20H44M11 27H42" stroke-width="5"/>
+    </g>
+    <g stroke-width="6">
+      <circle cx="22" cy="72" r="8" fill="#37DDF5"/>
+      <path d="M40 67H105M40 77H88"/>
+      <circle cx="22" cy="116" r="8" fill="#FF4F9A"/>
+      <path d="M40 111H100M40 121H76"/>
+      <circle cx="22" cy="160" r="8" fill="#37DDF5"/>
+      <path d="M40 155H108M40 165H91"/>
+      <circle cx="22" cy="204" r="8" fill="#FF4F9A"/>
+      <path d="M40 199H96M40 209H72"/>
+    </g>
+
+    <path d="M98 116H151" fill="none" stroke-width="8" stroke-linecap="square"/>
+
+    <rect x="76" y="73" width="112" height="174" rx="12" fill="#111111" stroke-width="7" transform="translate(7 9)"/>
+    <rect x="76" y="73" width="112" height="174" rx="12" fill="#FFF6DF" stroke-width="7"/>
+    <rect x="76" y="73" width="112" height="40" rx="12" fill="#37DDF5" stroke-width="7"/>
+    <path d="M76 113H188" stroke-width="7"/>
+    <path d="M91 92H104L96 84M104 92L96 100" fill="none" stroke-width="5" stroke-linecap="square"/>
+    <g stroke-width="6">
+      <circle cx="98" cy="139" r="7" fill="#FF4F9A"/>
+      <path d="M114 135H171M114 144H156"/>
+      <path d="M101 162V199" fill="none" stroke-dasharray="4 7"/>
+      <circle cx="113" cy="178" r="7" fill="#FFD60A"/>
+      <path d="M129 174H172M129 183H160"/>
+      <circle cx="113" cy="218" r="7" fill="#37DDF5"/>
+      <path d="M129 214H174M129 223H153"/>
+    </g>
+  </g>
 </svg>

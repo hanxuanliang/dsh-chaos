@@ -1,41 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">dsh-chaos logo</title>
-  <desc id="desc">A neobrutalist collaboration mark with a broken C-shaped message route, three connected nodes, and a central chaos spark.</desc>
+  <desc id="desc">A neobrutalist C-shaped chaos route around a channel hash, branching into two thread reply bubbles.</desc>
 
-  <!-- Hard shadow and paper tile. -->
   <rect x="36" y="42" width="436" height="436" rx="54" fill="#111111"/>
   <rect x="24" y="24" width="436" height="436" rx="54" fill="#FFF6DF" stroke="#111111" stroke-width="12"/>
 
-  <!-- Broken C: a durable route that stays open to new collaborators. -->
+  <!-- C = Chaos: an open route that can accept another collaborator. -->
   <path d="M354 142C322 103 269 84 218 94C143 108 91 176 91 253C91 339 157 410 242 416C300 420 354 396 389 352"
         fill="none" stroke="#111111" stroke-width="58" stroke-linecap="round"/>
   <path d="M354 142C322 103 269 84 218 94C143 108 91 176 91 253C91 339 157 410 242 416C300 420 354 396 389 352"
         fill="none" stroke="#37DDF5" stroke-width="36" stroke-linecap="round"/>
 
-  <!-- Three message nodes feed the same shared ledger. -->
+  <!-- # = the shared Channel, drawn as geometry rather than font text. -->
+  <g fill="none" stroke-linecap="square">
+    <path d="M238 172L216 337M313 172L291 337M190 230H338M181 292H329" stroke="#111111" stroke-width="38"/>
+    <path d="M238 172L216 337M313 172L291 337M190 230H338M181 292H329" stroke="#FFD60A" stroke-width="20"/>
+  </g>
+
+  <!-- One Channel message branches into two nested Thread replies. -->
+  <path d="M329 261H365M365 261V207M365 261V316M365 207H386M365 316H386"
+        fill="none" stroke="#111111" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter"/>
   <g stroke="#111111" stroke-width="10" stroke-linejoin="round">
-    <path d="M93 127H169V187H133L110 207V187H93Z" fill="#FF4F9A"/>
-    <path d="M62 274H138V334H102L79 354V334H62Z" fill="#FFD60A"/>
-    <path d="M260 380H336V440H300L277 460V440H260Z" fill="#FF4F9A"/>
+    <path d="M383 174H440V220H414L396 235V220H383Z" fill="#FF4F9A"/>
+    <path d="M383 286H440V332H414L396 347V332H383Z" fill="#FFFDF4"/>
   </g>
+  <circle cx="411" cy="198" r="7" fill="#111111"/>
+  <path d="M400 310H422" stroke="#111111" stroke-width="8" stroke-linecap="square"/>
 
-  <!-- Crossing paths make the collaboration intentionally non-linear. -->
-  <g fill="none" stroke="#111111" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M153 165L222 215L264 242"/>
-    <path d="M126 305L204 287L264 268"/>
-    <path d="M298 393L303 321L288 283"/>
-  </g>
-
-  <!-- Central chaos spark: unruly shape, authoritative black boundary. -->
-  <path d="M276 178L299 218L343 200L332 245L376 258L333 276L349 319L303 306L284 349L264 308L220 326L231 281L187 268L230 250L214 207L260 220Z"
-        fill="#111111" stroke="#111111" stroke-width="14" stroke-linejoin="round"/>
-  <path d="M278 202L295 233L326 220L318 253L350 261L318 273L329 304L298 294L284 325L271 294L239 307L247 274L215 266L247 254L236 223L268 233Z"
-        fill="#FFD60A" stroke="#111111" stroke-width="8" stroke-linejoin="round"/>
-  <circle cx="283" cy="263" r="24" fill="#FFF6DF" stroke="#111111" stroke-width="9"/>
-
-  <!-- Small ink details preserve the hand-built, neobrutalist character. -->
-  <circle cx="123" cy="157" r="7" fill="#111111"/>
-  <circle cx="151" cy="157" r="7" fill="#111111"/>
-  <path d="M91 305H108M118 305H127" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
-  <path d="M290 410H307" stroke="#111111" stroke-width="8" stroke-linecap="round"/>
+  <!-- A root Message enters the Channel from the left. -->
+  <path d="M79 222H142V276H113L92 294V276H79Z" fill="#FF4F9A" stroke="#111111" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M105 249H124" stroke="#111111" stroke-width="8" stroke-linecap="square"/>
 </svg>
