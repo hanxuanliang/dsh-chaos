@@ -3,6 +3,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import {
   Button,
   IconEllipsisOutline16,
+  IconChevronRightOutline14,
   IconFolderOpenOutline16,
   IconTrashOutline16,
   Menu,
@@ -19,12 +20,13 @@ type Tab = 'identity' | 'runtime' | 'collaboration'
 
 function reasonText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
-export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspace, onDelete, t }: {
+export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspace, onNavigateChannel, onDelete, t }: {
   connection: ConnectionHandle
   profile: AgentProfile
   presets: AgentPresetSummary[]
   onUpdated(profile: AgentProfile): void
   onWorkspace(): void
+  onNavigateChannel(targetId: string): void
   onDelete(): void
   t: ChaosTranslate
 }): JSX.Element {
@@ -187,7 +189,9 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
           {membershipsError !== null && <ErrorBanner>{t('agents.membershipsFailed', { error: membershipsError })}</ErrorBanner>}
           {memberships === null && membershipsError === null && <p className={css.state} role="status">{t('agents.membershipsLoading')}</p>}
           {memberships !== null && memberships.length === 0 && <p className={css.state}>{t('agents.membershipsEmpty')}</p>}
-          {memberships !== null && memberships.length > 0 && <div className={css.memberships}>{memberships.map(item => <div key={item.target.id} className={css.membership}><span>{item.target.kind === 'channel' ? '#' : '↔'} {item.target.name}</span><small>{item.role}</small></div>)}</div>}
+          {memberships !== null && memberships.length > 0 && <div className={css.memberships}>{memberships.map(item => item.target.kind === 'channel'
+            ? <button key={item.target.id} type="button" className={css.membership} data-navigable="true" aria-label={t('agents.openChannel', { name: item.target.name })} onClick={() => { onNavigateChannel(item.target.id) }}><span># {item.target.name}</span><span className={css.membershipMeta}><small>{item.role}</small><IconChevronRightOutline14 aria-hidden="true" /></span></button>
+            : <div key={item.target.id} className={css.membership}><span>↔ {item.target.name}</span><small>{item.role}</small></div>)}</div>}
         </section>}
       </div>
     </section>

@@ -19,6 +19,7 @@ import css from './CollabPanel.module.css'
 import { CollabPanel } from './CollabPanel.tsx'
 import { CollabPanelController } from './panel-controller.ts'
 import { mountCollabSidebarEntry } from './collab-entry.ts'
+import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './collab-navigation.ts'
 
 export const CHAOS_PANEL_SELECTOR = '[data-dsh-chaos-panel]'
 
@@ -169,18 +170,40 @@ export function mountCollabWorkspace(ctx: ChaosClientContext, t: ChaosTranslate)
   // connected while closed so unread badges keep ticking (P0-3 input).
   const store = new CollabStore(new ChaosClient(ctx.connection))
   let storeStarted = false
+  let pendingChannelId: string | undefined
+  const applyPendingNavigation = (): void => {
+    if (pendingChannelId === undefined || !store.getSnapshot().bootstrapped) return
+    const targetId = pendingChannelId
+    pendingChannelId = undefined
+    if (store.getSnapshot().channels.some(channel => channel.id === targetId)) store.setActiveChannel(targetId)
+  }
   const unsubscribeStoreTrigger = controller.subscribe(() => {
     if (!storeStarted && controller.getSnapshot().open) {
       storeStarted = true
       store.start()
     }
   })
+  const unsubscribeNavigation = store.subscribe(applyPendingNavigation)
+  const onNavigateChannel = (event: Event): void => {
+    const targetId = (event as CustomEvent<unknown>).detail
+    if (typeof targetId !== 'string' || targetId === '') return
+    pendingChannelId = targetId
+    controller.open()
+    if (!storeStarted) {
+      storeStarted = true
+      store.start()
+    }
+    applyPendingNavigation()
+  }
+  document.addEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, onNavigateChannel)
   const disposeEntry = mountCollabSidebarEntry(controller, key => t(key), listener => ctx.locale.subscribe(listener))
   const disposePanel = mountPanel(controller, ctx, t, store)
   return () => {
     disposePanel()
     disposeEntry()
     unsubscribeStoreTrigger()
+    unsubscribeNavigation()
+    document.removeEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, onNavigateChannel)
     store.dispose()
   }
 }

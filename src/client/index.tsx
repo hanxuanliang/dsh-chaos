@@ -2,6 +2,7 @@ import { AgentSettingsCard } from './AgentSettingsCard.tsx'
 import { mountCollabWorkspace } from './collab-mount.tsx'
 import type { ChaosClientContext } from './dsh-compat.ts'
 import { en, zh } from './locales.ts'
+import { navigateToCollabChannel } from './collab-navigation.ts'
 
 export const inject = ['slots', 'connection', 'locale', 'sessions', 'conversation', 'workspaces']
 
@@ -17,7 +18,12 @@ export function apply(rawContext: unknown): void {
     order: 40,
     label: () => translate('settings.tab'),
     locale: 'chaos',
-    inject: () => ({ connection: ctx.connection, openPath: (path: string) => ctx.workspaces.openPath(path), t: translate }),
+    inject: () => ({
+      connection: ctx.connection,
+      openPath: (path: string) => ctx.workspaces.openPath(path),
+      navigateChannel: navigateToCollabChannel,
+      t: translate,
+    }),
   }, AgentSettingsCard))
   ctx.effect(() => mountCollabWorkspace(ctx, translate), 'dsh-chaos: collab overlay')
 }

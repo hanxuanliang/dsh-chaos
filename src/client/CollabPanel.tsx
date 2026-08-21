@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore, type JSX } from 'react'
+import { useEffect, useState, useSyncExternalStore, type JSX } from 'react'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStore } from './collab-store.ts'
 import { ChannelRail } from './ChannelRail.tsx'
@@ -9,6 +9,7 @@ import type { ChaosTranslate } from './locales.ts'
 import css from './CollabPanel.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
 import { IconJoin } from './atoms/DomainIcons.tsx'
+import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './collab-navigation.ts'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -32,6 +33,15 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
   /** Activity 行点击 → 新 ChannelView mount 初始值一次性消费 (key 换血保证 remount)。 */
   const [pendingThreadRoot, setPendingThreadRoot] = useState<string | undefined>(undefined)
   const active = state.channels.find(channel => channel.id === state.activeChannelId)
+
+  useEffect(() => {
+    const showCollab = (): void => {
+      setPanelView('collab')
+      setPendingThreadRoot(undefined)
+    }
+    document.addEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, showCollab)
+    return () => { document.removeEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, showCollab) }
+  }, [])
 
   return (
     <>

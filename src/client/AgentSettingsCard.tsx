@@ -10,13 +10,18 @@ import { AgentList } from './blocks/AgentList.tsx'
 import streamCss from './blocks/MessageStream.module.css'
 import css from './AgentSettingsCard.module.css'
 
-export interface AgentSettingsCardProps { connection: ConnectionHandle; openPath(path: string): Promise<void>; t: ChaosTranslate }
+export interface AgentSettingsCardProps {
+  connection: ConnectionHandle
+  openPath(path: string): Promise<void>
+  navigateChannel(targetId: string): void
+  t: ChaosTranslate
+}
 type Phase = 'loading' | 'ready' | 'error'
 const SKELETON_ROWS = [0, 1, 2]
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
 /** Identity-first expandable Agent settings surface. */
-export function AgentSettingsCard({ connection, openPath, t }: AgentSettingsCardProps): JSX.Element {
+export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: AgentSettingsCardProps): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
   const request = useRef(0)
   const presetRequest = useRef(0)
@@ -115,6 +120,7 @@ export function AgentSettingsCard({ connection, openPath, t }: AgentSettingsCard
             onWorkspace={() => {
               openPath(visibleSelected.workspacePath).catch(reason => { setActionError(t('agents.workspaceOpenFailed', { error: errorText(reason) })) })
             }}
+            onNavigateChannel={navigateChannel}
             onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />} t={t} />
       </div>}
       {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
