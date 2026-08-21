@@ -20,7 +20,7 @@
   margin: 0 0 2px;
 }
 
-.row:hover { background: var(--dsw-alias-tertiary); }
+.row:hover { background: var(--dsw-alias-interactive-bg-hover); }
 
 .row[data-selected='true'] {
   border-color: var(--dsw-alias-border-l1);

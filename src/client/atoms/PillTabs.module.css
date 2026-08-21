@@ -27,7 +27,7 @@
   cursor: pointer;
 }
 
-.tabs .tab:hover:not([disabled]) {
+.tabs .tab:hover:not([disabled]):not([data-active]) {
   color: var(--dsw-alias-label-primary);
 }
 

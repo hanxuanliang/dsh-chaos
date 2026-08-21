@@ -88,7 +88,7 @@
   text-align: left;
 }
 
-.menuItem:hover:not(:disabled) { background: var(--dsw-alias-tertiary); }
+.menuItem:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
 .menuItem:disabled { cursor: default; opacity: 0.45; }
 .menuItem[data-current='true'] { font-weight: 600; }
 

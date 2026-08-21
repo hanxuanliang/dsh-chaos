@@ -152,7 +152,6 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
           </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
           <label className={css.field}><span>{t('agents.name')}</span><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></label>
-          <label className={css.field}><span>{t('agents.handle')}</span><div className={css.readonly}>@{profile.actor.handle}</div><small>{t('agents.handleLocked')}</small></label>
           <label className={css.field}><span>{t('agents.charter')}</span><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></label>
           <footer className={css.footer}>
             <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>

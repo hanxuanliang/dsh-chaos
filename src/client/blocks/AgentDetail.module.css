@@ -18,7 +18,6 @@
 .field textarea { min-height: 88px; resize: vertical; }
 .field select { height: 36px; }
 .field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible { box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
-.readonly { border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; padding: 7px 10px; color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-bg-layer-3); font-family: var(--ds-font-family-code, ui-monospace, monospace); font-size: 13px; line-height: 20px; }
 .footer { display: flex; min-height: 42px; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--dsw-alias-border-l1); margin-top: 8px; padding-top: 10px; }
 .footer > button { white-space: nowrap; }
 .runtimeGrid { display: flex; min-width: 0; flex-direction: column; }

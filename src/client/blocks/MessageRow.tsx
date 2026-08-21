@@ -11,35 +11,29 @@ import { MessageBody } from '../atoms/MessageBody.tsx'
 import css from './MessageRow.module.css'
 import { IconReply } from '../atoms/DomainIcons.tsx'
 
-/** spec §2.1 preview row: ↩ N 条回复 — count only when the total is known; never invented. */
+/** spec §2.1 preview row: only a committed reply count may create this marker. */
 export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, variant = 'avatar' }: {
   t: ChaosTranslate
   thread: NativeTarget | undefined
-  /** tae thread.summaries 批量投影；未知时回退纯「打开线程」。 */
+  /** Authoritative thread.summaries projection; absent/zero means no marker. */
   summary: NativeThreadSummary | undefined
   actorNamesById: Map<string, string>
   onOpen: (() => void) | undefined
   /** 'avatar'(默认,流)含小头像组; 'plain'=activity 同排号 task chip 写真相。 */
   variant?: 'avatar' | 'plain' | undefined
 }): JSX.Element | undefined {
-  if (thread === undefined) return undefined
+  if (thread === undefined || summary === undefined || summary.replyCount === 0) return undefined
   return (
     <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant} onClick={onOpen} disabled={onOpen === undefined}>
       <IconReply size={12} />
-      {summary === undefined ? (
-        t('thread.openThread')
-      ) : (
-        <>
-          {variant === 'avatar' && (
-            <span className={css.previewAvatars} aria-hidden="true">
-              {summary.recentReplierIds.map(id => (
-                <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} size="xxsmall" title={actorNamesById.get(id) ?? id} />
-              ))}
-            </span>
-          )}
-          {t('thread.replies', { count: summary.replyCount })}
-        </>
+      {variant === 'avatar' && (
+        <span className={css.previewAvatars} aria-hidden="true">
+          {summary.recentReplierIds.map(id => (
+            <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} size="xxsmall" title={actorNamesById.get(id) ?? id} />
+          ))}
+        </span>
       )}
+      {t('thread.replies', { count: summary.replyCount })}
     </button>
   )
 }
