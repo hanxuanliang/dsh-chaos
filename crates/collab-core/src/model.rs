@@ -61,6 +61,7 @@ pub enum AgentLifecycle {
 }
 
 impl AgentLifecycle {
+    #[cfg(feature = "napi")]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Active => "active",
@@ -90,6 +91,7 @@ pub enum MembershipRole {
 }
 
 impl MembershipRole {
+    #[cfg(feature = "napi")]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Owner => "owner",
