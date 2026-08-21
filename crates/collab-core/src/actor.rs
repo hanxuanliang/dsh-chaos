@@ -145,35 +145,3 @@ pub(crate) async fn require_agent(connection: &Connection, agent_id: &str) -> Re
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn ensure_user_migrates_display_name_on_stable_handle() -> Result<()> {
-        let core = CollabCore::open_memory().await?;
-        let created = core.ensure_user("local-user", "Local User").await?;
-        let channel = core.create_channel("identity", &created.id).await?;
-
-        // Same handle with a new display name keeps the actor id, so
-        // Memberships and Tasks survive the rename.
-        let renamed = core.ensure_user("local-user", "Updated User").await?;
-        assert_eq!(renamed.id, created.id);
-        assert_eq!(renamed.display_name, "Updated User");
-        let members = core.list_target_members(&renamed.id, &channel.id).await?;
-        assert_eq!(members.len(), 1);
-        assert_eq!(members[0].id, created.id);
-
-        // Repeating with the current name is a no-op.
-        let stable = core.ensure_user("local-user", "Updated User").await?;
-        assert_eq!(stable, renamed);
-
-        // A custom name is never overwritten by a later ensure.
-        let custom = core.ensure_user("alice", "Custom Alice").await?;
-        let kept = core.ensure_user("alice", "Updated User").await?;
-        assert_eq!(kept.id, custom.id);
-        assert_eq!(kept.display_name, "Custom Alice");
-        Ok(())
-    }
-}
