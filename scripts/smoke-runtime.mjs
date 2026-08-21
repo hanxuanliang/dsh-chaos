@@ -278,7 +278,8 @@ const createdTask = await tools.get('task_create').execute({
   messageId: 'message-2',
   actorId: 'forged-agent',
 }, execution)
-assert.equal(createdTask.status, 'todo')
+// 方案A(2026-08-19): task_create = create+claim — in_progress
+assert.equal(createdTask.status, 'in_progress')
 const claimedTask = await tools.get('task_claim').execute({
   messageId: 'message-2',
   actorId: 'forged-agent',
@@ -297,7 +298,10 @@ const unclaimedTask = await tools.get('task_unclaim').execute({
   expectedVersion: '3',
 }, execution)
 assert.equal(unclaimedTask.assigneeId, undefined)
+// 方案A后 create+claim 于工具内连调 → 由业 mock 含 (1 create + 2 claim + 1 list
+// + 1 update + 1 unclaim + 1 claim-again 不): 实际 7 动; 老断言 6 = 前方案A。
 assert.deepEqual(collab.taskActors, [
+  'agent-1',
   'agent-1',
   'agent-1',
   'agent-1',
