@@ -4,20 +4,19 @@ import { Button, IconPlusOutline16, RiskConfirmation } from '@deepseek-ai/dsh-cl
 import type { AgentPresetSummary, AgentProfile, CreatedAgent } from '../agent-settings-types.ts'
 import { ChaosClient } from './api.ts'
 import { AgentCreateDialog } from './AgentCreateDialog.tsx'
-import { AgentWorkspaceDialog } from './AgentWorkspaceDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
 import { AgentDetail } from './blocks/AgentDetail.tsx'
 import { AgentList } from './blocks/AgentList.tsx'
 import streamCss from './blocks/MessageStream.module.css'
 import css from './AgentSettingsCard.module.css'
 
-export interface AgentSettingsCardProps { connection: ConnectionHandle; t: ChaosTranslate }
+export interface AgentSettingsCardProps { connection: ConnectionHandle; openPath(path: string): Promise<void>; t: ChaosTranslate }
 type Phase = 'loading' | 'ready' | 'error'
 const SKELETON_ROWS = [0, 1, 2]
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
 /** Identity-first expandable Agent settings surface. */
-export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JSX.Element {
+export function AgentSettingsCard({ connection, openPath, t }: AgentSettingsCardProps): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
   const request = useRef(0)
   const presetRequest = useRef(0)
@@ -31,7 +30,6 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
   const [presetsLoading, setPresetsLoading] = useState(true)
   const [presetsError, setPresetsError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [workspaceProfile, setWorkspaceProfile] = useState<AgentProfile | null>(null)
   const [deleteProfile, setDeleteProfile] = useState<AgentProfile | null>(null)
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -114,12 +112,13 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
           onSelect={profile => { setSelectedId(current => current === profile.actor.id ? undefined : profile.actor.id) }}
           expandedContent={visibleSelected === undefined ? undefined : <AgentDetail connection={connection} profile={visibleSelected} presets={presets}
             onUpdated={updateProfile}
-            onWorkspace={() => { setWorkspaceProfile(visibleSelected) }}
+            onWorkspace={() => {
+              openPath(visibleSelected.workspacePath).catch(reason => { setActionError(t('agents.workspaceOpenFailed', { error: errorText(reason) })) })
+            }}
             onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />} t={t} />
       </div>}
       {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
         presetsError={presetsError} onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
-      {workspaceProfile !== null && <AgentWorkspaceDialog connection={connection} profile={workspaceProfile} onClose={() => { setWorkspaceProfile(null) }} t={t} />}
       {deleteProfile !== null && <RiskConfirmation open title={t('agents.deleteTitle', { name: deleteProfile.actor.displayName })}
         description={t('agents.deleteDescription')} acknowledgeLabel={t('agents.deleteAcknowledge')} cancelLabel={t('agents.cancel')}
         confirmLabel={deleting ? t('agents.deleting') : t('agents.deleteConfirm')} acknowledged={deleteAcknowledged}

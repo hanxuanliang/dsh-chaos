@@ -1,4 +1,4 @@
-import { Fragment, type JSX, type ReactNode } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { IconChevronDownOutline14, IconSearchOutline16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentProfile } from '../../agent-settings-types.ts'
 import type { ChaosTranslate } from '../locales.ts'
@@ -25,10 +25,10 @@ export function AgentList({ profiles, total, query, selectedId, expandedContent,
     <div className={css.listHeading}><strong>{t('agents.list')}</strong><span>{profiles.length === total ? total : `${profiles.length} / ${total}`}</span></div>
     {profiles.length === 0
       ? <p className={css.noResults}>{t('agents.searchEmpty')}</p>
-      : <nav className={css.grid} aria-label={t('agents.list')}>
+      : <div className={css.items} role="list" aria-label={t('agents.list')}>
         {profiles.map(profile => {
           const expanded = profile.actor.id === selectedId
-          return <Fragment key={profile.actor.id}>
+          return <article key={profile.actor.id} className={css.item} role="listitem" data-expanded={expanded ? 'true' : undefined}>
             <button type="button" className={css.card}
               data-agent-id={profile.actor.id}
               data-selected={expanded ? 'true' : undefined}
@@ -48,8 +48,8 @@ export function AgentList({ profiles, total, query, selectedId, expandedContent,
               <IconChevronDownOutline14 size={14} className={expanded ? css.chevronOpen : css.chevron} />
             </button>
             {expanded && expandedContent !== undefined && <div className={css.expanded}>{expandedContent}</div>}
-          </Fragment>
+          </article>
         })}
-      </nav>}
+      </div>}
   </section>
 }

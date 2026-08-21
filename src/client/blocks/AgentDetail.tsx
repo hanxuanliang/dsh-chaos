@@ -6,14 +6,16 @@ import {
   IconFolderOpenOutline16,
   IconTrashOutline16,
   Menu,
-  StateDot,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentMembership, AgentPresetSummary, AgentProfile } from '../../agent-settings-types.ts'
 import { ChaosClient, type LlmModelGroup } from '../api.ts'
 import type { ChaosTranslate } from '../locales.ts'
 import { ErrorBanner } from '../atoms/ErrorBanner.tsx'
+import { PillTabs } from '../atoms/PillTabs.tsx'
 import css from './AgentDetail.module.css'
+
+type Tab = 'identity' | 'runtime' | 'collaboration'
 
 function reasonText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
@@ -27,6 +29,7 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
   t: ChaosTranslate
 }): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
+  const [tab, setTab] = useState<Tab>('identity')
   const [menuOpen, setMenuOpen] = useState(false)
   const [name, setName] = useState(profile.actor.displayName)
   const [description, setDescription] = useState(profile.charter.summary)
@@ -72,8 +75,8 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
   }, [client])
 
   useEffect(() => {
-    if (catalog === null && catalogError === null && !catalogLoading) loadCatalog()
-    if (memberships === null && membershipsError === null && !membershipsLoading) {
+    if (tab === 'runtime' && catalog === null && catalogError === null && !catalogLoading) loadCatalog()
+    if (tab === 'collaboration' && memberships === null && membershipsError === null && !membershipsLoading) {
       const current = ++membershipsRequest.current
       setMembershipsLoading(true)
       client.agentMemberships(profile.actor.id).then(value => {
@@ -82,7 +85,7 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
         if (membershipsRequest.current === current) setMembershipsError(reasonText(reason))
       }).finally(() => { if (membershipsRequest.current === current) setMembershipsLoading(false) })
     }
-  }, [catalog, catalogError, catalogLoading, client, loadCatalog, memberships, membershipsError, membershipsLoading, profile.actor.id])
+  }, [catalog, catalogError, catalogLoading, client, loadCatalog, memberships, membershipsError, membershipsLoading, profile.actor.id, tab])
 
   useEffect(() => () => {
     catalogRequest.current += 1
@@ -117,25 +120,34 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
 
   return (
     <section id={`chaos-agent-${profile.actor.id}-detail`} className={css.detail} aria-label={profile.actor.displayName}>
-      <header className={css.header}>
-        <div className={css.identity}>
-          <h2>{profile.actor.displayName}</h2>
-          <span>@{profile.actor.handle}</span>
+      <div className={css.toolbar}>
+        <PillTabs align="lead" ariaLabel={t('agents.detailTabs')} items={([
+          ['identity', t('agents.identity')],
+          ['runtime', t('agents.runtime')],
+          ['collaboration', t('agents.collaboration')],
+        ] as const).map(([id, label]) => ({
+          id,
+          label,
+          active: tab === id,
+          tabId: `chaos-agent-${profile.actor.id}-tab-${id}`,
+          controls: `chaos-agent-${profile.actor.id}-panel-${id}`,
+          onClick: () => { setTab(id) },
+        }))} />
+        <div className={css.actions}>
+          <Tooltip label={t('agents.openWorkspace')} side="bottom">
+            <button type="button" className={css.iconButton} aria-label={t('agents.openWorkspace')} onClick={onWorkspace}><IconFolderOpenOutline16 size={16} /></button>
+          </Tooltip>
+          <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
+            onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}
+            items={[{ id: 'delete', label: t('agents.delete'), icon: <IconTrashOutline16 size={16} />, danger: true }]}
+            anchor={<button type="button" className={css.iconButton} aria-label={t('agents.more')} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }}><IconEllipsisOutline16 size={16} /></button>} />
         </div>
-        <span className={css.runtimeState}><StateDot state={profile.binding === undefined ? 'warning' : 'done'} size={8} />{profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')}</span>
-        <Tooltip label={t('agents.openWorkspace')} side="bottom">
-          <button type="button" className={css.iconButton} aria-label={t('agents.openWorkspace')} onClick={onWorkspace}><IconFolderOpenOutline16 size={16} /></button>
-        </Tooltip>
-        <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
-          onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}
-          items={[{ id: 'delete', label: t('agents.delete'), icon: <IconTrashOutline16 size={16} />, danger: true }]}
-          anchor={<button type="button" className={css.iconButton} aria-label={t('agents.more')} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }}><IconEllipsisOutline16 size={16} /></button>} />
-      </header>
+      </div>
 
       <div className={css.sections}>
-        <section className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-identity`}>
+        {tab === 'identity' && <section id={`chaos-agent-${profile.actor.id}-panel-identity`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-identity`}>
           <div className={css.sectionHeading}>
-            <h3 id={`chaos-agent-${profile.actor.id}-identity`}>{t('agents.identity')}</h3>
+            <h3>{t('agents.identity')}</h3>
             <p>{t('agents.identityHint')}</p>
           </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
@@ -146,11 +158,11 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
             <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>
             <Button variant="primary" size="sm" disabled={!identityDirty || identitySaving || name.trim() === '' || description.trim() === ''} onClick={saveIdentity}>{identitySaving ? t('agents.saving') : t('agents.saveIdentity')}</Button>
           </footer>
-        </section>
+        </section>}
 
-        <section className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-runtime`}>
+        {tab === 'runtime' && <section id={`chaos-agent-${profile.actor.id}-panel-runtime`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-runtime`}>
           <div className={css.sectionHeading}>
-            <h3 id={`chaos-agent-${profile.actor.id}-runtime`}>{t('agents.runtime')}</h3>
+            <h3>{t('agents.runtime')}</h3>
             <p>{t('agents.runtimeHint')}</p>
           </div>
           {runtimeError !== null && <ErrorBanner>{t('agents.runtimeFailed', { error: runtimeError })}</ErrorBanner>}
@@ -160,25 +172,24 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
             <label className={css.field}><span>{t('create.provider')}</span><select value={provider} disabled={runtimeSaving} onChange={event => { setProvider(event.target.value); setModel(''); setRuntimeError(null) }}><option value="" disabled>{t('create.providerPlaceholder')}</option>{catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
             <label className={css.field}><span>{t('create.model')}</span><select value={model} disabled={runtimeSaving || provider === ''} onChange={event => { setModel(event.target.value); setRuntimeError(null) }}><option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>{models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className={css.field}><span>{t('create.preset')}</span><select value={presetId} disabled={runtimeSaving} onChange={event => { setPresetId(event.target.value); setRuntimeError(null) }}>{presets.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>{item.name?.trim() || item.id}</option>)}</select></label>
-            <div className={css.session}><span>{t('agents.session')}</span><code>{profile.binding?.sessionId ?? t('agents.noSession')}</code></div>
           </div>}
           <p className={css.runtimeWarning}>{t('agents.runtimeWarning')}</p>
           <footer className={css.footer}>
             <Button variant="outline" size="sm" disabled={!runtimeDirty || runtimeSaving} onClick={() => { setProvider(profile.binding?.provider ?? ''); setModel(profile.binding?.model ?? ''); setPresetId(profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? ''); setRuntimeError(null) }}>{t('agents.discard')}</Button>
             <Button variant="primary" size="sm" disabled={!runtimeDirty || runtimeSaving || provider === '' || model === '' || presetId === ''} onClick={saveRuntime}>{runtimeSaving ? t('agents.applying') : profile.binding === undefined ? t('agents.configureRuntime') : t('agents.applyRuntime')}</Button>
           </footer>
-        </section>
+        </section>}
 
-        <section className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-collaboration`}>
+        {tab === 'collaboration' && <section id={`chaos-agent-${profile.actor.id}-panel-collaboration`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-collaboration`}>
           <div className={css.sectionHeading}>
-            <h3 id={`chaos-agent-${profile.actor.id}-collaboration`}>{t('agents.collaboration')}</h3>
+            <h3>{t('agents.collaboration')}</h3>
             <p>{t('agents.collaborationHint')}</p>
           </div>
           {membershipsError !== null && <ErrorBanner>{t('agents.membershipsFailed', { error: membershipsError })}</ErrorBanner>}
           {memberships === null && membershipsError === null && <p className={css.state} role="status">{t('agents.membershipsLoading')}</p>}
           {memberships !== null && memberships.length === 0 && <p className={css.state}>{t('agents.membershipsEmpty')}</p>}
           {memberships !== null && memberships.length > 0 && <div className={css.memberships}>{memberships.map(item => <div key={item.target.id} className={css.membership}><span>{item.target.kind === 'channel' ? '#' : '↔'} {item.target.name}</span><small>{item.role}</small></div>)}</div>}
-        </section>
+        </section>}
       </div>
     </section>
   )

@@ -42,13 +42,14 @@ await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
 // The P0 client declares the services it needs and registers a single
 // settings.section entry (id 'chaos-agents') for the Agents management page.
-assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale', 'sessions', 'conversation'])
+assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale', 'sessions', 'conversation', 'workspaces'])
 assert.equal(typeof clientModule.apply, 'function')
 
 const injected = []
 const registered = []
 const effects = []
 const namespaces = []
+const openedPaths = []
 const ctx = {
   connection: {
     rpc: { async call() { throw new Error('smoke: rpc must not fire during apply') } },
@@ -81,6 +82,9 @@ const ctx = {
       return () => {}
     },
   },
+  workspaces: {
+    async openPath(path) { openedPaths.push(path) },
+  },
 }
 
 assert.doesNotThrow(() => { clientModule.apply(ctx) })
@@ -93,6 +97,9 @@ assert.equal(agentsEntry.locale, 'chaos')
 assert.equal(agentsEntry.label(), '协作 Agents')
 const face = agentsEntry.inject()
 assert.ok(face.connection === ctx.connection)
+assert.equal(typeof face.openPath, 'function')
+await face.openPath('/tmp/agent-workspace')
+assert.deepEqual(openedPaths, ['/tmp/agent-workspace'])
 assert.equal(typeof face.t, 'function')
 assert.equal(face.t('settings.tab'), '协作 Agents')
 assert.deepEqual(namespaces, ['chaos'])
