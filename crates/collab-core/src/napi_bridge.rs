@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use crate::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, Actor,
-    AgentCharter, AgentProfile, ChangeEvent, CollabCore, CollabError, CollabSnapshot,
-    IdentityContext, InboxBatch, Message, PendingWake, RuntimeBinding, SendMessageRequest,
-    SendMessageResult, Target, TargetMember, Task, TaskStatus, ThreadSummary,
+    AgentCharter, AgentMembership, AgentProfile, ChangeEvent, CollabCore, CollabError,
+    CollabSnapshot, IdentityContext, InboxBatch, Message, PendingWake, RuntimeBinding,
+    SendMessageRequest, SendMessageResult, Target, TargetMember, Task, TaskStatus, ThreadSummary,
 };
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -55,6 +55,13 @@ pub struct JsAgentProfile {
 #[napi(object)]
 pub struct JsTargetMember {
     pub actor: JsActor,
+    pub role: String,
+    pub joined_at_ms: f64,
+}
+
+#[napi(object)]
+pub struct JsAgentMembership {
+    pub target: JsTarget,
     pub role: String,
     pub joined_at_ms: f64,
 }
@@ -297,6 +304,15 @@ impl CollabHandle {
             .agent_profile(&agent_id)
             .await
             .map(JsAgentProfile::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn list_agent_profiles(&self, actor_id: String) -> Result<Vec<JsAgentProfile>> {
+        self.core
+            .list_agent_profiles(&actor_id)
+            .await
+            .map(|profiles| profiles.into_iter().map(JsAgentProfile::from).collect())
             .map_err(to_napi_error)
     }
 
@@ -669,6 +685,24 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn list_agent_memberships(
+        &self,
+        actor_id: String,
+        agent_id: String,
+    ) -> Result<Vec<JsAgentMembership>> {
+        self.core
+            .list_agent_memberships(&actor_id, &agent_id)
+            .await
+            .map(|memberships| {
+                memberships
+                    .into_iter()
+                    .map(JsAgentMembership::from)
+                    .collect()
+            })
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn snapshot(&self, actor_id: String) -> Result<JsCollabSnapshot> {
         self.core
             .snapshot(&actor_id)
@@ -825,6 +859,16 @@ impl From<TargetMember> for JsTargetMember {
             actor: member.actor.into(),
             role: member.role.as_str().into(),
             joined_at_ms: member.joined_at_ms as f64,
+        }
+    }
+}
+
+impl From<AgentMembership> for JsAgentMembership {
+    fn from(membership: AgentMembership) -> Self {
+        Self {
+            target: membership.target.into(),
+            role: membership.role.as_str().into(),
+            joined_at_ms: membership.joined_at_ms as f64,
         }
     }
 }

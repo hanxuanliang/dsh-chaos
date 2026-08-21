@@ -54,56 +54,86 @@ export class RuntimeManager {
 
   /** Create a fresh long-running Session and publish its binding only after DSH publication succeeds. */
   create(input: CreateRuntimeInput): Promise<NativeRuntimeBinding> {
+    return this.withAgentLock(input.agentId, () => this.createLocked(input))
+  }
+
+  /** Replace or first-configure one stable Agent under an exact generation fence. */
+  reset(input: CreateRuntimeInput, expectedGeneration?: string): Promise<NativeRuntimeBinding> {
     return this.withAgentLock(input.agentId, async () => {
       this.assertActive()
-      for (const [name, value] of [
-        ['agentId', input.agentId],
-        ['workspacePath', input.workspacePath],
-        ['provider', input.provider],
-        ['model', input.model],
-        ['preset', input.preset],
-      ] as const) requireText(name, value)
-      if (!isAbsolute(input.workspacePath)) throw new Error('workspacePath must be absolute')
-
-      const preset = await this.resolvePreset(input.preset)
-      await this.disposeLease(input.agentId)
-      const sessionId = input.sessionId ?? randomUUID()
-      requireText('sessionId', sessionId)
-      const handle = await this.registry.create({
-        sessionId: SessionId(sessionId),
-        meta: { cwd: input.workspacePath, agentPreset: preset.id },
-        ...(input.provider === 'default'
-          ? {}
-          : { agentOptions: { provider: input.provider, model: input.model } }),
-        setup: async (agentCtx: Context) => {
-          await this.presets.mount(agentCtx, preset.id)
-          installCollabTools(agentCtx, this.collab, this)
-        },
-      })
-      try {
-        const binding = await this.collab.bindRuntime(
-          input.agentId,
-          sessionId,
-          input.provider,
-          input.model,
-          preset.id,
+      const current = await this.collab.runtimeBinding(input.agentId)
+      if (expectedGeneration === undefined) {
+        if (current !== undefined) {
+          throw new Error(
+            `[runtime_generation_mismatch] Agent ${input.agentId} already has generation ${current.generation}`,
+          )
+        }
+      } else if (current === undefined || current.generation !== expectedGeneration) {
+        throw new Error(
+          `[runtime_generation_mismatch] Agent ${input.agentId} expected generation ${expectedGeneration}, current generation is ${current?.generation ?? 'none'}`,
         )
-        this.active.set(input.agentId, { binding, handle })
-        return binding
+      }
+      try {
+        return await this.createLocked(input)
       } catch (error) {
+        if (current === undefined) throw error
         try {
-          await handle.dispose()
-        } catch (disposeError) {
-          throw new AggregateError([error, disposeError], `failed to bind and dispose Agent ${input.agentId}`)
+          await this.resumeLocked(input.agentId, current)
+        } catch (resumeError) {
+          throw new AggregateError(
+            [error, resumeError],
+            `failed to replace and recover Agent ${input.agentId}`,
+          )
         }
         throw error
       }
     })
   }
 
-  /** Replace one stable Agent's Session generation while preserving its collab identity. */
-  reset(input: CreateRuntimeInput): Promise<NativeRuntimeBinding> {
-    return this.create(input)
+  private async createLocked(input: CreateRuntimeInput): Promise<NativeRuntimeBinding> {
+    this.assertActive()
+    for (const [name, value] of [
+      ['agentId', input.agentId],
+      ['workspacePath', input.workspacePath],
+      ['provider', input.provider],
+      ['model', input.model],
+      ['preset', input.preset],
+    ] as const) requireText(name, value)
+    if (!isAbsolute(input.workspacePath)) throw new Error('workspacePath must be absolute')
+
+    const preset = await this.resolvePreset(input.preset)
+    await this.disposeLease(input.agentId)
+    const sessionId = input.sessionId ?? randomUUID()
+    requireText('sessionId', sessionId)
+    const handle = await this.registry.create({
+      sessionId: SessionId(sessionId),
+      meta: { cwd: input.workspacePath, agentPreset: preset.id },
+      ...(input.provider === 'default'
+        ? {}
+        : { agentOptions: { provider: input.provider, model: input.model } }),
+      setup: async (agentCtx: Context) => {
+        await this.presets.mount(agentCtx, preset.id)
+        installCollabTools(agentCtx, this.collab, this)
+      },
+    })
+    try {
+      const binding = await this.collab.bindRuntime(
+        input.agentId,
+        sessionId,
+        input.provider,
+        input.model,
+        preset.id,
+      )
+      this.active.set(input.agentId, { binding, handle })
+      return binding
+    } catch (error) {
+      try {
+        await handle.dispose()
+      } catch (disposeError) {
+        throw new AggregateError([error, disposeError], `failed to bind and dispose Agent ${input.agentId}`)
+      }
+      throw error
+    }
   }
 
   /** Resume every persisted binding independently; one stale Session does not hide healthy peers. */
@@ -120,50 +150,58 @@ export class RuntimeManager {
 
   /** Resume one persisted Session without incrementing its generation. */
   resume(agentId: string): Promise<NativeRuntimeBinding> {
-    return this.withAgentLock(agentId, async () => {
-      this.assertActive()
-      let binding = await this.collab.runtimeBinding(agentId)
-      if (binding === undefined) throw new Error(`no runtime binding for Agent ${agentId}`)
-      const preset = await this.resolvePreset(binding.preset)
-      await this.disposeLease(agentId)
-      const handle = await this.registry.resume({
-        resumeSessionId: SessionId(binding.sessionId),
-        agentOptions: { provider: binding.provider, model: binding.model },
-        setup: async (agentCtx: Context) => {
-          await this.presets.mount(agentCtx, preset.id)
-          installCollabTools(agentCtx, this.collab, this)
-        },
-      })
-      try {
-        if (preset.id !== binding.preset) {
-          handle.agent.session.append('agent-preset/selected', { agentPreset: preset.id })
-          binding = await this.collab.updateRuntimePreset(
-            binding.agentId,
-            binding.generation,
-            binding.sessionId,
-            preset.id,
-          )
-        }
-        const current = await this.collab.runtimeBinding(agentId)
-        if (current === undefined || !sameBinding(current, binding)) {
-          throw new Error(`runtime binding changed while resuming Agent ${agentId}`)
-        }
-        await this.collab.rearmRuntimeWake(
+    return this.withAgentLock(agentId, () => this.resumeLocked(agentId))
+  }
+
+  private async resumeLocked(
+    agentId: string,
+    expectedBinding?: NativeRuntimeBinding,
+  ): Promise<NativeRuntimeBinding> {
+    this.assertActive()
+    let binding = await this.collab.runtimeBinding(agentId)
+    if (binding === undefined) throw new Error(`no runtime binding for Agent ${agentId}`)
+    if (expectedBinding !== undefined && !sameBinding(binding, expectedBinding)) {
+      throw new Error(`runtime binding changed before recovering Agent ${agentId}`)
+    }
+    const preset = await this.resolvePreset(binding.preset)
+    await this.disposeLease(agentId)
+    const handle = await this.registry.resume({
+      resumeSessionId: SessionId(binding.sessionId),
+      agentOptions: { provider: binding.provider, model: binding.model },
+      setup: async (agentCtx: Context) => {
+        await this.presets.mount(agentCtx, preset.id)
+        installCollabTools(agentCtx, this.collab, this)
+      },
+    })
+    try {
+      if (preset.id !== binding.preset) {
+        handle.agent.session.append('agent-preset/selected', { agentPreset: preset.id })
+        binding = await this.collab.updateRuntimePreset(
           binding.agentId,
           binding.generation,
           binding.sessionId,
+          preset.id,
         )
-        this.active.set(agentId, { binding, handle })
-        return binding
-      } catch (error) {
-        try {
-          await handle.dispose()
-        } catch (disposeError) {
-          throw new AggregateError([error, disposeError], `failed to resume and dispose Agent ${agentId}`)
-        }
-        throw error
       }
-    })
+      const current = await this.collab.runtimeBinding(agentId)
+      if (current === undefined || !sameBinding(current, binding)) {
+        throw new Error(`runtime binding changed while resuming Agent ${agentId}`)
+      }
+      await this.collab.rearmRuntimeWake(
+        binding.agentId,
+        binding.generation,
+        binding.sessionId,
+      )
+      this.active.set(agentId, { binding, handle })
+      return binding
+    } catch (error) {
+      try {
+        await handle.dispose()
+      } catch (disposeError) {
+        throw new AggregateError([error, disposeError], `failed to resume and dispose Agent ${agentId}`)
+      }
+      throw error
+    }
   }
 
   /** Stop one process-local AgentHandle while retaining its durable binding for later resume. */

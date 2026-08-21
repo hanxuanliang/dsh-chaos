@@ -4,7 +4,9 @@ import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {
   AgentPresetSummary,
+  AgentMembership,
   AgentProfile,
+  CreatedAgent,
   AgentWorkspaceEntry,
   AgentWorkspaceFile,
 } from './agent-settings-types.ts'
@@ -37,6 +39,23 @@ export interface CollabRemoteApi {
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
   listAgentPresets(): Promise<AgentPresetSummary[]>
   agentProfile(viewerId: string, agentId: string): Promise<AgentProfile>
+  agentProfiles(viewerId: string): Promise<AgentProfile[]>
+  updateAgentProfile(
+    viewerId: string,
+    agentId: string,
+    displayName: string,
+    description: string,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile>
+  replaceAgentRuntime(
+    viewerId: string,
+    agentId: string,
+    provider: string,
+    model: string,
+    presetId: string,
+    expectedGeneration?: string,
+  ): Promise<NativeRuntimeBinding>
+  agentMemberships(viewerId: string, agentId: string): Promise<AgentMembership[]>
   agentWorkspace(
     viewerId: string,
     agentId: string,
@@ -44,11 +63,14 @@ export interface CollabRemoteApi {
     includeHidden: boolean,
   ): Promise<AgentWorkspaceEntry[]>
   agentWorkspaceFile(viewerId: string, agentId: string, path: string): Promise<AgentWorkspaceFile>
-  createNamedAgent(name: string, presetId?: string, provider?: string, model?: string): Promise<{
-    actor: NativeActor
-    binding: NativeRuntimeBinding
-    workspacePath: string
-  }>
+  createConfiguredAgent(
+    displayName: string,
+    handle: string,
+    description: string,
+    provider: string,
+    model: string,
+    presetId: string,
+  ): Promise<CreatedAgent>
   deleteAgent(agentId: string): Promise<void>
   listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
@@ -241,6 +263,27 @@ async function dispatchRemote(
       return await api.listAgentPresets()
     case 'agent.profile':
       return await api.agentProfile(actorId, requiredString(input, 'agentId'))
+    case 'agent.profiles':
+      return await api.agentProfiles(actorId)
+    case 'agent.profile.update':
+      return await api.updateAgentProfile(
+        actorId,
+        requiredString(input, 'agentId'),
+        requiredString(input, 'displayName'),
+        requiredString(input, 'description'),
+        decimalString(input, 'expectedProfileVersion'),
+      )
+    case 'agent.runtime.replace':
+      return await api.replaceAgentRuntime(
+        actorId,
+        requiredString(input, 'agentId'),
+        requiredString(input, 'provider'),
+        requiredString(input, 'model'),
+        requiredString(input, 'presetId'),
+        optionalString(input, 'expectedGeneration'),
+      )
+    case 'agent.memberships':
+      return await api.agentMemberships(actorId, requiredString(input, 'agentId'))
     case 'agent.workspace.list':
       return await api.agentWorkspace(
         actorId,
@@ -255,11 +298,13 @@ async function dispatchRemote(
         requiredString(input, 'path'),
       )
     case 'agent.create':
-      return await api.createNamedAgent(
-        requiredString(input, 'name'),
-        optionalString(input, 'presetId'),
-        optionalString(input, 'provider'),
-        optionalString(input, 'model'),
+      return await api.createConfiguredAgent(
+        requiredString(input, 'displayName'),
+        requiredString(input, 'handle'),
+        requiredString(input, 'description'),
+        requiredString(input, 'provider'),
+        requiredString(input, 'model'),
+        requiredString(input, 'presetId'),
       )
     case 'agent.delete':
       await api.deleteAgent(requiredString(input, 'agentId'))

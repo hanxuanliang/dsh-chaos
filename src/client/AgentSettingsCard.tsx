@@ -1,239 +1,137 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { Button, IconPlusOutline16, IconTrashOutline16, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { AgentPresetSummary } from '../agent-settings-types.ts'
-import type { NativeActor, NativeRuntimeBinding } from '../native.ts'
+import { Button, IconPlusOutline16, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { AgentPresetSummary, AgentProfile, CreatedAgent } from '../agent-settings-types.ts'
 import { ChaosClient } from './api.ts'
 import { AgentCreateDialog } from './AgentCreateDialog.tsx'
-import { avatarSeed } from './avatar.ts'
+import { AgentWorkspaceDialog } from './AgentWorkspaceDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
-import css from './AgentSettingsCard.module.css'
+import { AgentDetail } from './blocks/AgentDetail.tsx'
+import { AgentList } from './blocks/AgentList.tsx'
 import streamCss from './blocks/MessageStream.module.css'
+import css from './AgentSettingsCard.module.css'
 
-export interface AgentSettingsCardProps {
-  connection: ConnectionHandle
-  t: ChaosTranslate
-}
-
-interface AgentRow {
-  actor: NativeActor
-  binding?: NativeRuntimeBinding | undefined
-}
-
+export interface AgentSettingsCardProps { connection: ConnectionHandle; t: ChaosTranslate }
 type Phase = 'loading' | 'ready' | 'error'
-
 const SKELETON_ROWS = [0, 1, 2]
+function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
-function errorText(reason: unknown): string {
-  return reason instanceof Error ? reason.message : String(reason)
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)')
+    const update = (): void => { setNarrow(query.matches) }
+    query.addEventListener('change', update)
+    return () => { query.removeEventListener('change', update) }
+  }, [])
+  return narrow
 }
 
-/** Dedicated Agents page contributed directly to DSH's settings navigation. */
+/** Identity-first master/detail Agent settings surface. */
 export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
-  const listRequest = useRef(0)
+  const narrow = useNarrow()
+  const request = useRef(0)
   const presetRequest = useRef(0)
   const [phase, setPhase] = useState<Phase>('loading')
-  const [rows, setRows] = useState<AgentRow[]>([])
+  const [profiles, setProfiles] = useState<AgentProfile[]>([])
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [presets, setPresets] = useState<AgentPresetSummary[] | null>(null)
+  const [presets, setPresets] = useState<AgentPresetSummary[]>([])
   const [presetsLoading, setPresetsLoading] = useState(true)
   const [presetsError, setPresetsError] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<AgentRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [workspaceProfile, setWorkspaceProfile] = useState<AgentProfile | null>(null)
+  const [deleteProfile, setDeleteProfile] = useState<AgentProfile | null>(null)
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // Full reread after every mutation; no fine-grained incremental patching.
   const load = useCallback((initial: boolean): void => {
-    const request = ++listRequest.current
-    if (initial) setPhase('loading')
-    else setRefreshing(true)
-    void (async (): Promise<void> => {
-      try {
-        // Identifies the viewer for later surfaces; this page ignores the value.
-        await client.snapshot()
-        const [actors, bindings] = await Promise.all([client.actors(), client.runtimeBindings()])
-        if (listRequest.current !== request) return
-        setRows(
-          actors
-            .filter(actor => actor.kind === 'agent')
-            .map(actor => ({ actor, binding: bindings.find(binding => binding.agentId === actor.id) })),
-        )
-        setPhase('ready')
-      } catch (reason) {
-        if (listRequest.current !== request) return
-        if (initial) {
-          setLoadError(errorText(reason))
-          setPhase('error')
-        } else {
-          setActionError(errorText(reason))
-        }
-      } finally {
-        if (listRequest.current === request) setRefreshing(false)
-      }
-    })()
-  }, [client])
+    const current = ++request.current
+    if (initial) setPhase('loading'); else setRefreshing(true)
+    client.agentProfiles().then(rows => {
+      if (request.current !== current) return
+      setProfiles(rows)
+      setSelectedId(previous => previous !== undefined && rows.some(row => row.actor.id === previous)
+        ? previous
+        : narrow ? undefined : rows[0]?.actor.id)
+      setLoadError(null)
+      setPhase('ready')
+    }, reason => {
+      if (request.current !== current) return
+      if (initial) { setLoadError(errorText(reason)); setPhase('error') } else setActionError(errorText(reason))
+    }).finally(() => { if (request.current === current) setRefreshing(false) })
+  }, [client, narrow])
 
   const loadPresets = useCallback((): void => {
-    const request = ++presetRequest.current
+    const current = ++presetRequest.current
     setPresetsLoading(true)
     setPresetsError(null)
-    client.agentPresets().then(items => {
-      if (presetRequest.current !== request) return
-      setPresets(items)
-      setPresetsLoading(false)
-    }, (reason: unknown) => {
-      if (presetRequest.current !== request) return
-      setPresetsError(errorText(reason))
-      setPresetsLoading(false)
+    client.agentPresets().then(rows => {
+      if (presetRequest.current === current) { setPresets(rows); setPresetsLoading(false) }
+    }, reason => {
+      if (presetRequest.current === current) { setPresetsError(errorText(reason)); setPresetsLoading(false) }
     })
   }, [client])
 
   useEffect(() => {
-    load(true)
-    loadPresets()
-    return () => {
-      listRequest.current += 1
-      presetRequest.current += 1
-    }
+    load(true); loadPresets()
+    return () => { request.current += 1; presetRequest.current += 1 }
   }, [load, loadPresets])
 
+  const selected = profiles.find(profile => profile.actor.id === selectedId)
+  const updateProfile = (updated: AgentProfile): void => {
+    setProfiles(rows => rows.map(row => row.actor.id === updated.actor.id ? updated : row))
+  }
+  const created = (result: CreatedAgent): void => {
+    setProfiles(rows => [...rows.filter(row => row.actor.id !== result.profile.actor.id), result.profile])
+    setSelectedId(result.profile.actor.id)
+    setActionError(result.setupError === undefined ? null : t('agents.setupFailed', { error: result.setupError }))
+  }
   const confirmDelete = (): void => {
-    if (deleteTarget === null || deleting) return
+    if (deleteProfile === null || deleting) return
     setDeleting(true)
-    setActionError(null)
-    client.deleteAgent(deleteTarget.actor.id).then(() => {
-      setDeleteTarget(null)
+    client.deleteAgent(deleteProfile.actor.id).then(() => {
+      setProfiles(rows => rows.filter(row => row.actor.id !== deleteProfile.actor.id))
+      setSelectedId(undefined)
+      setDeleteProfile(null)
       setDeleteAcknowledged(false)
-      load(false)
-    }, (reason: unknown) => {
-      setDeleteTarget(null)
-      setDeleteAcknowledged(false)
-      setActionError(errorText(reason))
-    }).finally(() => {
-      setDeleting(false)
-    })
-  }
-
-  const routeParts = (row: AgentRow): { preset: string; route: string } | null => {
-    const binding = row.binding
-    if (binding === undefined) return null
-    const named = presets?.find(preset => preset.id === binding.preset)?.name?.trim()
-    return {
-      preset: named === undefined || named === '' ? binding.preset : named,
-      // 'default' is the host sentinel for "follow the host default model".
-      route: binding.provider === 'default' && binding.model === 'default'
-        ? t('agents.routeDefault')
-        : `${binding.provider}/${binding.model}`,
-    }
-  }
-
-  const openCreateDialog = (): void => {
-    setActionError(null)
-    setDialogOpen(true)
+    }, reason => { setActionError(errorText(reason)) }).finally(() => { setDeleting(false) })
   }
 
   return (
     <section className={css.page} aria-label={t('agents.title')} aria-busy={phase === 'loading' || refreshing}>
       <header className={css.headerRow}>
-        <div className={css.titleBlock}>
-          <h1>{t('agents.title')}</h1>
-        </div>
-        <Button variant="outline" size="sm" icon={<IconPlusOutline16 size={16} />} aria-label={t('agents.create')} onClick={openCreateDialog} />
+        <div className={css.titleBlock}><h1>{t('agents.title')}</h1><p>{t('agents.subtitle')}</p></div>
+        <Button variant="outline" size="sm" icon={<IconPlusOutline16 size={16} />} onClick={() => { setCreateOpen(true); setActionError(null) }}>{t('agents.create')}</Button>
       </header>
-
-      {actionError !== null && <p className={css.banner} role="alert">{t('agents.actionFailed', { error: actionError })}</p>}
+      {actionError !== null && <p className={css.banner} role="alert">{actionError}</p>}
       {refreshing && <p className={css.refreshing} role="status">{t('agents.refreshing')}</p>}
-
-      {phase === 'loading' && (
-        <div className={css.skeleton} role="status" aria-label={t('agents.loadingAria')}>
-          {SKELETON_ROWS.map(index => <div key={index} className={streamCss.skeletonRow} />)}
-        </div>
-      )}
-
-      {phase === 'error' && (
-        <div className={css.empty} role="alert">
-          <p className={css.emptyText}>{t('agents.loadFailed', { error: loadError ?? '' })}</p>
-          <Button variant="outline" size="sm" onClick={() => load(true)}>{t('agents.retry')}</Button>
-        </div>
-      )}
-
-      {phase === 'ready' && rows.length > 0 && (
-        <div className={css.list} role="list" aria-label={t('agents.title')}>
-          <div className={css.headRow} aria-hidden="true">
-            <span>{t('agents.col.name')}</span>
-            <span>{t('agents.col.route')}</span>
-            <span />
-          </div>
-          {rows.map(row => {
-            const seed = avatarSeed(row.actor.handle, row.actor.displayName)
-            const route = routeParts(row)
-            return (
-              <div key={row.actor.id} className={css.row} role="listitem">
-                <div className={css.cell}>
-                  <span className={css.avatar} style={{ background: seed.background }} aria-hidden="true">{seed.initial}</span>
-                  <span className={css.nameStack}>
-                    <span className={css.name}>{row.actor.displayName}</span>
-                    <span className={css.handle}>@{row.actor.handle}</span>
-                  </span>
-                </div>
-                <div className={css.cell}>
-                  {route === null
-                    ? <span className={css.meta}>—</span>
-                    : <>
-                        <span className={css.presetChip}>{route.preset}</span>
-                        <span className={css.mono}>{route.route}</span>
-                      </>}
-                </div>
-                <div className={css.actionsCell}>
-                  <button
-                    type="button"
-                    className={`${css.iconButton ?? ''} ${css.iconDanger ?? ''}`}
-                    aria-label={t('agents.deleteAria', { name: row.actor.displayName })}
-                    onClick={() => { setDeleteTarget(row); setDeleteAcknowledged(false); setActionError(null) }}
-                  >
-                    <IconTrashOutline16 size={14} />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <p className={css.note}>{t('agents.note')}</p>
-
-      {dialogOpen && (
-        <AgentCreateDialog
-          connection={connection}
-          presets={presets}
-          presetsLoading={presetsLoading}
-          presetsError={presetsError}
-          onPresetsRetry={loadPresets}
-          onClose={() => { setDialogOpen(false) }}
-          onCreated={() => { load(false) }}
-          t={t}
-        />
-      )}
-
-      {deleteTarget !== null && (
-        <RiskConfirmation
-          open
-          title={t('agents.deleteTitle', { name: deleteTarget.actor.displayName })}
-          description={t('agents.deleteDescription')}
-          acknowledgeLabel={t('agents.deleteAcknowledge')}
-          cancelLabel={t('agents.cancel')}
-          confirmLabel={deleting ? t('agents.deleting') : t('agents.deleteConfirm')}
-          acknowledged={deleteAcknowledged}
-          disabled={deleting}
-          onAcknowledgedChange={setDeleteAcknowledged}
-          onCancel={() => { if (!deleting) setDeleteTarget(null) }}
-          onConfirm={confirmDelete}
-        />
-      )}
+      {phase === 'loading' && <div className={css.skeleton} role="status" aria-label={t('agents.loadingAria')}>{SKELETON_ROWS.map(index => <div key={index} className={streamCss.skeletonRow} />)}</div>}
+      {phase === 'error' && <div className={css.empty} role="alert"><p className={css.emptyText}>{t('agents.loadFailed', { error: loadError ?? '' })}</p><Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button></div>}
+      {phase === 'ready' && profiles.length === 0 && <div className={css.empty}><p className={css.emptyText}>{t('agents.empty')}</p><Button variant="outline" size="sm" onClick={() => { setCreateOpen(true) }}>{t('agents.create')}</Button></div>}
+      {phase === 'ready' && profiles.length > 0 && <div className={css.workspace} data-detail={selected === undefined ? undefined : 'true'}>
+        {(!narrow || selected === undefined) && <AgentList profiles={profiles} selectedId={selectedId} onSelect={profile => { setSelectedId(profile.actor.id) }} t={t} />}
+        {selected !== undefined
+          ? <AgentDetail connection={connection} profile={selected} presets={presets} narrow={narrow}
+              onBack={() => {
+                const agentId = selected.actor.id
+                setSelectedId(undefined)
+                requestAnimationFrame(() => { document.querySelector<HTMLElement>(`[data-agent-id="${agentId}"]`)?.focus() })
+              }} onUpdated={updateProfile}
+              onWorkspace={() => { setWorkspaceProfile(selected) }}
+              onDelete={() => { setDeleteProfile(selected); setDeleteAcknowledged(false) }} t={t} />
+          : !narrow && <div className={css.placeholder}>{t('agents.select')}</div>}
+      </div>}
+      {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
+        presetsError={presetsError} onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
+      {workspaceProfile !== null && <AgentWorkspaceDialog connection={connection} profile={workspaceProfile} onClose={() => { setWorkspaceProfile(null) }} t={t} />}
+      {deleteProfile !== null && <RiskConfirmation open title={t('agents.deleteTitle', { name: deleteProfile.actor.displayName })}
+        description={t('agents.deleteDescription')} acknowledgeLabel={t('agents.deleteAcknowledge')} cancelLabel={t('agents.cancel')}
+        confirmLabel={deleting ? t('agents.deleting') : t('agents.deleteConfirm')} acknowledged={deleteAcknowledged}
+        disabled={deleting} onAcknowledgedChange={setDeleteAcknowledged} onCancel={() => { if (!deleting) setDeleteProfile(null) }} onConfirm={confirmDelete} />}
     </section>
   )
 }

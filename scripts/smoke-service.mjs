@@ -116,11 +116,20 @@ try {
   assert.equal(empty.messages.length, 0)
   assert.deepEqual(empty.contexts, [])
 
-  const named = await ctx.collab.createNamedAgent('Alpha Two')
-  assert.equal(named.actor.displayName, 'Alpha Two')
-  assert.match(named.workspacePath, /\/agents\/[0-9a-f-]{36}$/)
+  const named = await ctx.collab.createConfiguredAgent(
+    'Alpha Two',
+    'alpha-two',
+    'Own the second lane',
+    'openai',
+    'codex',
+    'standard',
+  )
+  assert.equal(named.profile.actor.displayName, 'Alpha Two')
+  assert.equal(named.profile.charter.summary, 'Own the second lane')
+  assert.equal(named.setupError, undefined)
+  assert.match(named.profile.workspacePath, /\/agents\/[0-9a-f-]{36}$/)
   const { stat } = await import('node:fs/promises')
-  assert.equal((await stat(named.workspacePath)).isDirectory(), true)
+  assert.equal((await stat(named.profile.workspacePath)).isDirectory(), true)
   await fiber.dispose()
 } finally {
   for (const dispose of dependencies.reverse()) dispose()

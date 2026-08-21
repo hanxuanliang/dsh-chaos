@@ -1,4 +1,9 @@
-import type { NativeActor, NativeAgentCharter, NativeRuntimeBinding } from './native.ts'
+import type {
+  NativeActor,
+  NativeAgentCharter,
+  NativeAgentMembership,
+  NativeRuntimeBinding,
+} from './native.ts'
 
 /** Browser-safe presentation row from the official DSH Agent Preset roster. */
 export interface AgentPresetSummary {
@@ -19,6 +24,13 @@ export interface AgentProfile {
   charter: NativeAgentCharter
   profileVersion: string
 }
+
+export interface CreatedAgent {
+  profile: AgentProfile
+  setupError?: string
+}
+
+export type AgentMembership = NativeAgentMembership
 
 export interface AgentWorkspaceEntry {
   name: string

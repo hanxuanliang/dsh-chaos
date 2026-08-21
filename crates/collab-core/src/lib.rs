@@ -12,8 +12,8 @@ pub use napi_bridge::*;
 pub use error::{CollabError, Result};
 pub use model::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
-    Actor, ActorKind, AgentCharter, AgentLifecycle, AgentProfile, ChangeEvent, ChangeKind,
-    CollabSnapshot, IdentityContext, InboxBatch, InboxMessage, MembershipRole, Message,
+    Actor, ActorKind, AgentCharter, AgentLifecycle, AgentMembership, AgentProfile, ChangeEvent,
+    ChangeKind, CollabSnapshot, IdentityContext, InboxBatch, InboxMessage, MembershipRole, Message,
     MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
     TargetKind, TargetMember, Task, TaskStatus, ThreadSummary,
 };
@@ -233,6 +233,15 @@ impl CollabCore {
         require_non_empty("agent_id", agent_id)?;
         let connection = self.connection.lock().await;
         find_agent_profile(&connection, agent_id).await
+    }
+
+    /// List every live Agent Profile in one coherent directory read.
+    pub async fn list_agent_profiles(&self, actor_id: &str) -> Result<Vec<AgentProfile>> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+        agent_profiles(&connection).await
     }
 
     /// Replace the mutable display name and Charter under an optimistic Profile fence.
@@ -992,6 +1001,23 @@ impl CollabCore {
         let route =
             require_target_access(&connection, target_id, actor_id, "list members of").await?;
         target_memberships(&connection, route.permission_target_id(target_id)).await
+    }
+
+    /// List one Agent's active top-level memberships that are also visible to
+    /// the requesting actor. Thread membership is inherited and therefore is
+    /// not duplicated in this projection.
+    pub async fn list_agent_memberships(
+        &self,
+        actor_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<AgentMembership>> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        require_non_empty("agent_id", agent_id)?;
+        let connection = self.connection.lock().await;
+        require_actor(&connection, actor_id).await?;
+        find_agent_profile(&connection, agent_id).await?;
+        agent_memberships_for(&connection, actor_id, agent_id).await
     }
 
     /// Return one authorization-filtered bootstrap projection and the global
@@ -2969,16 +2995,41 @@ async fn find_agent_profile(connection: &Connection, agent_id: &str) -> Result<A
     let Some(row) = rows.next().await? else {
         return Err(not_found("agent profile", agent_id));
     };
+    agent_profile_from_row(&row)
+}
+
+async fn agent_profiles(connection: &Connection) -> Result<Vec<AgentProfile>> {
+    let mut rows = connection
+        .query(
+            "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                    agent.workspace_path, agent.lifecycle, agent.charter_json,
+                    agent.profile_version, agent.created_at_ms, agent.updated_at_ms
+             FROM agents agent
+             JOIN actors actor ON actor.id = agent.actor_id
+             ORDER BY actor.handle, actor.id",
+            (),
+        )
+        .await?;
+    let mut profiles = Vec::new();
+    while let Some(row) = rows.next().await? {
+        profiles.push(agent_profile_from_row(&row)?);
+    }
+    Ok(profiles)
+}
+
+fn agent_profile_from_row(row: &Row) -> Result<AgentProfile> {
     let id = row.get::<String>(0)?;
     let kind_text = row.get::<String>(1)?;
     let kind = parse_actor_kind(&id, &kind_text)?;
     if kind != ActorKind::Agent {
         return Err(CollabError::Database(format!(
-            "Agent Profile '{agent_id}' belongs to a non-Agent actor"
+            "Agent Profile '{id}' belongs to a non-Agent actor"
         )));
     }
     let lifecycle_text = row.get::<String>(6)?;
     let charter_json = row.get::<String>(7)?;
+    let lifecycle = parse_agent_lifecycle(&id, &lifecycle_text)?;
+    let charter = decode_charter(&id, &charter_json)?;
     Ok(AgentProfile {
         actor: Actor {
             id,
@@ -2988,12 +3039,58 @@ async fn find_agent_profile(connection: &Connection, agent_id: &str) -> Result<A
             created_at_ms: row.get(4)?,
         },
         workspace_path: row.get(5)?,
-        lifecycle: parse_agent_lifecycle(agent_id, &lifecycle_text)?,
-        charter: decode_charter(agent_id, &charter_json)?,
+        lifecycle,
+        charter,
         version: row.get(8)?,
         created_at_ms: row.get(9)?,
         updated_at_ms: row.get(10)?,
     })
+}
+
+async fn agent_memberships_for(
+    connection: &Connection,
+    actor_id: &str,
+    agent_id: &str,
+) -> Result<Vec<AgentMembership>> {
+    let mut rows = connection
+        .query(
+            "SELECT target.id, target.kind, target.name, target.parent_target_id,
+                    target.root_message_id, target.created_by, target.created_at_ms,
+                    agent_membership.role, agent_membership.joined_at_ms
+             FROM memberships agent_membership
+             JOIN targets target ON target.id = agent_membership.target_id
+             JOIN memberships viewer_membership
+               ON viewer_membership.target_id = target.id
+              AND viewer_membership.actor_id = ?1
+              AND viewer_membership.left_at_ms IS NULL
+             WHERE agent_membership.actor_id = ?2
+               AND agent_membership.left_at_ms IS NULL
+               AND target.archived_at_ms IS NULL
+               AND target.kind IN ('channel', 'direct')
+             ORDER BY target.kind, target.name, target.id",
+            (actor_id, agent_id),
+        )
+        .await?;
+    let mut memberships = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let target_id = row.get::<String>(0)?;
+        let kind_text = row.get::<String>(1)?;
+        let role_text = row.get::<String>(7)?;
+        memberships.push(AgentMembership {
+            target: Target {
+                id: target_id.clone(),
+                kind: parse_target_kind(&target_id, &kind_text)?,
+                name: row.get(2)?,
+                parent_target_id: row.get(3)?,
+                root_message_id: row.get(4)?,
+                created_by: row.get(5)?,
+                created_at_ms: row.get(6)?,
+            },
+            role: parse_membership_role(&target_id, agent_id, &role_text)?,
+            joined_at_ms: row.get(8)?,
+        });
+    }
+    Ok(memberships)
 }
 
 async fn identity_context_for(
@@ -4480,6 +4577,60 @@ mod tests {
         assert!(changes.iter().any(|change| {
             change.kind == ChangeKind::AgentProfileChanged && change.entity_id == profile.actor.id
         }));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn agent_profile_directory_is_complete_and_handle_ordered() -> Result<()> {
+        let (core, user, alpha, beta, _channel) = fixture().await?;
+        let profiles = core.list_agent_profiles(&user.id).await?;
+        assert_eq!(
+            profiles
+                .iter()
+                .map(|profile| profile.actor.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![alpha.id.as_str(), beta.id.as_str()]
+        );
+        assert_eq!(profiles[0].actor.handle, "alpha");
+        assert_eq!(profiles[0].workspace_path, "/tmp/alpha");
+        assert_eq!(profiles[0].version, 1);
+        assert_eq!(profiles[1].actor.handle, "beta");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn agent_membership_directory_is_top_level_and_viewer_filtered() -> Result<()> {
+        let (core, owner, alpha, _beta, channel) = fixture().await?;
+        let direct = core.create_direct(&owner.id, &alpha.id).await?;
+        let root = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: owner.id.clone(),
+                client_request_id: "membership-root".into(),
+                text: "Open a thread".into(),
+            })
+            .await?
+            .message;
+        let _thread = core.create_thread(&root.id, &owner.id).await?;
+
+        let memberships = core.list_agent_memberships(&owner.id, &alpha.id).await?;
+        assert_eq!(memberships.len(), 2);
+        assert_eq!(memberships[0].target, channel);
+        assert_eq!(memberships[0].role, MembershipRole::Member);
+        assert_eq!(memberships[1].target, direct);
+        assert_eq!(memberships[1].role, MembershipRole::Member);
+        assert!(
+            memberships
+                .iter()
+                .all(|membership| membership.target.kind != TargetKind::Thread)
+        );
+
+        let outsider = core.create_user("outsider", "Outsider").await?;
+        assert!(
+            core.list_agent_memberships(&outsider.id, &alpha.id)
+                .await?
+                .is_empty()
+        );
         Ok(())
     }
 

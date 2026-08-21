@@ -139,6 +139,14 @@ pub struct Target {
     pub created_at_ms: i64,
 }
 
+/// One active top-level target membership visible to the requesting actor.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AgentMembership {
+    pub target: Target,
+    pub role: MembershipRole,
+    pub joined_at_ms: i64,
+}
+
 /// Authoritative model-facing identity plus optional exact target context.
 ///
 /// A Thread inherits its member roster from `membership_target`, which is its

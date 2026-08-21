@@ -6,7 +6,6 @@
 import { mkdir } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
-import { randomBytes } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import z from '@deepseek-ai/schemastery'
@@ -14,7 +13,9 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { listAgentWorkspace, readAgentWorkspaceFile } from './agent-workspace.ts'
 import type {
   AgentPresetSummary,
+  AgentMembership,
   AgentProfile,
+  CreatedAgent,
   AgentWorkspaceEntry,
   AgentWorkspaceFile,
 } from './agent-settings-types.ts'
@@ -29,7 +30,9 @@ export type { CreateRuntimeInput } from './runtime.ts'
 export { installCollabTools } from './tools.ts'
 export type {
   AgentPresetSummary,
+  AgentMembership,
   AgentProfile,
+  CreatedAgent,
   AgentWorkspaceEntry,
   AgentWorkspaceFile,
 } from './agent-settings-types.ts'
@@ -69,6 +72,7 @@ export const name = 'dsh-chaos'
 
 const CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000
 const CHANGE_PRUNE_INTERVAL_MS = 60 * 60 * 1_000
+const AGENT_HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
 
 export interface Config {
   path?: string
@@ -84,15 +88,6 @@ function dshHome(): string {
 }
 
 const DEFAULT_DATABASE_PATH = join(dshHome(), 'collab', 'state.db')
-
-function slugifyHandle(name: string): string {
-  const slug = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return slug === '' ? 'agent' : slug.slice(0, 40)
-}
 
 function defaultWebUserDisplayName(): string {
   try {
@@ -239,44 +234,59 @@ export class CollabService extends Service {
     return actor
   }
 
-  /** Human types a name; home dir, Session, and binding stay off-screen. */
-  async createNamedAgent(name: string, presetId?: string, provider?: string, model?: string) {
-    const displayName = name.trim()
-    if (displayName === '') throw new Error('[invalid_argument] name must not be blank')
-    if ((provider === undefined) !== (model === undefined)) {
-      throw new Error('[invalid_argument] provider and model must be given together')
+  /** Create durable identity first; runtime failure remains visible as an unconfigured Profile. */
+  async createConfiguredAgent(
+    displayName: string,
+    handle: string,
+    description: string,
+    provider: string,
+    model: string,
+    presetId: string,
+  ): Promise<CreatedAgent> {
+    displayName = displayName.trim()
+    handle = handle.trim()
+    description = description.trim()
+    if (!AGENT_HANDLE.test(handle)) {
+      throw new Error('[invalid_argument] handle must be 1..40 lowercase letters, numbers, or interior hyphens')
     }
-    const preset = await this.ctx.agentPresets.resolve(presetId ?? this.ctx.agentPresets.defaultId)
+    const preset = await this.ctx.agentPresets.resolve(presetId)
     if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
-    const base = slugifyHandle(displayName)
     const template = join(dshHome(), 'agents', '{id}')
-    let actor
+    const nativeProfile = await this.requireHandle().createAgentProfile(
+      handle,
+      displayName,
+      template,
+      { schemaVersion: 1, summary: description, capabilities: [], constraints: [] },
+    )
+    const workspacePath = join(dshHome(), 'agents', nativeProfile.actor.id)
+    let binding: NativeRuntimeBinding | undefined
+    let setupError: string | undefined
     try {
-      actor = await this.requireHandle().createAgent(base, displayName, template)
-    } catch (error) {
-      const suffix = randomBytes(2).toString('hex')
-      actor = await this.requireHandle().createAgent(`${base}-${suffix}`, displayName, template)
-      void error
-    }
-    const workspacePath = join(dshHome(), 'agents', actor.id)
-    await mkdir(workspacePath, { recursive: true })
-    let binding: NativeRuntimeBinding
-    try {
+      await mkdir(workspacePath, { recursive: true })
       binding = await this.createRuntime({
-        agentId: actor.id,
+        agentId: nativeProfile.actor.id,
         workspacePath,
-        provider: provider ?? 'default',
-        model: model ?? 'default',
+        provider,
+        model,
         preset: preset.id,
       })
     } catch (error) {
-      this.ctx.logger.warn(`dsh-chaos: created Agent ${actor.id} without a Session`)
+      setupError = error instanceof Error ? error.message : String(error)
+      this.ctx.logger.warn(`dsh-chaos: created Agent ${nativeProfile.actor.id} without a Session`)
       this.ctx.logger.warn(error)
-      this.publishChange()
-      throw error
     }
     this.publishChange()
-    return { actor, binding, workspacePath }
+    return {
+      profile: {
+        actor: nativeProfile.actor,
+        workspacePath,
+        lifecycle: nativeProfile.lifecycle,
+        charter: nativeProfile.charter,
+        profileVersion: nativeProfile.version,
+        ...(binding === undefined ? {} : { binding }),
+      },
+      ...(setupError === undefined ? {} : { setupError }),
+    }
   }
 
   /** Stop the Session first; the binding row goes away with the Agent's collab state. */
@@ -383,6 +393,79 @@ export class CollabService extends Service {
     }
   }
 
+  async agentProfiles(viewerId: string): Promise<AgentProfile[]> {
+    const [profiles, bindings] = await Promise.all([
+      this.requireHandle().listAgentProfiles(viewerId),
+      this.requireHandle().listRuntimeBindings(),
+    ])
+    const bindingByAgent = new Map(bindings.map(binding => [binding.agentId, binding]))
+    return profiles.map(profile => {
+      const binding = bindingByAgent.get(profile.actor.id)
+      return {
+        actor: profile.actor,
+        workspacePath: profile.workspacePath,
+        lifecycle: profile.lifecycle,
+        charter: profile.charter,
+        profileVersion: profile.version,
+        ...(binding === undefined ? {} : { binding }),
+      }
+    })
+  }
+
+  async updateAgentProfile(
+    viewerId: string,
+    agentId: string,
+    displayName: string,
+    description: string,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile> {
+    await this.requireVisibleAgent(viewerId, agentId)
+    const profile = await this.requireHandle().agentProfile(agentId)
+    const updated = await this.requireHandle().updateAgentProfile(
+      agentId,
+      displayName,
+      { ...profile.charter, schemaVersion: 1, summary: description },
+      expectedProfileVersion,
+    )
+    const binding = await this.requireHandle().runtimeBinding(agentId)
+    this.publishChange()
+    return {
+      actor: updated.actor,
+      workspacePath: updated.workspacePath,
+      lifecycle: updated.lifecycle,
+      charter: updated.charter,
+      profileVersion: updated.version,
+      ...(binding === undefined ? {} : { binding }),
+    }
+  }
+
+  async replaceAgentRuntime(
+    viewerId: string,
+    agentId: string,
+    provider: string,
+    model: string,
+    presetId: string,
+    expectedGeneration?: string,
+  ): Promise<NativeRuntimeBinding> {
+    const profile = await this.agentProfile(viewerId, agentId)
+    const preset = await this.ctx.agentPresets.resolve(presetId)
+    if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
+    await mkdir(profile.workspacePath, { recursive: true })
+    const binding = await this.requireRuntimes().reset({
+      agentId,
+      workspacePath: profile.workspacePath,
+      provider,
+      model,
+      preset: preset.id,
+    }, expectedGeneration)
+    this.publishChange()
+    return binding
+  }
+
+  async agentMemberships(viewerId: string, agentId: string): Promise<AgentMembership[]> {
+    return await this.requireHandle().listAgentMemberships(viewerId, agentId)
+  }
+
   identityContext(agentId: string, targetId?: string) {
     return this.requireHandle().identityContext(agentId, targetId)
   }
@@ -471,8 +554,8 @@ export class CollabService extends Service {
     return this.requireRuntimes().create(input)
   }
 
-  resetRuntime(input: CreateRuntimeInput) {
-    return this.requireRuntimes().reset(input)
+  resetRuntime(input: CreateRuntimeInput, expectedGeneration?: string) {
+    return this.requireRuntimes().reset(input, expectedGeneration)
   }
 
   resumeRuntime(agentId: string) {

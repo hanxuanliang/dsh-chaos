@@ -33,6 +33,12 @@ export interface NativeTargetMember {
   joinedAtMs: number
 }
 
+export interface NativeAgentMembership {
+  target: NativeTarget
+  role: 'owner' | 'member'
+  joinedAtMs: number
+}
+
 export interface NativeThreadSummary {
   rootMessageId: string
   threadId: string
@@ -194,6 +200,7 @@ export interface NativeCollabHandle {
     charter: NativeAgentCharter,
   ): Promise<NativeAgentProfile>
   agentProfile(agentId: string): Promise<NativeAgentProfile>
+  listAgentProfiles(actorId: string): Promise<NativeAgentProfile[]>
   updateAgentProfile(
     agentId: string,
     displayName: string,
@@ -250,6 +257,7 @@ export interface NativeCollabHandle {
   listActors(actorId: string): Promise<NativeActor[]>
   listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
   listTargetMemberships(actorId: string, targetId: string): Promise<NativeTargetMember[]>
+  listAgentMemberships(actorId: string, agentId: string): Promise<NativeAgentMembership[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   pruneChangesBefore(beforeMs: number): Promise<string>

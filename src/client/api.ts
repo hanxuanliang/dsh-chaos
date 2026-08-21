@@ -1,5 +1,12 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { AgentPresetSummary, AgentProfile } from '../agent-settings-types.ts'
+import type {
+  AgentMembership,
+  AgentPresetSummary,
+  AgentProfile,
+  AgentWorkspaceEntry,
+  AgentWorkspaceFile,
+  CreatedAgent,
+} from '../agent-settings-types.ts'
 import type {
   NativeActor,
   NativeCollabSnapshot,
@@ -26,11 +33,12 @@ type CollabDomainResult<T> =
   | { ok: false; error: { code: string; message: string } }
 
 export interface CreateAgentRequest {
-  name: string
+  displayName: string
+  handle: string
+  description: string
+  provider: string
+  model: string
   presetId: string
-  /** Optional route override; host requires provider and model together. */
-  provider?: string
-  model?: string
 }
 
 /** Host model catalog group (apiproxy `llm.models` ModelProviderGroup). */
@@ -38,13 +46,6 @@ export interface LlmModelGroup {
   id: string
   name: string
   models: { id: string; name: string; description?: string }[]
-}
-
-/** Result of agent.create: the actor, its runtime binding, and the workspace path. */
-export interface CreatedAgent {
-  actor: NativeActor
-  binding: NativeRuntimeBinding
-  workspacePath: string
 }
 
 /** Thin typed caller over the '/dsh-chaos' RPC channel. */
@@ -159,6 +160,52 @@ export class ChaosClient {
 
   agentProfile(agentId: string): Promise<AgentProfile> {
     return this.call('agent.profile', { agentId })
+  }
+
+  agentProfiles(): Promise<AgentProfile[]> {
+    return this.call('agent.profiles', {})
+  }
+
+  updateAgentProfile(
+    agentId: string,
+    displayName: string,
+    description: string,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile> {
+    return this.call('agent.profile.update', {
+      agentId,
+      displayName,
+      description,
+      expectedProfileVersion,
+    })
+  }
+
+  replaceAgentRuntime(
+    agentId: string,
+    provider: string,
+    model: string,
+    presetId: string,
+    expectedGeneration?: string,
+  ): Promise<NativeRuntimeBinding> {
+    return this.call('agent.runtime.replace', {
+      agentId,
+      provider,
+      model,
+      presetId,
+      ...(expectedGeneration === undefined ? {} : { expectedGeneration }),
+    })
+  }
+
+  agentMemberships(agentId: string): Promise<AgentMembership[]> {
+    return this.call('agent.memberships', { agentId })
+  }
+
+  agentWorkspace(agentId: string, dirPath: string): Promise<AgentWorkspaceEntry[]> {
+    return this.call('agent.workspace.list', { agentId, dirPath, includeHidden: false })
+  }
+
+  agentWorkspaceFile(agentId: string, path: string): Promise<AgentWorkspaceFile> {
+    return this.call('agent.workspace.read', { agentId, path })
   }
 
   runtimeBindings(): Promise<NativeRuntimeBinding[]> {

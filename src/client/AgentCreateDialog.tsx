@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { AgentPresetSummary } from '../agent-settings-types.ts'
+import type { AgentPresetSummary, CreatedAgent } from '../agent-settings-types.ts'
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from './api.ts'
 import type { ChaosTranslate } from './locales.ts'
 import css from './AgentCreateDialog.module.css'
@@ -11,35 +11,45 @@ export interface AgentCreateDialogProps {
   presets: AgentPresetSummary[] | null
   presetsLoading: boolean
   presetsError: string | null
-  onPresetsRetry: () => void
-  onClose: () => void
-  onCreated: () => void
+  onPresetsRetry(): void
+  onClose(): void
+  onCreated(result: CreatedAgent): void
   t: ChaosTranslate
 }
 
-/**
- * One-shot create form. The parent remounts the dialog per open, so stale
- * form state never survives; an RPC failure keeps the filled form in place.
- */
-export function AgentCreateDialog({ connection, presets, presetsLoading, presetsError, onPresetsRetry, onClose, onCreated, t }: AgentCreateDialogProps): JSX.Element {
+function generatedHandle(name: string): string {
+  const handle = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return (handle === '' ? 'agent' : handle).slice(0, 40)
+}
+
+const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
+
+/** One-page identity-first creation; runtime failure still returns the durable Profile. */
+export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
+  const { connection, presets, presetsLoading, presetsError, onPresetsRetry, onClose, onCreated, t } = props
   const client = useMemo(() => new ChaosClient(connection), [connection])
-  const [name, setName] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [handle, setHandle] = useState('agent')
+  const [handleEdited, setHandleEdited] = useState(false)
+  const [description, setDescription] = useState('')
   const [presetId, setPresetId] = useState('')
+  const [provider, setProvider] = useState('')
+  const [model, setModel] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
-  // '' = follow the host default model (host writes the 'default' sentinel).
-  const [provider, setProvider] = useState('')
-  const [modelId, setModelId] = useState('')
   const [catalog, setCatalog] = useState<{ groups: LlmModelGroup[]; failures: unknown[] } | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const catalogRequest = useRef(0)
 
-  // Default to the host default preset (first healthy preset as fallback).
+  useEffect(() => {
+    if (!handleEdited) setHandle(generatedHandle(displayName))
+  }, [displayName, handleEdited])
+
   useEffect(() => {
     if (presetId !== '' || presets === null) return
-    const fallback = presets.find(preset => preset.isDefault && preset.broken === undefined)
-      ?? presets.find(preset => preset.broken === undefined)
+    const fallback = presets.find(item => item.isDefault && item.broken === undefined)
+      ?? presets.find(item => item.broken === undefined)
     if (fallback !== undefined) setPresetId(fallback.id)
   }, [presets, presetId])
 
@@ -63,25 +73,33 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
     return () => { catalogRequest.current += 1 }
   }, [loadCatalog])
 
-  const trimmedName = name.trim()
-  const selected = presets?.find(preset => preset.id === presetId)
-  const selectedDescription = selected?.description?.trim() ?? ''
-  const providerModels = catalog?.groups.find(group => group.id === provider)?.models ?? []
-  // Host RPC rule (src/index.ts createNamedAgent): provider and model must be given together.
-  const canSubmit = trimmedName !== '' && presetId !== '' && (provider === '' || modelId !== '') && !submitting
+  const models = catalog?.groups.find(group => group.id === provider)?.models ?? []
+  const canSubmit = displayName.trim() !== ''
+    && HANDLE.test(handle)
+    && description.trim() !== ''
+    && provider !== ''
+    && model !== ''
+    && presetId !== ''
+    && !submitting
+    && !catalogLoading
+    && catalogError === null
 
   const submit = (): void => {
     if (!canSubmit) return
     setSubmitting(true)
     setFailure(null)
-    const request: CreateAgentRequest = provider === ''
-      ? { name: trimmedName, presetId }
-      : { name: trimmedName, presetId, provider, model: modelId }
-    client.createAgent(request).then(() => {
-      onCreated()
+    const request: CreateAgentRequest = {
+      displayName: displayName.trim(),
+      handle,
+      description: description.trim(),
+      provider,
+      model,
+      presetId,
+    }
+    client.createAgent(request).then(result => {
+      onCreated(result)
       onClose()
     }, (reason: unknown) => {
-      // Keep the filled form; the inline error explains the next step.
       setFailure(reason instanceof Error ? reason.message : String(reason))
       setSubmitting(false)
     })
@@ -94,102 +112,79 @@ export function AgentCreateDialog({ connection, presets, presetsLoading, presets
       title={t('create.title')}
       closeLabel={t('create.close')}
       contentClassName={css.body as string}
-      footer={(
-        <>
-          <Button variant="outline" disabled={submitting} onClick={onClose}>{t('create.cancel')}</Button>
-          <Button variant="primary" disabled={!canSubmit} onClick={submit}>
-            {submitting ? t('create.submitting') : t('create.submit')}
-          </Button>
-        </>
-      )}
+      footer={<>
+        <Button variant="outline" disabled={submitting} onClick={onClose}>{t('create.cancel')}</Button>
+        <Button variant="primary" disabled={!canSubmit} onClick={submit}>
+          {submitting ? t('create.submitting') : t('create.submit')}
+        </Button>
+      </>}
     >
-      <label className={css.field} htmlFor="chaos-agent-create-name">
-        <span className={css.labelText}>{t('create.name')}<em className={css.req} aria-hidden="true">*</em></span>
-        <Input
-          id="chaos-agent-create-name"
-          className={css.input as string}
-          value={name}
-          onChange={event => { setName(event.target.value); setFailure(null) }}
-          maxLength={64}
-          placeholder={t('create.namePlaceholder')}
-          autoComplete="off"
-          autoFocus
-          spellCheck={false}
-          disabled={submitting}
-        />
-        <small className={css.hint}>{t('create.nameHint')}</small>
-      </label>
+      <section className={css.section} aria-labelledby="chaos-create-identity">
+        <div className={css.sectionHeading}>
+          <strong id="chaos-create-identity">{t('create.identity')}</strong>
+          <span>{t('create.identityHint')}</span>
+        </div>
+        <label className={css.field} htmlFor="chaos-agent-create-name">
+          <span className={css.labelText}>{t('create.name')}<em className={css.req}>*</em></span>
+          <Input id="chaos-agent-create-name" className={css.input as string} value={displayName}
+            onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
+            placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
+        </label>
+        <label className={css.field} htmlFor="chaos-agent-create-handle">
+          <span className={css.labelText}>{t('create.handle')}<em className={css.req}>*</em></span>
+          <div className={css.handleInput}><span aria-hidden="true">@</span><input id="chaos-agent-create-handle"
+            value={handle} onChange={event => { setHandleEdited(true); setHandle(event.target.value.toLowerCase()); setFailure(null) }}
+            maxLength={40} autoComplete="off" spellCheck={false} disabled={submitting} /></div>
+          {!HANDLE.test(handle) && <small className={css.error}>{t('create.handleInvalid')}</small>}
+          <small className={css.hint}>{t('create.handleHint')}</small>
+        </label>
+        <label className={css.field} htmlFor="chaos-agent-create-charter">
+          <span className={css.labelText}>{t('create.charter')}<em className={css.req}>*</em></span>
+          <textarea id="chaos-agent-create-charter" className={css.textarea} value={description}
+            onChange={event => { setDescription(event.target.value); setFailure(null) }} maxLength={800}
+            placeholder={t('create.charterPlaceholder')} disabled={submitting} />
+          <small className={css.hint}>{t('create.charterHint')}</small>
+        </label>
+      </section>
 
-      <div className={css.field}>
-        <span className={css.labelText}>{t('create.preset')}<em className={css.req} aria-hidden="true">*</em></span>
-        {presetsLoading && <p className={css.hint} role="status">{t('create.presetLoading')}</p>}
-        {presetsError !== null && (
-          <p className={css.hint} role="alert">
-            {t('create.presetFailed', { error: presetsError })}{' '}
-            <Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button>
-          </p>
-        )}
-        {presets !== null && presets.length === 0 && <p className={css.hint}>{t('create.presetEmpty')}</p>}
-        {presets !== null && presets.length > 0 && (
-          <select
-            className={css.select}
-            aria-label={t('create.preset')}
-            value={presetId}
-            disabled={submitting}
-            onChange={event => { setPresetId(event.target.value); setFailure(null) }}
-          >
-            {presetId === '' && <option value="" disabled>{t('create.presetPlaceholder')}</option>}
-            {presets.map(preset => {
-              const label = preset.name?.trim() === undefined || preset.name.trim() === '' ? preset.id : preset.name
-              return (
-                <option key={preset.id} value={preset.id} disabled={preset.broken !== undefined}>
-                  {preset.broken === undefined ? label : t('create.presetBroken', { label, reason: preset.broken })}
-                </option>
-              )
-            })}
-          </select>
-        )}
-        {selectedDescription !== '' && <small className={css.hint}>{selectedDescription}</small>}
-      </div>
-
-      <div className={css.field}>
-        <span className={css.labelText}>{t('create.route')}</span>
+      <section className={css.section} aria-labelledby="chaos-create-runtime">
+        <div className={css.sectionHeading}>
+          <strong id="chaos-create-runtime">{t('create.runtime')}</strong>
+          <span>{t('create.runtimeHint')}</span>
+        </div>
         {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
-        {catalogError !== null && (
-          <p className={css.hint} role="alert">
-            {t('create.routeFailed', { error: catalogError })}{' '}
-            <Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>
-          </p>
-        )}
-        {catalog !== null && (
-          <>
-            <select
-              className={css.select}
-              aria-label={t('create.route')}
-              value={provider}
-              disabled={submitting}
-              onChange={event => { setProvider(event.target.value); setModelId(''); setFailure(null) }}
-            >
-              <option value="">{t('create.providerPlaceholder')}</option>
-              {catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
+        {catalogError !== null && <p className={css.error} role="alert">{t('create.routeFailed', { error: catalogError })}{' '}<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button></p>}
+        <div className={css.routeGrid}>
+          <label className={css.field}>
+            <span className={css.labelText}>{t('create.provider')}<em className={css.req}>*</em></span>
+            <select className={css.select} value={provider} disabled={submitting || catalogLoading}
+              onChange={event => { setProvider(event.target.value); setModel(''); setFailure(null) }}>
+              <option value="" disabled>{t('create.providerPlaceholder')}</option>
+              {catalog?.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
-            {provider !== '' && (
-              <select
-                className={css.select}
-                aria-label={t('create.route')}
-                value={modelId}
-                disabled={submitting || providerModels.length === 0}
-                onChange={event => { setModelId(event.target.value); setFailure(null) }}
-              >
-                {modelId === '' && <option value="" disabled>{providerModels.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>}
-                {providerModels.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-            )}
-          </>
-        )}
-        <small className={css.hint}>{t('create.routeHint')}</small>
-      </div>
-
+          </label>
+          <label className={css.field}>
+            <span className={css.labelText}>{t('create.model')}<em className={css.req}>*</em></span>
+            <select className={css.select} value={model} disabled={submitting || provider === '' || models.length === 0}
+              onChange={event => { setModel(event.target.value); setFailure(null) }}>
+              <option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>
+              {models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className={css.field}>
+          <span className={css.labelText}>{t('create.preset')}<em className={css.req}>*</em></span>
+          {presetsLoading && <p className={css.hint} role="status">{t('create.presetLoading')}</p>}
+          {presetsError !== null && <p className={css.error} role="alert">{t('create.presetFailed', { error: presetsError })}{' '}<Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button></p>}
+          <select className={css.select} value={presetId} disabled={submitting || presetsLoading}
+            onChange={event => { setPresetId(event.target.value); setFailure(null) }}>
+            <option value="" disabled>{t('create.presetPlaceholder')}</option>
+            {presets?.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>
+              {item.name?.trim() || item.id}{item.broken === undefined ? '' : ` — ${item.broken}`}
+            </option>)}
+          </select>
+        </label>
+      </section>
       {failure !== null && <p className={css.error} role="alert">{t('create.failed', { error: failure })}</p>}
     </Modal>
   )

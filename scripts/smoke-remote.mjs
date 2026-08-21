@@ -127,20 +127,49 @@ try {
   const presets = await call('agent.presets', {})
   assert.equal(presets.ok, true)
   assert.equal(presets.value[0].isDefault, true)
-  const createdAgent = await call('agent.create', { name: 'Workspace Agent', presetId: 'minimal' })
+  const createdAgent = await call('agent.create', {
+    displayName: 'Workspace Agent',
+    handle: 'workspace-agent',
+    description: 'Own workspace verification',
+    provider: 'openai',
+    model: 'codex',
+    presetId: 'minimal',
+  })
   assert.equal(createdAgent.ok, true)
-  assert.equal(createdAgent.value.binding.preset, 'minimal')
-  const profile = await call('agent.profile', { agentId: createdAgent.value.actor.id })
+  assert.equal(createdAgent.value.profile.binding.preset, 'minimal')
+  const agentId = createdAgent.value.profile.actor.id
+  const profile = await call('agent.profile', { agentId })
   assert.equal(profile.ok, true)
-  assert.equal(profile.value.binding.sessionId, createdAgent.value.binding.sessionId)
-  assert.equal(profile.value.workspacePath, join(root, 'agents', createdAgent.value.actor.id))
+  assert.equal(profile.value.binding.sessionId, createdAgent.value.profile.binding.sessionId)
+  assert.equal(profile.value.charter.summary, 'Own workspace verification')
+  assert.equal(profile.value.workspacePath, join(root, 'agents', agentId))
+  const profiles = await call('agent.profiles', {})
+  assert.equal(profiles.ok, true)
+  assert(profiles.value.some(item => item.actor.id === agentId && item.binding.sessionId === profile.value.binding.sessionId))
+  const updatedProfile = await call('agent.profile.update', {
+    agentId,
+    displayName: 'Workspace Reviewer',
+    description: 'Review workspace behavior',
+    expectedProfileVersion: profile.value.profileVersion,
+  })
+  assert.equal(updatedProfile.ok, true)
+  assert.equal(updatedProfile.value.actor.displayName, 'Workspace Reviewer')
+  assert.equal(updatedProfile.value.charter.summary, 'Review workspace behavior')
+  const staleProfile = await call('agent.profile.update', {
+    agentId,
+    displayName: 'Stale',
+    description: 'Must not overwrite',
+    expectedProfileVersion: profile.value.profileVersion,
+  })
+  assert.equal(staleProfile.ok, false)
+  assert.equal(staleProfile.error.code, 'agent_profile_version_conflict')
   await writeFile(join(profile.value.workspacePath, 'hello.txt'), 'hello workspace')
   await writeFile(join(profile.value.workspacePath, 'binary.bin'), Buffer.from([0, 1, 2]))
   await writeFile(join(profile.value.workspacePath, 'large.txt'), 'x'.repeat(512 * 1024 + 1))
   await mkdir(join(profile.value.workspacePath, '.hidden'))
   await symlink('/etc/passwd', join(profile.value.workspacePath, 'escape'))
   const workspace = await call('agent.workspace.list', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     dirPath: '',
     includeHidden: false,
   })
@@ -148,59 +177,94 @@ try {
   assert.deepEqual(workspace.value.map(entry => entry.name), ['binary.bin', 'hello.txt', 'large.txt', 'escape'])
   assert.equal(workspace.value[3].kind, 'symlink')
   const hiddenWorkspace = await call('agent.workspace.list', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     dirPath: '',
     includeHidden: true,
   })
   assert.equal(hiddenWorkspace.value[0].name, '.hidden')
   const preview = await call('agent.workspace.read', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     path: 'hello.txt',
   })
   assert.equal(preview.ok, true)
   assert.equal(preview.value.content, 'hello workspace')
   const binaryPreview = await call('agent.workspace.read', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     path: 'binary.bin',
   })
   assert.equal(binaryPreview.value.binary, true)
   assert.equal(binaryPreview.value.content, undefined)
   const largePreview = await call('agent.workspace.read', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     path: 'large.txt',
   })
   assert.equal(largePreview.value.truncated, true)
   assert.equal(largePreview.value.content.length, 512 * 1024)
   const escapedPreview = await call('agent.workspace.read', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     path: '../outside.txt',
   })
   assert.equal(escapedPreview.ok, false)
   assert.equal(escapedPreview.error.code, 'invalid_argument')
   const symlinkPreview = await call('agent.workspace.read', {
-    agentId: createdAgent.value.actor.id,
+    agentId,
     path: 'escape',
   })
   assert.equal(symlinkPreview.ok, false)
   assert.equal(symlinkPreview.error.code, 'invalid_argument')
 
-  // agent.create: presetId is optional; provider/model must come as a pair.
-  const defaulted = await call('agent.create', { name: 'Defaulted Agent' })
-  assert.equal(defaulted.ok, true)
-  assert.equal(defaulted.value.binding.preset, 'standard')
-  assert.equal(defaulted.value.binding.provider, 'default')
-  assert.equal(defaulted.value.binding.model, 'default')
+  // Runtime replacement is generation-fenced; only the exact binding can restart.
   const paired = await call('agent.create', {
-    name: 'Paired Agent',
+    displayName: 'Paired Agent',
+    handle: 'paired-agent',
+    description: 'Own pairing checks',
     provider: 'openai',
     model: 'codex',
+    presetId: 'standard',
   })
   assert.equal(paired.ok, true)
-  assert.equal(paired.value.binding.provider, 'openai')
-  assert.equal(paired.value.binding.model, 'codex')
-  const halfPair = await call('agent.create', { name: 'Half Pair', provider: 'openai' })
-  assert.equal(halfPair.ok, false)
-  assert.equal(halfPair.error.code, 'invalid_argument')
+  assert.equal(paired.value.profile.binding.provider, 'openai')
+  const replaced = await call('agent.runtime.replace', {
+    agentId: paired.value.profile.actor.id,
+    provider: 'openai',
+    model: 'codex-next',
+    presetId: 'minimal',
+    expectedGeneration: paired.value.profile.binding.generation,
+  })
+  assert.equal(replaced.ok, true)
+  assert.equal(replaced.value.generation, '2')
+  const staleRuntime = await call('agent.runtime.replace', {
+    agentId: paired.value.profile.actor.id,
+    provider: 'openai',
+    model: 'stale',
+    presetId: 'standard',
+    expectedGeneration: paired.value.profile.binding.generation,
+  })
+  assert.equal(staleRuntime.ok, false)
+  assert.equal(staleRuntime.error.code, 'runtime_generation_mismatch')
+  const partial = await call('agent.create', {
+    displayName: 'Missing Model',
+    handle: 'missing-model',
+    description: 'Invalid request',
+    provider: 'openai',
+    presetId: 'standard',
+  })
+  assert.equal(partial.ok, false)
+  assert.equal(partial.error.code, 'invalid_argument')
+  const invalidHandle = await call('agent.create', {
+    displayName: 'Invalid Handle',
+    handle: 'Invalid Handle',
+    description: 'Must be rejected',
+    provider: 'openai',
+    model: 'codex',
+    presetId: 'standard',
+  })
+  assert.equal(invalidHandle.ok, false)
+  assert.equal(invalidHandle.error.code, 'invalid_argument')
+
+  const unconfiguredActor = await ctx.collab.createAgent('unconfigured', 'Unconfigured', join(root, 'agents', 'unconfigured'))
+  const profilesWithUnconfigured = await call('agent.profiles', {})
+  assert(profilesWithUnconfigured.value.some(item => item.actor.id === unconfiguredActor.id && item.binding === undefined))
 
   const created = await call('channel.create', {
     name: 'remote-channel',
@@ -284,32 +348,35 @@ try {
   assert.equal(historyChannel.ok, true)
   const added = await call('member.add', {
     targetId: historyChannel.value.id,
-    memberId: paired.value.actor.id,
+    memberId: paired.value.profile.actor.id,
   })
   assert.equal(added.ok, true)
+  const memberships = await call('agent.memberships', { agentId: paired.value.profile.actor.id })
+  assert.equal(memberships.ok, true)
+  assert(memberships.value.some(item => item.target.id === historyChannel.value.id && item.role === 'member'))
   const pairedNote = await ctx.collab.sendMessage({
     targetId: historyChannel.value.id,
-    authorId: paired.value.actor.id,
+    authorId: paired.value.profile.actor.id,
     clientRequestId: 'paired-note',
     text: 'paired was here',
   })
-  assert.equal(pairedNote.message.authorId, paired.value.actor.id)
-  const deleted = await call('agent.delete', { agentId: paired.value.actor.id })
+  assert.equal(pairedNote.message.authorId, paired.value.profile.actor.id)
+  const deleted = await call('agent.delete', { agentId: paired.value.profile.actor.id })
   assert.equal(deleted.ok, true)
   const actorsAfterDelete = await call('actors', {})
-  assert(!actorsAfterDelete.value.some(actor => actor.id === paired.value.actor.id))
-  assert(actorsAfterDelete.value.some(actor => actor.id === defaulted.value.actor.id))
+  assert(!actorsAfterDelete.value.some(actor => actor.id === paired.value.profile.actor.id))
+  assert(actorsAfterDelete.value.some(actor => actor.id === agentId))
   const bindingsAfterDelete = await call('runtime.bindings', {})
-  assert(!bindingsAfterDelete.value.some(binding => binding.agentId === paired.value.actor.id))
+  assert(!bindingsAfterDelete.value.some(binding => binding.agentId === paired.value.profile.actor.id))
   const history = await call('history', { targetId: historyChannel.value.id })
   assert.equal(history.ok, true)
   assert(history.value.some(
-    message => message.authorId === paired.value.actor.id && message.text === 'paired was here',
+    message => message.authorId === paired.value.profile.actor.id && message.text === 'paired was here',
   ))
-  const deletedProfile = await call('agent.profile', { agentId: paired.value.actor.id })
+  const deletedProfile = await call('agent.profile', { agentId: paired.value.profile.actor.id })
   assert.equal(deletedProfile.ok, false)
   assert.equal(deletedProfile.error.code, 'not_found')
-  const deletedAgain = await call('agent.delete', { agentId: paired.value.actor.id })
+  const deletedAgain = await call('agent.delete', { agentId: paired.value.profile.actor.id })
   assert.equal(deletedAgain.ok, true)
   const deleteUser = await call('agent.delete', { agentId: firstSnapshot.value.actor.id })
   assert.equal(deleteUser.ok, false)

@@ -225,6 +225,7 @@ const steers = []
 const sessionEvents = []
 let disposed = 0
 let createdOptions
+let failNextCreate = false
 const collab = new FakeCollab()
 const fakeAgent = {
   id: 'session-1',
@@ -236,6 +237,10 @@ const fakeAgent = {
 const registry = {
   async create(options) {
     createdOptions = options
+    if (failNextCreate) {
+      failNextCreate = false
+      throw new Error('injected create failure')
+    }
     await options.setup({
       on: () => {},
       tools: { register: definition => { tools.set(definition.name, definition) } },
@@ -379,19 +384,91 @@ const reset = await runtimes.reset({
   model: 'codex',
   preset: 'default',
   sessionId: 'session-2',
-})
+}, binding.generation)
 assert.equal(reset.generation, '2')
 assert.equal(runtimes.resolve(binding), undefined)
 assert.equal(disposed, 1)
+
+failNextCreate = true
+await assert.rejects(
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: '/tmp/dsh-chaos-agent-1',
+    provider: 'openai',
+    model: 'broken',
+    preset: 'default',
+    sessionId: 'session-broken',
+  }, reset.generation),
+  /injected create failure/,
+)
+assert.equal(runtimes.resolve(reset), fakeAgent, 'failed replacement must recover the previous Session')
+
+await assert.rejects(
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: '/tmp/dsh-chaos-agent-1',
+    provider: 'openai',
+    model: 'stale',
+    preset: 'default',
+    sessionId: 'session-stale',
+  }, binding.generation),
+  /runtime_generation_mismatch/,
+)
+
+const initial = await runtimes.reset({
+  agentId: 'agent-2',
+  workspacePath: '/tmp/dsh-chaos-agent-2',
+  provider: 'openai',
+  model: 'codex',
+  preset: 'default',
+  sessionId: 'session-agent-2',
+})
+assert.equal(initial.generation, '1')
+await assert.rejects(
+  runtimes.reset({
+    agentId: 'agent-2',
+    workspacePath: '/tmp/dsh-chaos-agent-2',
+    provider: 'openai',
+    model: 'codex',
+    preset: 'default',
+  }),
+  /runtime_generation_mismatch/,
+)
+await runtimes.stop('agent-2')
+
+const concurrent = await Promise.allSettled([
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: '/tmp/dsh-chaos-agent-1',
+    provider: 'openai',
+    model: 'codex-next',
+    preset: 'default',
+    sessionId: 'session-3a',
+  }, reset.generation),
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: '/tmp/dsh-chaos-agent-1',
+    provider: 'openai',
+    model: 'codex-other',
+    preset: 'default',
+    sessionId: 'session-3b',
+  }, reset.generation),
+])
+assert.equal(concurrent.filter(result => result.status === 'fulfilled').length, 1)
+assert.equal(concurrent.filter(result => result.status === 'rejected').length, 1)
+const replaced = concurrent.find(result => result.status === 'fulfilled').value
+assert.equal(replaced.generation, '3')
+assert.match(concurrent.find(result => result.status === 'rejected').reason.message, /runtime_generation_mismatch/)
+
 await runtimes.stop('agent-1')
-assert.equal(disposed, 2)
-collab.bindings.set('agent-1', { ...reset, preset: 'default' })
+assert.equal(disposed, 5)
+collab.bindings.set('agent-1', { ...replaced, preset: 'default' })
 const resumed = await runtimes.resume('agent-1')
 assert.equal(resumed.preset, 'standard')
 assert.equal(runtimes.resolve(resumed), fakeAgent)
-assert.deepEqual(mountedPresets, ['standard', 'standard', 'standard'])
+assert.deepEqual(mountedPresets, ['standard', 'standard', 'standard', 'standard', 'standard', 'standard'])
 assert.deepEqual(sessionEvents, [{ type: 'agent-preset/selected', data: { agentPreset: 'standard' } }])
 await runtimes.close()
-assert.equal(disposed, 3)
+assert.equal(disposed, 6)
 assert.deepEqual(warningErrors, [])
 console.log('runtime/delivery/tools smoke ok')

@@ -31,6 +31,11 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.tabs .tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
+
 .tabs .tab[data-active] {
   color: var(--dsw-alias-label-primary-foreground, #fff);
   background: var(--dsw-alias-button-primary-fill);
