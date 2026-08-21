@@ -178,17 +178,42 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
   // row is not in the merged window yet, page older until it appears (or the
   // channel is fully backfilled); handled jumps are reported exactly once.
   const jumpHandledRef = useRef<string | undefined>(undefined)
+  const jumpFlashRef = useRef<{ row: HTMLElement; timer: number } | undefined>(undefined)
+  useEffect(() => () => {
+    const active = jumpFlashRef.current
+    if (active === undefined) return
+    window.clearTimeout(active.timer)
+    active.row.removeAttribute('data-jump-flash')
+  }, [])
   useEffect(() => {
-    if (jumpMessageId === undefined || jumpHandledRef.current === jumpMessageId) return
+    if (jumpMessageId === undefined) {
+      // Let a later jump to the same Message replay the marker.
+      jumpHandledRef.current = undefined
+      return
+    }
+    if (jumpHandledRef.current === jumpMessageId) return
     const el = scrollerRef.current
     if (el === null) return
-    const row = el.querySelector(`[data-message-id="${jumpMessageId}"]`)
+    const row = el.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(jumpMessageId)}"]`)
     if (row !== null) {
       jumpHandledRef.current = jumpMessageId
       pinnedRef.current = false
       row.scrollIntoView({ block: 'center' })
+      const previous = jumpFlashRef.current
+      if (previous !== undefined) {
+        window.clearTimeout(previous.timer)
+        previous.row.removeAttribute('data-jump-flash')
+      }
+      // Removing + forcing layout lets an immediate second jump to the same
+      // Message replay the animation rather than inheriting its old timeline.
+      row.removeAttribute('data-jump-flash')
+      void row.offsetWidth
       row.setAttribute('data-jump-flash', '')
-      window.setTimeout(() => { row.removeAttribute('data-jump-flash') }, 1600)
+      const timer = window.setTimeout(() => {
+        row.removeAttribute('data-jump-flash')
+        if (jumpFlashRef.current?.row === row) jumpFlashRef.current = undefined
+      }, 2200)
+      jumpFlashRef.current = { row, timer }
       onJumpHandled?.()
       return
     }

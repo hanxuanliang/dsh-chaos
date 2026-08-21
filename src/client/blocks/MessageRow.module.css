@@ -173,11 +173,12 @@
   border-color: var(--dsw-alias-border-l3);
 }
 
-/* jump flash 常驻 keyframe (原 mega 末次) */
-.msg[data-jump-flash],
-.msgCompact[data-jump-flash] {
+/* plocal message-flash: the whole landed row receives a soft signal wash.
+ * Keep selectors in lockstep with this module's actual row class names. */
+.row[data-jump-flash],
+.rowCompact[data-jump-flash] {
   border-radius: 8px;
-  animation: dshChaosJumpFlash 1.5s ease-out;
+  animation: dshChaosJumpFlash 2.2s ease-out 1;
 }
 
 @keyframes dshChaosJumpFlash {
