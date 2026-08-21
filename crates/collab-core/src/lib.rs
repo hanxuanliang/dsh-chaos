@@ -2,7 +2,7 @@
 
 mod activity;
 mod actor;
-mod change;
+mod changefeed;
 mod core;
 mod db;
 mod delivery;
@@ -39,7 +39,7 @@ use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
 
 use actor::*;
-use change::*;
+use changefeed::*;
 use core::*;
 use db::rows::*;
 use membership::*;

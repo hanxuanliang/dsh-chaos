@@ -1,4 +1,4 @@
-//! Authorization-filtered snapshots and durable change-ledger retention.
+//! Durable, recipient-filtered change notifications for client synchronization.
 
 use super::*;
 
