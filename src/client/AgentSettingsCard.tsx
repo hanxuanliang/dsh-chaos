@@ -16,26 +16,15 @@ type Phase = 'loading' | 'ready' | 'error'
 const SKELETON_ROWS = [0, 1, 2]
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
-function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches)
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 760px)')
-    const update = (): void => { setNarrow(query.matches) }
-    query.addEventListener('change', update)
-    return () => { query.removeEventListener('change', update) }
-  }, [])
-  return narrow
-}
-
-/** Identity-first master/detail Agent settings surface. */
+/** Identity-first expandable Agent settings surface. */
 export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
-  const narrow = useNarrow()
   const request = useRef(0)
   const presetRequest = useRef(0)
   const [phase, setPhase] = useState<Phase>('loading')
   const [profiles, setProfiles] = useState<AgentProfile[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [presets, setPresets] = useState<AgentPresetSummary[]>([])
@@ -56,14 +45,14 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
       setProfiles(rows)
       setSelectedId(previous => previous !== undefined && rows.some(row => row.actor.id === previous)
         ? previous
-        : narrow ? undefined : rows[0]?.actor.id)
+        : undefined)
       setLoadError(null)
       setPhase('ready')
     }, reason => {
       if (request.current !== current) return
       if (initial) { setLoadError(errorText(reason)); setPhase('error') } else setActionError(errorText(reason))
     }).finally(() => { if (request.current === current) setRefreshing(false) })
-  }, [client, narrow])
+  }, [client])
 
   const loadPresets = useCallback((): void => {
     const current = ++presetRequest.current
@@ -82,6 +71,13 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
   }, [load, loadPresets])
 
   const selected = profiles.find(profile => profile.actor.id === selectedId)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredProfiles = normalizedQuery === '' ? profiles : profiles.filter(profile => (
+    profile.actor.displayName.toLocaleLowerCase().includes(normalizedQuery)
+    || profile.actor.handle.toLocaleLowerCase().includes(normalizedQuery)
+    || profile.charter.summary.toLocaleLowerCase().includes(normalizedQuery)
+  ))
+  const visibleSelected = filteredProfiles.some(profile => profile.actor.id === selectedId) ? selected : undefined
   const updateProfile = (updated: AgentProfile): void => {
     setProfiles(rows => rows.map(row => row.actor.id === updated.actor.id ? updated : row))
   }
@@ -112,18 +108,14 @@ export function AgentSettingsCard({ connection, t }: AgentSettingsCardProps): JS
       {phase === 'loading' && <div className={css.skeleton} role="status" aria-label={t('agents.loadingAria')}>{SKELETON_ROWS.map(index => <div key={index} className={streamCss.skeletonRow} />)}</div>}
       {phase === 'error' && <div className={css.empty} role="alert"><p className={css.emptyText}>{t('agents.loadFailed', { error: loadError ?? '' })}</p><Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button></div>}
       {phase === 'ready' && profiles.length === 0 && <div className={css.empty}><p className={css.emptyText}>{t('agents.empty')}</p><Button variant="outline" size="sm" onClick={() => { setCreateOpen(true) }}>{t('agents.create')}</Button></div>}
-      {phase === 'ready' && profiles.length > 0 && <div className={css.workspace} data-detail={selected === undefined ? undefined : 'true'}>
-        {(!narrow || selected === undefined) && <AgentList profiles={profiles} selectedId={selectedId} onSelect={profile => { setSelectedId(profile.actor.id) }} t={t} />}
-        {selected !== undefined
-          ? <AgentDetail connection={connection} profile={selected} presets={presets} narrow={narrow}
-              onBack={() => {
-                const agentId = selected.actor.id
-                setSelectedId(undefined)
-                requestAnimationFrame(() => { document.querySelector<HTMLElement>(`[data-agent-id="${agentId}"]`)?.focus() })
-              }} onUpdated={updateProfile}
-              onWorkspace={() => { setWorkspaceProfile(selected) }}
-              onDelete={() => { setDeleteProfile(selected); setDeleteAcknowledged(false) }} t={t} />
-          : !narrow && <div className={css.placeholder}>{t('agents.select')}</div>}
+      {phase === 'ready' && profiles.length > 0 && <div className={css.workspace}>
+        <AgentList profiles={filteredProfiles} total={profiles.length} query={query} selectedId={visibleSelected?.actor.id}
+          onQueryChange={setQuery}
+          onSelect={profile => { setSelectedId(current => current === profile.actor.id ? undefined : profile.actor.id) }}
+          expandedContent={visibleSelected === undefined ? undefined : <AgentDetail connection={connection} profile={visibleSelected} presets={presets}
+            onUpdated={updateProfile}
+            onWorkspace={() => { setWorkspaceProfile(visibleSelected) }}
+            onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />} t={t} />
       </div>}
       {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
         presetsError={presetsError} onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
