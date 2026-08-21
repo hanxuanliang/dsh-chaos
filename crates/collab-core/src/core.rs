@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tokio::sync::Mutex;
-use turso::transaction::TransactionBehavior;
 use turso::Connection;
+use turso::transaction::TransactionBehavior;
 use uuid::Uuid;
 
 use crate::db::migrate::migrate;
