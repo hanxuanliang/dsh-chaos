@@ -7,6 +7,7 @@ mod core;
 mod db;
 mod delivery;
 mod error;
+mod ids;
 mod membership;
 mod message;
 mod model;
@@ -18,6 +19,7 @@ mod target;
 mod task;
 #[cfg(test)]
 mod test_support;
+mod thread;
 
 #[cfg(feature = "napi")]
 pub use napi_bridge::*;
@@ -29,8 +31,9 @@ pub use model::{
     Actor, ActorKind, AgentCharter, AgentLifecycle, AgentMembership, AgentProfile, ChangeEvent,
     ChangeKind, CollabSnapshot, IdentityContext, InboxBatch, InboxMessage, MembershipRole, Message,
     MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
-    TargetKind, TargetMember, Task, TaskStatus, ThreadSummary,
+    TargetKind, TargetMember, Task, TaskStatus,
 };
+pub use thread::ThreadSummary;
 
 use std::collections::BTreeSet;
 
@@ -48,3 +51,4 @@ use profile::*;
 use runtime::*;
 use target::*;
 use task::*;
+use thread::query::followed_thread_ids_for_actor;

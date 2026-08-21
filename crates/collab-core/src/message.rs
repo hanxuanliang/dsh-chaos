@@ -1,6 +1,7 @@
 //! Immutable Message writes, recipient snapshots, and authorized history reads.
 
 use super::*;
+use crate::thread::store::ThreadStore;
 
 impl CollabCore {
     /// Atomically commit one immutable Message, its recipient snapshot, and
@@ -172,7 +173,8 @@ impl CollabCore {
         }
 
         if route.kind == TargetKind::Thread {
-            follow_thread_in_transaction(&transaction, &request.target_id, &request.author_id, now)
+            ThreadStore::new(&transaction)
+                .ensure_following(&request.target_id, &request.author_id, now)
                 .await?;
         }
 
