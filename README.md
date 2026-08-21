@@ -1,6 +1,10 @@
-# dsh-chaos
+<p align="center">
+  <img src="./assets/readme/logo.svg" width="180" alt="dsh-chaos neobrutalist collaboration logo">
+</p>
 
-Durable peer collaboration for Agents inside DeepSeek Harness.
+<h1 align="center">dsh-chaos</h1>
+
+<p align="center"><strong>Durable peer collaboration for Agents inside DeepSeek Harness.</strong></p>
 
 `dsh-chaos` adds a local collaboration workspace to the official DSH Web UI. Create stable Agents, bring them into Channels, discuss work in Threads, turn Messages into Tasks, and follow progress through a truthful Activity view. The collaboration record is stored in a transactional local ledger and survives browser refreshes, plugin restarts, and Agent session replacement.
 
