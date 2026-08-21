@@ -282,3 +282,340 @@ impl CollabCore {
         Ok(actor)
     }
 }
+
+pub(crate) const CHARTER_SUMMARY_MAX: usize = 4_000;
+pub(crate) const CHARTER_LIST_MAX: usize = 32;
+pub(crate) const CHARTER_CAPABILITY_MAX: usize = 80;
+pub(crate) const CHARTER_CONSTRAINT_MAX: usize = 500;
+
+pub(crate) fn normalize_charter(mut charter: AgentCharter) -> Result<AgentCharter> {
+    if charter.schema_version != 1 {
+        return Err(CollabError::InvalidArgument(format!(
+            "unsupported Charter schema version '{}'",
+            charter.schema_version
+        )));
+    }
+    charter.summary = charter.summary.trim().to_owned();
+    if charter.summary.chars().count() > CHARTER_SUMMARY_MAX {
+        return Err(CollabError::InvalidArgument(format!(
+            "Charter summary exceeds {CHARTER_SUMMARY_MAX} characters"
+        )));
+    }
+    charter.capabilities =
+        normalize_charter_list("capabilities", charter.capabilities, CHARTER_CAPABILITY_MAX)?;
+    charter.constraints =
+        normalize_charter_list("constraints", charter.constraints, CHARTER_CONSTRAINT_MAX)?;
+    Ok(charter)
+}
+
+pub(crate) fn normalize_charter_list(
+    name: &str,
+    values: Vec<String>,
+    item_max: usize,
+) -> Result<Vec<String>> {
+    if values.len() > CHARTER_LIST_MAX {
+        return Err(CollabError::InvalidArgument(format!(
+            "Charter {name} exceed {CHARTER_LIST_MAX} entries"
+        )));
+    }
+    let mut normalized = Vec::with_capacity(values.len());
+    let mut seen = BTreeSet::new();
+    for value in values {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(CollabError::InvalidArgument(format!(
+                "Charter {name} cannot contain blank entries"
+            )));
+        }
+        if value.chars().count() > item_max {
+            return Err(CollabError::InvalidArgument(format!(
+                "Charter {name} entry exceeds {item_max} characters"
+            )));
+        }
+        let key = value.to_lowercase();
+        if seen.insert(key) {
+            normalized.push(value.to_owned());
+        }
+    }
+    Ok(normalized)
+}
+
+pub(crate) fn encode_charter(charter: &AgentCharter) -> Result<String> {
+    serde_json::to_string(charter)
+        .map_err(|error| CollabError::Database(format!("encode Agent Charter: {error}")))
+}
+
+pub(crate) fn decode_charter(agent_id: &str, value: &str) -> Result<AgentCharter> {
+    let charter: AgentCharter = serde_json::from_str(value).map_err(|error| {
+        CollabError::Database(format!("Agent '{agent_id}' Charter is malformed: {error}"))
+    })?;
+    normalize_charter(charter).map_err(|error| {
+        CollabError::Database(format!("Agent '{agent_id}' Charter is invalid: {error}"))
+    })
+}
+
+pub(crate) fn parse_agent_lifecycle(agent_id: &str, value: &str) -> Result<AgentLifecycle> {
+    match value {
+        "active" => Ok(AgentLifecycle::Active),
+        "archived" => Ok(AgentLifecycle::Archived),
+        other => Err(CollabError::Database(format!(
+            "Agent '{agent_id}' has unknown lifecycle '{other}'"
+        ))),
+    }
+}
+
+pub(crate) async fn find_agent_profile(
+    connection: &Connection,
+    agent_id: &str,
+) -> Result<AgentProfile> {
+    let mut rows = connection
+        .query(
+            "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                    agent.workspace_path, agent.lifecycle, agent.charter_json,
+                    agent.profile_version, agent.created_at_ms, agent.updated_at_ms
+             FROM agents agent
+             JOIN actors actor ON actor.id = agent.actor_id
+             WHERE agent.actor_id = ?1",
+            [agent_id],
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(not_found("agent profile", agent_id));
+    };
+    agent_profile_from_row(&row)
+}
+
+pub(crate) async fn agent_profiles(connection: &Connection) -> Result<Vec<AgentProfile>> {
+    let mut rows = connection
+        .query(
+            "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                    agent.workspace_path, agent.lifecycle, agent.charter_json,
+                    agent.profile_version, agent.created_at_ms, agent.updated_at_ms
+             FROM agents agent
+             JOIN actors actor ON actor.id = agent.actor_id
+             ORDER BY actor.handle, actor.id",
+            (),
+        )
+        .await?;
+    let mut profiles = Vec::new();
+    while let Some(row) = rows.next().await? {
+        profiles.push(agent_profile_from_row(&row)?);
+    }
+    Ok(profiles)
+}
+
+pub(crate) fn agent_profile_from_row(row: &Row) -> Result<AgentProfile> {
+    let id = row.get::<String>(0)?;
+    let kind_text = row.get::<String>(1)?;
+    let kind = parse_actor_kind(&id, &kind_text)?;
+    if kind != ActorKind::Agent {
+        return Err(CollabError::Database(format!(
+            "Agent Profile '{id}' belongs to a non-Agent actor"
+        )));
+    }
+    let lifecycle_text = row.get::<String>(6)?;
+    let charter_json = row.get::<String>(7)?;
+    let lifecycle = parse_agent_lifecycle(&id, &lifecycle_text)?;
+    let charter = decode_charter(&id, &charter_json)?;
+    Ok(AgentProfile {
+        actor: Actor {
+            id,
+            kind,
+            handle: row.get(2)?,
+            display_name: row.get(3)?,
+            created_at_ms: row.get(4)?,
+        },
+        workspace_path: row.get(5)?,
+        lifecycle,
+        charter,
+        version: row.get(8)?,
+        created_at_ms: row.get(9)?,
+        updated_at_ms: row.get(10)?,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::*;
+
+    #[tokio::test]
+    async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
+        let core = CollabCore::open_memory().await?;
+        let owner = core.create_user("owner", "Owner").await?;
+        let profile = core
+            .create_agent_profile(
+                "reviewer",
+                "Reviewer",
+                "/tmp/reviewer",
+                AgentCharter {
+                    schema_version: 1,
+                    summary: "  Review frontend behavior.  ".into(),
+                    capabilities: vec!["a11y".into(), " A11Y ".into(), "visual".into()],
+                    constraints: vec!["Yield backend implementation".into()],
+                },
+            )
+            .await?;
+        assert_eq!(profile.version, 1);
+        assert_eq!(profile.charter.summary, "Review frontend behavior.");
+        assert_eq!(profile.charter.capabilities, vec!["a11y", "visual"]);
+        assert_eq!(profile.lifecycle, AgentLifecycle::Active);
+
+        let updated = core
+            .update_agent_profile(
+                &profile.actor.id,
+                "Frontend Reviewer",
+                AgentCharter {
+                    schema_version: 1,
+                    summary: "Own interaction review".into(),
+                    capabilities: vec!["frontend".into()],
+                    constraints: Vec::new(),
+                },
+                profile.version,
+            )
+            .await?;
+        assert_eq!(updated.version, 2);
+        assert_eq!(updated.actor.id, profile.actor.id);
+        assert_eq!(updated.actor.handle, "reviewer");
+        assert_eq!(updated.actor.display_name, "Frontend Reviewer");
+        assert_eq!(updated.workspace_path, profile.workspace_path);
+        assert!(matches!(
+            core.update_agent_profile(
+                &profile.actor.id,
+                "Stale",
+                AgentCharter::default(),
+                profile.version,
+            )
+            .await,
+            Err(CollabError::AgentProfileVersionConflict {
+                expected: 1,
+                actual: 2,
+                ..
+            })
+        ));
+
+        let changes = core.list_changes(&owner.id, 0, 20).await?;
+        assert!(changes.iter().any(|change| {
+            change.kind == ChangeKind::AgentProfileChanged && change.entity_id == profile.actor.id
+        }));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn agent_profile_directory_is_complete_and_handle_ordered() -> Result<()> {
+        let (core, user, alpha, beta, _channel) = fixture().await?;
+        let profiles = core.list_agent_profiles(&user.id).await?;
+        assert_eq!(
+            profiles
+                .iter()
+                .map(|profile| profile.actor.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![alpha.id.as_str(), beta.id.as_str()]
+        );
+        assert_eq!(profiles[0].actor.handle, "alpha");
+        assert_eq!(profiles[0].workspace_path, "/tmp/alpha");
+        assert_eq!(profiles[0].version, 1);
+        assert_eq!(profiles[1].actor.handle, "beta");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_agent_removes_operational_state_but_keeps_history() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        core.create_direct(&user.id, &alpha.id).await?;
+        let binding = core
+            .bind_runtime(&alpha.id, "session-delete", "openai", "codex", "default")
+            .await?;
+        core.send_message(SendMessageRequest {
+            target_id: channel.id.clone(),
+            author_id: user.id.clone(),
+            client_request_id: "wake-alpha".into(),
+            text: "wake up".into(),
+        })
+        .await?;
+        core.send_message(SendMessageRequest {
+            target_id: channel.id.clone(),
+            author_id: alpha.id.clone(),
+            client_request_id: "alpha-message".into(),
+            text: "alpha was here".into(),
+        })
+        .await?;
+        let batch = core
+            .check_inbox(&alpha.id, binding.generation, &binding.session_id, 10)
+            .await?;
+        assert!(batch.id.is_some());
+        let directory_before = core.list_actors(&user.id).await?;
+        assert!(directory_before.iter().any(|actor| actor.id == alpha.id));
+        let actors_before = {
+            let connection = core.connection.lock().await;
+            count(&connection, "actors").await?
+        };
+
+        core.delete_agent(&alpha.id).await?;
+
+        // The deleted Agent leaves the directory but keeps its actors row and
+        // stays readable as the author of its history messages.
+        let directory_after = core.list_actors(&user.id).await?;
+        assert!(!directory_after.iter().any(|actor| actor.id == alpha.id));
+        assert!(directory_after.iter().any(|actor| actor.id == user.id));
+        let history = core.read_messages(&user.id, &channel.id, 0, 10).await?;
+        assert!(
+            history
+                .iter()
+                .any(|message| message.author_id == alpha.id && message.text == "alpha was here")
+        );
+
+        let connection = core.connection.lock().await;
+        assert_eq!(count(&connection, "actors").await?, actors_before);
+        assert_eq!(
+            count_where(&connection, "memberships", "actor_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "runtime_bindings", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "agents", "actor_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "agent_wake_state", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(
+            count_where(&connection, "inbox_batches", "agent_id", &alpha.id).await?,
+            0
+        );
+        assert_eq!(count(&connection, "inbox_batch_items").await?, 0);
+        assert_eq!(
+            count_where(&connection, "actors", "id", &alpha.id).await?,
+            1
+        );
+        assert_eq!(
+            count_where(&connection, "messages", "author_id", &alpha.id).await?,
+            1
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_agent_rejects_users_and_missing_actors() -> Result<()> {
+        let (core, user, _alpha, _beta, _channel) = fixture().await?;
+        assert!(matches!(
+            core.delete_agent(&user.id).await,
+            Err(CollabError::NotFound {
+                entity: "agent",
+                ..
+            })
+        ));
+        assert!(matches!(
+            core.delete_agent("missing-actor").await,
+            Err(CollabError::NotFound {
+                entity: "actor",
+                ..
+            })
+        ));
+        Ok(())
+    }
+}

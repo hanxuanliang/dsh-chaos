@@ -401,3 +401,345 @@ impl CollabCore {
         })
     }
 }
+
+pub(crate) async fn find_task(connection: &Connection, message_id: &str) -> Result<Option<Task>> {
+    let mut rows = connection
+        .query(
+            "SELECT task.message_id, task.target_id, task.number, task.status, task.assignee_id,
+                    task.version, task.created_at_ms, task.updated_at_ms, message.body_json
+             FROM tasks task
+             LEFT JOIN messages message ON message.id = task.message_id
+             WHERE task.message_id = ?1",
+            [message_id],
+        )
+        .await?;
+    rows.next()
+        .await?
+        .map(|row| task_from_row(&row))
+        .transpose()
+}
+
+pub(crate) fn task_from_row(row: &Row) -> Result<Task> {
+    let message_id = row.get::<String>(0)?;
+    let status_text = row.get::<String>(3)?;
+    let status = TaskStatus::parse(&status_text).ok_or_else(|| {
+        CollabError::Database(format!(
+            "task '{message_id}' has invalid status '{status_text}'"
+        ))
+    })?;
+    let anchor_text = row
+        .get::<Option<String>>(8)?
+        .map(|body_json| {
+            serde_json::from_str::<StoredTextBody>(&body_json)
+                .map(|body| body.text)
+                .map_err(|error| {
+                    CollabError::Database(format!(
+                        "task '{message_id}' anchor has invalid body: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
+    Ok(Task {
+        message_id,
+        target_id: row.get(1)?,
+        number: row.get(2)?,
+        status,
+        assignee_id: row.get(4)?,
+        version: row.get(5)?,
+        created_at_ms: row.get(6)?,
+        updated_at_ms: row.get(7)?,
+        anchor_text,
+    })
+}
+
+pub(crate) async fn tasks_for_actor(
+    connection: &Connection,
+    actor_id: &str,
+    target_id: Option<&str>,
+) -> Result<Vec<Task>> {
+    let statement = if target_id.is_some() {
+        "SELECT task.message_id, task.target_id, task.number, task.status,
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms,
+                message.body_json
+         FROM tasks task
+         JOIN targets target ON target.id = task.target_id
+         JOIN memberships membership
+           ON membership.target_id = CASE
+             WHEN target.kind = 'thread' THEN target.parent_target_id
+             ELSE target.id
+           END
+          AND membership.actor_id = ?1
+          AND membership.left_at_ms IS NULL
+         LEFT JOIN messages message ON message.id = task.message_id
+         WHERE task.target_id = ?2 AND target.archived_at_ms IS NULL
+         ORDER BY task.number"
+    } else {
+        "SELECT task.message_id, task.target_id, task.number, task.status,
+                task.assignee_id, task.version, task.created_at_ms, task.updated_at_ms,
+                message.body_json
+         FROM tasks task
+         JOIN targets target ON target.id = task.target_id
+         JOIN memberships membership
+           ON membership.target_id = CASE
+             WHEN target.kind = 'thread' THEN target.parent_target_id
+             ELSE target.id
+           END
+          AND membership.actor_id = ?1
+          AND membership.left_at_ms IS NULL
+         LEFT JOIN messages message ON message.id = task.message_id
+         WHERE target.archived_at_ms IS NULL
+         ORDER BY task.target_id, task.number"
+    };
+    let mut rows = if let Some(target_id) = target_id {
+        connection.query(statement, (actor_id, target_id)).await?
+    } else {
+        connection.query(statement, [actor_id]).await?
+    };
+    let mut tasks = Vec::new();
+    while let Some(row) = rows.next().await? {
+        tasks.push(task_from_row(&row)?);
+    }
+    Ok(tasks)
+}
+
+pub(crate) fn task_transition_allowed(from: TaskStatus, to: TaskStatus) -> bool {
+    matches!(
+        (from, to),
+        (TaskStatus::Todo, TaskStatus::InProgress)
+            | (
+                TaskStatus::InProgress,
+                TaskStatus::Todo | TaskStatus::InReview
+            )
+            | (
+                TaskStatus::InReview,
+                TaskStatus::InProgress | TaskStatus::Done
+            )
+            | (TaskStatus::Done, TaskStatus::InProgress)
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn insert_task_event(
+    connection: &Connection,
+    message_id: &str,
+    actor_id: &str,
+    event_type: &str,
+    from_status: Option<TaskStatus>,
+    to_status: Option<TaskStatus>,
+    from_assignee_id: Option<&str>,
+    to_assignee_id: Option<&str>,
+    task_version: i64,
+    created_at_ms: i64,
+) -> Result<()> {
+    connection
+        .execute(
+            "INSERT INTO task_events
+             (message_id, actor_id, event_type, from_status, to_status,
+              from_assignee_id, to_assignee_id, task_version, created_at_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            (
+                message_id,
+                actor_id,
+                event_type,
+                from_status.map(TaskStatus::as_str),
+                to_status.map(TaskStatus::as_str),
+                from_assignee_id,
+                to_assignee_id,
+                task_version,
+                created_at_ms,
+            ),
+        )
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::*;
+
+    #[tokio::test]
+    async fn task_reads_carry_authoritative_anchor_text() -> Result<()> {
+        let (core, user, alpha, _beta, channel) = fixture().await?;
+        let anchor = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "anchor-1".into(),
+                text: "anchor body survives paging".into(),
+            })
+            .await?
+            .message;
+        let created = core.create_task(&anchor.id, &user.id).await?;
+        assert_eq!(
+            created.anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
+
+        // Push the anchor far outside any recent-message page; the Task read
+        // still resolves the true anchor body from the store.
+        for index in 0..120 {
+            core.send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: format!("filler-{index}"),
+                text: format!("filler {index}"),
+            })
+            .await?;
+        }
+        let tasks = core.list_tasks(&alpha.id, Some(&channel.id)).await?;
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(
+            tasks[0].anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
+
+        // Mutations keep the anchor attached.
+        let claimed = core.claim_task(&anchor.id, &alpha.id).await?;
+        assert_eq!(
+            claimed.anchor_text.as_deref(),
+            Some("anchor body survives paging")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn task_lifecycle_uses_version_fencing_and_emits_changes() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let before = core.snapshot(&user.id).await?.cursor;
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "task-lifecycle-message".into(),
+                text: "finish the lifecycle".into(),
+            })
+            .await?;
+        let created = core.create_task(&sent.message.id, &user.id).await?;
+        let claimed = core.claim_task(&sent.message.id, &alpha.id).await?;
+        assert_eq!(claimed.version, created.version + 1);
+        assert!(matches!(
+            core.update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::InReview,
+                claimed.version,
+            )
+            .await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
+
+        let owner_review = core
+            .update_task_status(
+                &sent.message.id,
+                &user.id,
+                TaskStatus::InReview,
+                claimed.version,
+            )
+            .await?;
+        let reopened = core
+            .update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::InProgress,
+                owner_review.version,
+            )
+            .await?;
+        let review = core
+            .update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::InReview,
+                reopened.version,
+            )
+            .await?;
+        assert!(matches!(
+            core.update_task_status(
+                &sent.message.id,
+                &alpha.id,
+                TaskStatus::Done,
+                claimed.version,
+            )
+            .await,
+            Err(CollabError::TaskVersionConflict { .. })
+        ));
+        let unclaimed = core
+            .unclaim_task(&sent.message.id, &alpha.id, review.version)
+            .await?;
+        assert_eq!(unclaimed.status, TaskStatus::InReview);
+        assert!(unclaimed.assignee_id.is_none());
+
+        let beta_claim = core.claim_task(&sent.message.id, &beta.id).await?;
+        let beta_review = core
+            .update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::InReview,
+                beta_claim.version,
+            )
+            .await?;
+        let done = core
+            .update_task_status(
+                &sent.message.id,
+                &beta.id,
+                TaskStatus::Done,
+                beta_review.version,
+            )
+            .await?;
+        assert!(matches!(
+            core.unclaim_task(&sent.message.id, &beta.id, done.version)
+                .await,
+            Err(CollabError::TaskTransitionDenied { .. })
+        ));
+        assert_eq!(
+            core.list_tasks(&user.id, Some(&channel.id)).await?,
+            vec![done]
+        );
+        let changes = core.list_changes(&user.id, before, 50).await?;
+        assert_eq!(changes[0].kind, ChangeKind::MessageCreated);
+        assert_eq!(
+            changes
+                .iter()
+                .filter(|change| change.kind == ChangeKind::TaskCreated)
+                .count(),
+            1
+        );
+        assert_eq!(
+            changes
+                .iter()
+                .filter(|change| change.kind == ChangeKind::TaskUpdated)
+                .count(),
+            8
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn only_one_concurrent_task_claim_wins() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let sent = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id,
+                author_id: user.id.clone(),
+                client_request_id: "task-message".into(),
+                text: "implement it".into(),
+            })
+            .await?;
+        core.create_task(&sent.message.id, &user.id).await?;
+
+        let alpha_claim = core.claim_task(&sent.message.id, &alpha.id);
+        let beta_claim = core.claim_task(&sent.message.id, &beta.id);
+        let (alpha_result, beta_result) = tokio::join!(alpha_claim, beta_claim);
+        let successes = usize::from(alpha_result.is_ok()) + usize::from(beta_result.is_ok());
+        let conflicts = usize::from(matches!(
+            alpha_result,
+            Err(CollabError::TaskAlreadyClaimed { .. })
+        )) + usize::from(matches!(
+            beta_result,
+            Err(CollabError::TaskAlreadyClaimed { .. })
+        ));
+        assert_eq!(successes, 1);
+        assert_eq!(conflicts, 1);
+        Ok(())
+    }
+}
