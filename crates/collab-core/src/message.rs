@@ -20,7 +20,7 @@ impl CollabCore {
     ) -> Result<Message> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
-        require_target_access(&connection, target_id, actor_id, "read").await?;
+        require_target_access(&connection, target_id, actor_id).await?;
         let mut rows = connection
             .query(
                 "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
@@ -54,7 +54,7 @@ impl CollabCore {
             ));
         }
         let connection = self.connection.lock().await;
-        require_target_access(&connection, target_id, actor_id, "read").await?;
+        require_target_access(&connection, target_id, actor_id).await?;
         let mut rows = connection
             .query(
                 "SELECT seq, id, target_id, author_id, client_request_id, body_json, created_at_ms
@@ -94,7 +94,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Deferred)
             .await?;
-        require_target_access(&transaction, target_id, actor_id, "read").await?;
+        require_target_access(&transaction, target_id, actor_id).await?;
         let mut count_rows = transaction
             .query(
                 "SELECT COUNT(*) FROM messages WHERE target_id = ?1",
@@ -149,13 +149,8 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        let route = require_target_access(
-            &transaction,
-            &request.target_id,
-            &request.author_id,
-            "send message to",
-        )
-        .await?;
+        let route =
+            require_target_access(&transaction, &request.target_id, &request.author_id).await?;
 
         if let Some(message) =
             find_message_by_request(&transaction, &request.author_id, &request.client_request_id)

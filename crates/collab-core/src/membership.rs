@@ -1,6 +1,41 @@
 //! Membership mutation and role-bearing member projections.
 
 use super::*;
+use crate::db::{FromRow, QueryRows};
+
+/// Presence proof that one Actor is an active member of one target. Obtained
+/// exclusively through [`Membership::require`]; role-bearing checks will grow
+/// fields when a caller needs them.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Membership;
+
+impl FromRow for Membership {
+    fn from_row(_row: &Row) -> Result<Self> {
+        Ok(Self)
+    }
+}
+
+impl Membership {
+    /// Certify that `actor` is an active member of `target_id`.
+    pub(crate) async fn require(
+        connection: &Connection,
+        target_id: &str,
+        actor: &Actor,
+    ) -> Result<Self> {
+        connection
+            .query_row::<Self>(
+                "SELECT 1 FROM memberships
+                 WHERE target_id = ?1 AND actor_id = ?2 AND left_at_ms IS NULL",
+                (target_id, actor.id.as_str()),
+            )
+            .await?
+            .ok_or_else(|| CollabError::PermissionDenied {
+                actor_id: actor.id.clone(),
+                action: "participate in",
+                target_id: target_id.to_owned(),
+            })
+    }
+}
 
 impl CollabCore {
     /// Add or reactivate one Channel member.
@@ -63,20 +98,15 @@ impl CollabCore {
         self.assert_open()?;
         let connection = self.connection.lock().await;
         require_actor(&connection, actor_id).await?;
-        let mut rows = connection
-            .query(
+        connection
+            .query_rows::<Actor>(
                 "SELECT id, kind, handle, display_name, created_at_ms
                  FROM actors
                  WHERE kind = 'user' OR id IN (SELECT actor_id FROM agents)
                  ORDER BY handle, id",
                 (),
             )
-            .await?;
-        let mut actors = Vec::new();
-        while let Some(row) = rows.next().await? {
-            actors.push(actor_from_row(&row)?);
-        }
-        Ok(actors)
+            .await
     }
 
     /// List the active members of one Channel after authorizing the caller's
@@ -85,14 +115,14 @@ impl CollabCore {
     pub async fn list_target_members(&self, actor_id: &str, target_id: &str) -> Result<Vec<Actor>> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
-        require_target_access(&connection, target_id, actor_id, "list members of").await?;
+        require_target_access(&connection, target_id, actor_id).await?;
         if require_target(&connection, target_id).await? != TargetKind::Channel {
             return Err(CollabError::InvalidArgument(
                 "list_target_members only supports Channel targets".into(),
             ));
         }
-        let mut rows = connection
-            .query(
+        connection
+            .query_rows::<Actor>(
                 "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms
                  FROM memberships membership
                  JOIN actors actor ON actor.id = membership.actor_id
@@ -101,12 +131,7 @@ impl CollabCore {
                  ORDER BY actor.handle, actor.id",
                 (target_id,),
             )
-            .await?;
-        let mut members = Vec::new();
-        while let Some(row) = rows.next().await? {
-            members.push(actor_from_row(&row)?);
-        }
-        Ok(members)
+            .await
     }
 
     /// List the role-bearing active roster for an exact target. Thread rosters
@@ -120,8 +145,7 @@ impl CollabCore {
         require_non_empty("actor_id", actor_id)?;
         require_non_empty("target_id", target_id)?;
         let connection = self.connection.lock().await;
-        let route =
-            require_target_access(&connection, target_id, actor_id, "list members of").await?;
+        let route = require_target_access(&connection, target_id, actor_id).await?;
         target_memberships(&connection, route.permission_target_id(target_id)).await
     }
 
@@ -216,7 +240,7 @@ pub(crate) async fn target_change_recipients(
     target_id: &str,
     extra_actor_ids: &[&str],
 ) -> Result<Vec<String>> {
-    let route = require_target_route(connection, target_id).await?;
+    let route = TargetRoute::require(connection, target_id).await?;
     let mut recipients = BTreeSet::new();
     // Change events drive authorized UI invalidation, not attention delivery.
     // A Thread therefore addresses every active parent member even when they
@@ -302,8 +326,7 @@ pub(crate) async fn identity_context_for(
         });
     };
     require_non_empty("target_id", target_id)?;
-    let route =
-        require_target_access(connection, target_id, agent_id, "inspect identity in").await?;
+    let route = require_target_access(connection, target_id, agent_id).await?;
     let target = find_target(connection, target_id).await?;
     let membership_target_id = route.permission_target_id(target_id);
     let membership_target = if membership_target_id == target_id {

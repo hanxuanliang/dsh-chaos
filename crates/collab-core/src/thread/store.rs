@@ -3,15 +3,11 @@ use std::collections::HashMap;
 use turso::params_from_iter;
 use turso::{Connection, Row};
 
-use crate::actor::require_actor;
-use crate::db::{FromRow, placeholders, query_all};
+use crate::db::{FromRow, QueryRows, placeholders};
 use crate::ids::{ActorId, ThreadId};
-use crate::target::{require_active_member, require_target_route};
-use crate::{CollabError, Result, TargetKind};
+use crate::{Actor, CollabError, Result};
 
-use super::model::{
-    FollowOutcome, FollowState, RootMessageIds, ThreadAccess, ThreadSubscription, ThreadSummary,
-};
+use super::model::{FollowOutcome, FollowState, RootMessageIds, ThreadSubscription, ThreadSummary};
 
 struct ThreadCountRow {
     thread_id: String,
@@ -65,6 +61,28 @@ impl FromRow for FollowedThreadId {
     }
 }
 
+struct SubscriptionRow {
+    unfollowed_at_ms: Option<i64>,
+}
+
+impl FromRow for SubscriptionRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            unfollowed_at_ms: row.get(0)?,
+        })
+    }
+}
+
+impl From<SubscriptionRow> for FollowState {
+    fn from(row: SubscriptionRow) -> Self {
+        if row.unfollowed_at_ms.is_none() {
+            Self::Following
+        } else {
+            Self::NotFollowing
+        }
+    }
+}
+
 pub(crate) struct ThreadStore<'connection> {
     connection: &'connection Connection,
 }
@@ -74,50 +92,20 @@ impl<'connection> ThreadStore<'connection> {
         Self { connection }
     }
 
-    pub(crate) async fn load_accessible(
-        &self,
-        thread_id: &ThreadId,
-        actor_id: &ActorId,
-        action: &'static str,
-    ) -> Result<ThreadAccess> {
-        require_actor(self.connection, actor_id.as_str()).await?;
-        let route = require_target_route(self.connection, thread_id.as_str()).await?;
-        if route.kind != TargetKind::Thread {
-            return Err(CollabError::InvalidArgument(format!(
-                "{action} requires a Thread target"
-            )));
-        }
-        let permission_target_id = route.permission_target_id(thread_id.as_str()).to_owned();
-        require_active_member(
-            self.connection,
-            &permission_target_id,
-            actor_id.as_str(),
-            action,
-        )
-        .await?;
-        Ok(ThreadAccess {
-            thread_id: thread_id.clone(),
-            permission_target_id,
-        })
-    }
-
     pub(crate) async fn load_subscription(
         &self,
         thread_id: &ThreadId,
         actor_id: &ActorId,
     ) -> Result<ThreadSubscription> {
-        let mut rows = self
+        let state = self
             .connection
-            .query(
+            .query_row::<SubscriptionRow>(
                 "SELECT unfollowed_at_ms FROM thread_follows
                  WHERE thread_target_id = ?1 AND actor_id = ?2",
                 (thread_id.as_str(), actor_id.as_str()),
             )
-            .await?;
-        let state = match rows.next().await? {
-            Some(row) if row.get::<Option<i64>>(0)?.is_none() => FollowState::Following,
-            Some(_) | None => FollowState::NotFollowing,
-        };
+            .await?
+            .map_or(FollowState::NotFollowing, FollowState::from);
         Ok(ThreadSubscription::new(
             thread_id.clone(),
             actor_id.clone(),
@@ -211,7 +199,7 @@ impl<'connection> ThreadStore<'connection> {
         if roots.is_empty() {
             return Ok(Vec::new());
         }
-        require_actor(self.connection, actor_id.as_str()).await?;
+        Actor::require(self.connection, actor_id).await?;
         let root_placeholders = placeholders(roots.as_slice().len());
         let actor_parameter = roots.as_slice().len() + 1;
         let counts_sql = format!(
@@ -235,12 +223,10 @@ impl<'connection> ThreadStore<'connection> {
         );
         let mut count_parameters = roots.as_slice().to_vec();
         count_parameters.push(actor_id.as_str().to_owned());
-        let counts: Vec<ThreadCountRow> = query_all(
-            self.connection,
-            &counts_sql,
-            params_from_iter(count_parameters),
-        )
-        .await?;
+        let counts: Vec<ThreadCountRow> = self
+            .connection
+            .query_rows(&counts_sql, params_from_iter(count_parameters))
+            .await?;
         let mut summaries: Vec<ThreadSummary> = Vec::new();
         let mut index_by_thread = HashMap::new();
         for count in counts.into_iter().filter(|count| count.reply_count > 0) {
@@ -263,12 +249,10 @@ impl<'connection> ThreadStore<'connection> {
              ORDER BY target_id, latest_seq DESC, author_id",
             placeholders(visible_thread_ids.len()),
         );
-        let repliers: Vec<ThreadReplierRow> = query_all(
-            self.connection,
-            &replier_sql,
-            params_from_iter(visible_thread_ids),
-        )
-        .await?;
+        let repliers: Vec<ThreadReplierRow> = self
+            .connection
+            .query_rows(&replier_sql, params_from_iter(visible_thread_ids))
+            .await?;
         for replier in repliers {
             if let Some(&index) = index_by_thread.get(&replier.thread_id) {
                 let recent = &mut summaries[index].recent_replier_ids;
@@ -281,9 +265,10 @@ impl<'connection> ThreadStore<'connection> {
     }
 
     pub(crate) async fn followed_thread_ids(&self, actor_id: &ActorId) -> Result<Vec<String>> {
-        let rows: Vec<FollowedThreadId> = query_all(
-            self.connection,
-            "SELECT follow.thread_target_id
+        let rows: Vec<FollowedThreadId> = self
+            .connection
+            .query_rows(
+                "SELECT follow.thread_target_id
              FROM thread_follows follow
              JOIN targets thread
                ON thread.id = follow.thread_target_id AND thread.kind = 'thread'
@@ -299,9 +284,9 @@ impl<'connection> ThreadStore<'connection> {
                AND parent.archived_at_ms IS NULL
                AND membership.left_at_ms IS NULL
              ORDER BY thread.created_at_ms DESC, follow.thread_target_id",
-            [actor_id.as_str()],
-        )
-        .await?;
+                [actor_id.as_str()],
+            )
+            .await?;
         Ok(rows.into_iter().map(|row| row.0).collect())
     }
 }

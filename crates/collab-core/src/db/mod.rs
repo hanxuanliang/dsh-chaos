@@ -2,6 +2,5 @@
 
 pub(crate) mod migrate;
 pub(crate) mod row;
-pub(crate) mod rows;
 
-pub(crate) use row::{FromRow, placeholders, query_all};
+pub(crate) use row::{FromRow, QueryRows, placeholders};

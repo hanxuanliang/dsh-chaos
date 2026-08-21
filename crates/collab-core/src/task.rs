@@ -10,7 +10,7 @@ impl CollabCore {
         let connection = self.connection.lock().await;
         require_actor(&connection, actor_id).await?;
         if let Some(target_id) = target_id {
-            require_target_access(&connection, target_id, actor_id, "list tasks in").await?;
+            require_target_access(&connection, target_id, actor_id).await?;
         }
         tasks_for_actor(&connection, actor_id, target_id).await
     }
@@ -25,8 +25,7 @@ impl CollabCore {
             .await?;
         require_actor(&transaction, actor_id).await?;
         let target_id = message_target(&transaction, message_id).await?;
-        let route =
-            require_target_access(&transaction, &target_id, actor_id, "create task").await?;
+        let route = require_target_access(&transaction, &target_id, actor_id).await?;
         if route.kind == TargetKind::Thread {
             return Err(CollabError::InvalidArgument(
                 "Thread replies cannot become Tasks".into(),
@@ -124,7 +123,7 @@ impl CollabCore {
         let current = find_task(&transaction, message_id)
             .await?
             .ok_or_else(|| not_found("task", message_id))?;
-        require_target_access(&transaction, &current.target_id, actor_id, "claim task").await?;
+        require_target_access(&transaction, &current.target_id, actor_id).await?;
         if current.status == TaskStatus::Done {
             return Err(CollabError::TaskTransitionDenied {
                 message_id: message_id.to_owned(),
@@ -216,13 +215,7 @@ impl CollabCore {
         let current = find_task(&transaction, message_id)
             .await?
             .ok_or_else(|| not_found("task", message_id))?;
-        require_target_access(
-            &transaction,
-            &current.target_id,
-            actor_id,
-            "unclaim task in",
-        )
-        .await?;
+        require_target_access(&transaction, &current.target_id, actor_id).await?;
         if current.version != expected_version {
             return Err(CollabError::TaskVersionConflict {
                 message_id: message_id.to_owned(),
@@ -318,7 +311,7 @@ impl CollabCore {
         let current = find_task(&transaction, message_id)
             .await?
             .ok_or_else(|| not_found("task", message_id))?;
-        require_target_access(&transaction, &current.target_id, actor_id, "update task in").await?;
+        require_target_access(&transaction, &current.target_id, actor_id).await?;
         if current.version != expected_version {
             return Err(CollabError::TaskVersionConflict {
                 message_id: message_id.to_owned(),
