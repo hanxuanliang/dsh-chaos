@@ -83,7 +83,8 @@ try {
   const claimed = await scopedTools.get('task_claim').execute({
     messageId: sent.message.id,
   }, execution)
-  assert.equal(task.status, 'todo')
+  // 方案A(2026-08-19): task_create = create+claim — 创建即自领, in_progress
+  assert.equal(task.status, 'in_progress')
   assert.equal(claimed.assigneeId, alpha.id)
   const reviewed = await scopedTools.get('task_update').execute({
     messageId: sent.message.id,
