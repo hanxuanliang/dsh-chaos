@@ -1,18 +1,69 @@
 use std::collections::HashMap;
 
 use turso::params_from_iter;
-use turso::Connection;
+use turso::{Connection, Row};
 
 use crate::actor::require_actor;
-use crate::db::{placeholders, query_all};
+use crate::db::{FromRow, placeholders, query_all};
 use crate::ids::{ActorId, ThreadId};
 use crate::target::{require_active_member, require_target_route};
 use crate::{CollabError, Result, TargetKind};
 
 use super::model::{
-    FollowOutcome, FollowState, FollowedThreadId, RootMessageIds, ThreadAccess, ThreadCountRow,
-    ThreadReplierRow, ThreadSubscription, ThreadSummary,
+    FollowOutcome, FollowState, RootMessageIds, ThreadAccess, ThreadSubscription, ThreadSummary,
 };
+
+struct ThreadCountRow {
+    thread_id: String,
+    root_message_id: String,
+    reply_count: i64,
+    last_reply_at_ms: Option<i64>,
+}
+
+impl FromRow for ThreadCountRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            thread_id: row.get(0)?,
+            root_message_id: row.get(1)?,
+            reply_count: row.get(2)?,
+            last_reply_at_ms: row.get(3)?,
+        })
+    }
+}
+
+impl ThreadCountRow {
+    fn into_summary(self) -> ThreadSummary {
+        ThreadSummary {
+            root_message_id: self.root_message_id,
+            thread_id: self.thread_id,
+            reply_count: self.reply_count,
+            last_reply_at_ms: self.last_reply_at_ms,
+            recent_replier_ids: Vec::new(),
+        }
+    }
+}
+
+struct ThreadReplierRow {
+    thread_id: String,
+    author_id: String,
+}
+
+impl FromRow for ThreadReplierRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            thread_id: row.get(0)?,
+            author_id: row.get(1)?,
+        })
+    }
+}
+
+struct FollowedThreadId(String);
+
+impl FromRow for FollowedThreadId {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self(row.get(0)?))
+    }
+}
 
 pub(crate) struct ThreadStore<'connection> {
     connection: &'connection Connection,
@@ -184,14 +235,15 @@ impl<'connection> ThreadStore<'connection> {
         );
         let mut count_parameters = roots.as_slice().to_vec();
         count_parameters.push(actor_id.as_str().to_owned());
-        let counts: Vec<ThreadCountRow> =
-            query_all(self.connection, &counts_sql, params_from_iter(count_parameters)).await?;
+        let counts: Vec<ThreadCountRow> = query_all(
+            self.connection,
+            &counts_sql,
+            params_from_iter(count_parameters),
+        )
+        .await?;
         let mut summaries: Vec<ThreadSummary> = Vec::new();
         let mut index_by_thread = HashMap::new();
-        for count in counts {
-            if count.reply_count == 0 {
-                continue;
-            }
+        for count in counts.into_iter().filter(|count| count.reply_count > 0) {
             let thread_id = count.thread_id.clone();
             index_by_thread.insert(thread_id, summaries.len());
             summaries.push(count.into_summary());
