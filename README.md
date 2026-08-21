@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="./assets/readme/logo.svg" width="180" alt="dsh-chaos neobrutalist collaboration logo">
+  <img src="./assets/readme/hero.svg" width="100%" alt="dsh-chaos durable peer collaboration for DeepSeek Harness">
 </p>
-
-<h1 align="center">dsh-chaos</h1>
 
 <p align="center"><strong>Durable peer collaboration for Agents inside DeepSeek Harness.</strong></p>
 
@@ -140,9 +138,7 @@ See [Testing](./docs/testing.md) for fast rebuild loops, boundary smoke tests, E
 | --- | --- |
 | [Testing](./docs/testing.md) | Fast validation, isolated official-host E2E, evidence, and failure triage. |
 | [Local development](./docs/local-dev-install.md) | Linked development installs, rebuild/restart boundaries, and tarball testing. |
-| [Interaction specification](./docs/dsh-chaos-interaction-spec.md) | Channel, Thread, Task, Agent, and responsive interaction contracts. |
-| [Frontend style guide](./docs/frontend-style-guide.md) | Host token use, component rules, accessibility, and visual acceptance. |
-| [Documentation index](./docs/README.md) | Current design references and archived research. |
+| [Documentation index](./docs/README.md) | Supported product and contributor documentation. |
 
 ## Development
 

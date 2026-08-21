@@ -1,10 +1,10 @@
 /**
  * Collab data store for the P0-2 panel (channels + message stream + tasks).
  * Shape follows UseSyncExternalStore (subscribe/getSnapshot), deliberately the
- * same pattern as panel-controller.ts; merge semantics follow plocal-web's
- * mergeMessagesBySeq (id-dedupe, seq-ascending).
+ * same pattern as panel-controller.ts; message merges deduplicate by id and
+ * preserve ascending server sequence order.
  *
- * Backend truths honored here (see docs/p02-implementation-brief.md):
+ * Backend truths honored here:
  * - All seq/count/version wire values are decimal strings (crates napi bridge).
  * - No read markers / unread counters exist server-side: unread = tail.count
  *   minus a per-channel localStorage marker (`dsh-chaos:read:<targetId>`),

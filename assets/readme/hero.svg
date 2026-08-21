@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">dsh-chaos</title>
+  <desc id="desc">A neobrutalist banner for durable peer collaboration in DeepSeek Harness, with connected message nodes converging on a chaos spark.</desc>
+
+  <!-- Hard-shadow paper canvas. -->
+  <rect x="18" y="22" width="1164" height="320" rx="26" fill="#111111"/>
+  <rect x="8" y="8" width="1164" height="320" rx="26" fill="#FFF6DF" stroke="#111111" stroke-width="8"/>
+
+  <!-- Standalone collaboration mark, redrawn as a compact hero emblem. -->
+  <g transform="translate(42 41)">
+    <rect x="8" y="12" width="248" height="248" rx="34" fill="#111111"/>
+    <rect width="248" height="248" rx="34" fill="#FFFDF4" stroke="#111111" stroke-width="8"/>
+    <path d="M184 75C166 53 136 43 109 49C69 57 43 93 43 132C43 177 76 213 120 216C151 218 180 205 198 182"
+          fill="none" stroke="#111111" stroke-width="32" stroke-linecap="round"/>
+    <path d="M184 75C166 53 136 43 109 49C69 57 43 93 43 132C43 177 76 213 120 216C151 218 180 205 198 182"
+          fill="none" stroke="#37DDF5" stroke-width="19" stroke-linecap="round"/>
+    <g stroke="#111111" stroke-width="6" stroke-linejoin="round">
+      <path d="M37 65H82V99H62L48 112V99H37Z" fill="#FF4F9A"/>
+      <path d="M22 141H67V175H47L33 188V175H22Z" fill="#FFD60A"/>
+      <path d="M131 199H176V233H156L142 246V233H131Z" fill="#FF4F9A"/>
+    </g>
+    <g fill="none" stroke="#111111" stroke-width="7" stroke-linecap="round">
+      <path d="M74 86L111 112L137 126"/>
+      <path d="M60 158L105 149L137 139"/>
+      <path d="M153 207L155 173L148 149"/>
+    </g>
+    <path d="M146 91L158 113L183 103L177 128L202 135L178 145L186 169L161 162L151 186L140 163L116 173L122 148L97 141L121 131L113 107L138 114Z"
+          fill="#111111" stroke="#111111" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M147 105L155 120L170 114L166 130L182 135L166 141L172 157L156 152L150 168L143 152L127 158L131 142L115 137L131 131L126 115L142 120Z"
+          fill="#FFD60A" stroke="#111111" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="149" cy="136" r="11" fill="#FFF6DF" stroke="#111111" stroke-width="5"/>
+  </g>
+
+  <!-- Wordmark and promise. -->
+  <g font-family="Arial Black, Arial, Helvetica, sans-serif" fill="#111111">
+    <text x="338" y="78" font-size="16" font-weight="800" letter-spacing="2.6">DEEPSEEK HARNESS · PEER COLLABORATION</text>
+    <text x="332" y="158" font-size="70" font-weight="900" letter-spacing="-3">dsh-chaos</text>
+    <text x="336" y="202" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">Agents coordinate. The ledger remembers.</text>
+  </g>
+
+  <!-- Product truths as hard-edged neobrutalist labels. -->
+  <g font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="800" fill="#111111" stroke="#111111" stroke-width="4">
+    <rect x="336" y="240" width="150" height="42" rx="5" fill="#FFD60A"/>
+    <rect x="498" y="240" width="140" height="42" rx="5" fill="#37DDF5"/>
+    <rect x="650" y="240" width="126" height="42" rx="5" fill="#FF4F9A"/>
+    <rect x="788" y="240" width="170" height="42" rx="5" fill="#FFFDF4"/>
+    <g stroke="none" text-anchor="middle">
+      <text x="411" y="266">STABLE AGENTS</text>
+      <text x="568" y="266">CHANNELS</text>
+      <text x="713" y="266">TASKS</text>
+      <text x="873" y="266">DURABLE DELIVERY</text>
+    </g>
+  </g>
+
+  <!-- An open route exits the frame: collaboration remains extensible. -->
+  <path d="M1001 69L1054 109L1019 145L1096 187L1057 231L1137 278" fill="none" stroke="#111111" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter"/>
+  <circle cx="1001" cy="69" r="18" fill="#FF4F9A" stroke="#111111" stroke-width="7"/>
+  <rect x="1037" y="91" width="34" height="34" fill="#FFD60A" stroke="#111111" stroke-width="7" transform="rotate(12 1054 108)"/>
+  <circle cx="1096" cy="187" r="19" fill="#37DDF5" stroke="#111111" stroke-width="7"/>
+  <path d="M1112 247L1140 261L1120 282L1093 266Z" fill="#FF4F9A" stroke="#111111" stroke-width="7" stroke-linejoin="round"/>
+</svg>

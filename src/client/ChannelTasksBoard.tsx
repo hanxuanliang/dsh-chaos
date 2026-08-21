@@ -1,29 +1,21 @@
 /**
  * Channel tasks board (P0-4).
  *
- * Truth sources:
- * - Layout/skin anatomy: zrepo/dsh-web-ui packages/dsh-task-board (columns =
- *   grid-auto-flow:column minmax(220px,1fr), column = bg-layer-2 + l1 + r12,
- *   statusDot + 13/700 title + count pill, card = bg-base + l2 + r10 with
- *   hover shadow-lv2 + lift, per-column empty copy). Five-dim mapping logged
- *   in docs/frontend-style-guide.md §P0-4.
- * - Filter: plocal-web ChannelTasksBoard — the toolbar filter is an
- *   ASSIGNEE pill dropdown ("Assignee ▾" with All / Unassigned / members),
- *   not a free-text search (user feedback 2026-08-19).
- * - Status control: plocal-web TaskStatusMenu — a tinted status chip opening a
- *   menu of statuses; rows whose transition is not legal render disabled
- *   instead of pretending to work. Legal transitions mirror the backend truth
- *   in crates/collab-core task_transition_allowed:
+ * Contract:
+ * - The board uses horizontally scrolling lanes, host design tokens, and one
+ *   compact card per authoritative task projection.
+ * - The toolbar filters by assignee (All / Unassigned / current members).
+ * - A tinted status chip opens the transition menu; illegal transitions stay
+ *   visible but disabled. Legal transitions mirror the backend truth in
+ *   crates/collab-core task_transition_allowed:
  *     todo → in_progress
  *     in_progress → todo | in_review
  *     in_review → in_progress | done
  *     done → in_progress   (reopen)
  *   Special case: todo(unassigned) → in_progress goes through task.claim so
    * the move attaches an assignee (spec §3.1's drop-to-progress rule).
- * - Detail: spec §3.2 — centered Modal; the status chip dropdown lives inside
- *   the meta rows (never leading the head, because it is now an editor); the
- *   anchor message is a LINK: clicking closes the modal, switches to the
- *   Messages tab, and scroll-flashes the anchor row.
+ * - The centered detail Modal edits status in the metadata rows. Its source
+ *   Message link closes the Modal, opens Messages, and highlights the anchor.
  * - Data truth: NativeTask is message-anchored; tasksByMessage refetches on
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
