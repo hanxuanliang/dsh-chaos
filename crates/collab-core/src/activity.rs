@@ -1,6 +1,7 @@
 //! Actor-scoped Activity inbox projection and Done fences.
 
 use super::*;
+use crate::ids::{ActorId, ThreadId};
 use crate::thread::store::ThreadStore;
 use uuid::Uuid;
 
@@ -216,7 +217,7 @@ impl CollabCore {
         let route = require_target_access(&transaction, target_id, actor_id).await?;
         if route.kind == TargetKind::Thread
             && !ThreadStore::new(&transaction)
-                .is_following(target_id, actor_id)
+                .is_following(&ThreadId::parse(target_id)?, &ActorId::parse(actor_id)?)
                 .await?
         {
             return Err(not_found("active Thread follow", target_id));
