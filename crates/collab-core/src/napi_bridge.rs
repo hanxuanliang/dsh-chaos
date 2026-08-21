@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use crate::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, Actor,
-    ChangeEvent, CollabCore, CollabError, CollabSnapshot, InboxBatch, Message, PendingWake,
-    RuntimeBinding, SendMessageRequest, SendMessageResult, Target, Task, TaskStatus, ThreadSummary,
+    AgentCharter, AgentProfile, ChangeEvent, CollabCore, CollabError, CollabSnapshot,
+    IdentityContext, InboxBatch, Message, PendingWake, RuntimeBinding, SendMessageRequest,
+    SendMessageResult, Target, TargetMember, Task, TaskStatus, ThreadSummary,
 };
 use napi::{Error, Result, Status};
 use napi_derive::napi;
@@ -33,6 +34,32 @@ pub struct JsActor {
 }
 
 #[napi(object)]
+pub struct JsAgentCharter {
+    pub schema_version: u32,
+    pub summary: String,
+    pub capabilities: Vec<String>,
+    pub constraints: Vec<String>,
+}
+
+#[napi(object)]
+pub struct JsAgentProfile {
+    pub actor: JsActor,
+    pub workspace_path: String,
+    pub lifecycle: String,
+    pub charter: JsAgentCharter,
+    pub version: String,
+    pub created_at_ms: f64,
+    pub updated_at_ms: f64,
+}
+
+#[napi(object)]
+pub struct JsTargetMember {
+    pub actor: JsActor,
+    pub role: String,
+    pub joined_at_ms: f64,
+}
+
+#[napi(object)]
 pub struct JsTarget {
     pub id: String,
     pub kind: String,
@@ -41,6 +68,14 @@ pub struct JsTarget {
     pub root_message_id: Option<String>,
     pub created_by: String,
     pub created_at_ms: f64,
+}
+
+#[napi(object)]
+pub struct JsIdentityContext {
+    pub agent: JsAgentProfile,
+    pub target: Option<JsTarget>,
+    pub membership_target: Option<JsTarget>,
+    pub members: Vec<JsTargetMember>,
 }
 
 #[napi(object)]
@@ -159,6 +194,7 @@ pub struct JsInboxBatch {
     pub session_id: String,
     pub generation: String,
     pub messages: Vec<JsInboxMessage>,
+    pub contexts: Vec<JsIdentityContext>,
     pub checked_at_ms: f64,
 }
 
@@ -237,6 +273,59 @@ impl CollabHandle {
             .create_agent(&handle, &display_name, &workspace_path)
             .await
             .map(JsActor::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn create_agent_profile(
+        &self,
+        handle: String,
+        display_name: String,
+        workspace_path: String,
+        charter: JsAgentCharter,
+    ) -> Result<JsAgentProfile> {
+        self.core
+            .create_agent_profile(&handle, &display_name, &workspace_path, charter.into())
+            .await
+            .map(JsAgentProfile::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn agent_profile(&self, agent_id: String) -> Result<JsAgentProfile> {
+        self.core
+            .agent_profile(&agent_id)
+            .await
+            .map(JsAgentProfile::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn update_agent_profile(
+        &self,
+        agent_id: String,
+        display_name: String,
+        charter: JsAgentCharter,
+        expected_version: String,
+    ) -> Result<JsAgentProfile> {
+        let expected_version = parse_i64("expected_version", &expected_version)?;
+        self.core
+            .update_agent_profile(&agent_id, &display_name, charter.into(), expected_version)
+            .await
+            .map(JsAgentProfile::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn identity_context(
+        &self,
+        agent_id: String,
+        target_id: Option<String>,
+    ) -> Result<JsIdentityContext> {
+        self.core
+            .identity_context(&agent_id, target_id.as_deref())
+            .await
+            .map(JsIdentityContext::from)
             .map_err(to_napi_error)
     }
 
@@ -567,6 +656,19 @@ impl CollabHandle {
     }
 
     #[napi]
+    pub async fn list_target_memberships(
+        &self,
+        actor_id: String,
+        target_id: String,
+    ) -> Result<Vec<JsTargetMember>> {
+        self.core
+            .list_target_memberships(&actor_id, &target_id)
+            .await
+            .map(|members| members.into_iter().map(JsTargetMember::from).collect())
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
     pub async fn snapshot(&self, actor_id: String) -> Result<JsCollabSnapshot> {
         self.core
             .snapshot(&actor_id)
@@ -677,6 +779,67 @@ impl From<Actor> for JsActor {
             handle: actor.handle,
             display_name: actor.display_name,
             created_at_ms: actor.created_at_ms as f64,
+        }
+    }
+}
+
+impl From<JsAgentCharter> for AgentCharter {
+    fn from(charter: JsAgentCharter) -> Self {
+        Self {
+            schema_version: charter.schema_version,
+            summary: charter.summary,
+            capabilities: charter.capabilities,
+            constraints: charter.constraints,
+        }
+    }
+}
+
+impl From<AgentCharter> for JsAgentCharter {
+    fn from(charter: AgentCharter) -> Self {
+        Self {
+            schema_version: charter.schema_version,
+            summary: charter.summary,
+            capabilities: charter.capabilities,
+            constraints: charter.constraints,
+        }
+    }
+}
+
+impl From<AgentProfile> for JsAgentProfile {
+    fn from(profile: AgentProfile) -> Self {
+        Self {
+            actor: profile.actor.into(),
+            workspace_path: profile.workspace_path,
+            lifecycle: profile.lifecycle.as_str().into(),
+            charter: profile.charter.into(),
+            version: profile.version.to_string(),
+            created_at_ms: profile.created_at_ms as f64,
+            updated_at_ms: profile.updated_at_ms as f64,
+        }
+    }
+}
+
+impl From<TargetMember> for JsTargetMember {
+    fn from(member: TargetMember) -> Self {
+        Self {
+            actor: member.actor.into(),
+            role: member.role.as_str().into(),
+            joined_at_ms: member.joined_at_ms as f64,
+        }
+    }
+}
+
+impl From<IdentityContext> for JsIdentityContext {
+    fn from(context: IdentityContext) -> Self {
+        Self {
+            agent: context.agent.into(),
+            target: context.target.map(JsTarget::from),
+            membership_target: context.membership_target.map(JsTarget::from),
+            members: context
+                .members
+                .into_iter()
+                .map(JsTargetMember::from)
+                .collect(),
         }
     }
 }
@@ -811,6 +974,11 @@ impl From<InboxBatch> for JsInboxBatch {
                     delivery_id: item.delivery_id,
                     message: item.message.into(),
                 })
+                .collect(),
+            contexts: batch
+                .contexts
+                .into_iter()
+                .map(JsIdentityContext::from)
                 .collect(),
             checked_at_ms: batch.checked_at_ms as f64,
         }

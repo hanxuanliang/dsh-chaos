@@ -370,13 +370,21 @@ export class CollabService extends Service {
   }
 
   async agentProfile(viewerId: string, agentId: string): Promise<AgentProfile> {
-    const actor = await this.requireVisibleAgent(viewerId, agentId)
+    await this.requireVisibleAgent(viewerId, agentId)
+    const profile = await this.requireHandle().agentProfile(agentId)
     const binding = await this.requireHandle().runtimeBinding(agentId)
     return {
-      actor,
-      workspacePath: join(dshHome(), 'agents', actor.id),
+      actor: profile.actor,
+      workspacePath: profile.workspacePath,
+      lifecycle: profile.lifecycle,
+      charter: profile.charter,
+      profileVersion: profile.version,
       ...binding === undefined ? {} : { binding },
     }
+  }
+
+  identityContext(agentId: string, targetId?: string) {
+    return this.requireHandle().identityContext(agentId, targetId)
   }
 
   async agentWorkspace(
@@ -441,6 +449,10 @@ export class CollabService extends Service {
 
   listTargetMembers(actorId: string, targetId: string) {
     return this.requireHandle().listTargetMembers(actorId, targetId)
+  }
+
+  listTargetMemberships(actorId: string, targetId: string) {
+    return this.requireHandle().listTargetMemberships(actorId, targetId)
   }
 
   snapshot(actorId: string) {

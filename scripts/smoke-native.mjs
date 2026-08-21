@@ -23,9 +23,36 @@ try {
   assert.equal(renamed.displayName, 'Local Owner')
   const alpha = await core.createAgent('alpha', 'Alpha', join(root, 'alpha'))
   const beta = await core.createAgent('beta', 'Beta', join(root, 'beta'))
+  const alphaProfile = await core.agentProfile(alpha.id)
+  assert.equal(alphaProfile.version, '1')
+  assert.equal(alphaProfile.actor.handle, 'alpha')
+  assert.deepEqual(alphaProfile.charter, {
+    schemaVersion: 1,
+    summary: '',
+    capabilities: [],
+    constraints: [],
+  })
+  const updatedAlpha = await core.updateAgentProfile(alpha.id, 'Alpha Reviewer', {
+    schemaVersion: 1,
+    summary: 'Own review',
+    capabilities: ['rust'],
+    constraints: ['Do not address peers by UUID'],
+  }, alphaProfile.version)
+  assert.equal(updatedAlpha.version, '2')
+  assert.equal(updatedAlpha.actor.displayName, 'Alpha Reviewer')
+  await assert.rejects(
+    core.updateAgentProfile(alpha.id, 'Stale Alpha', alphaProfile.charter, alphaProfile.version),
+    /agent_profile_version_conflict/,
+  )
   const channel = await core.createChannel('design', owner.id)
   await core.addMember(channel.id, alpha.id, owner.id)
   await core.addMember(channel.id, beta.id, owner.id)
+  const identity = await core.identityContext(alpha.id, channel.id)
+  assert.equal(identity.agent.actor.displayName, 'Alpha Reviewer')
+  assert.equal(identity.target.name, 'design')
+  assert.equal(identity.members.find(member => member.actor.id === owner.id).role, 'owner')
+  assert.equal(identity.members.find(member => member.actor.id === beta.id).actor.handle, 'beta')
+  assert.deepEqual(await core.listTargetMemberships(alpha.id, channel.id), identity.members)
 
   const sent = await core.sendMessage({
     targetId: channel.id,
@@ -56,6 +83,9 @@ try {
   assert.equal((await core.readMessages(alpha.id, channel.id, '0', 20)).length, 1)
   const inbox = await core.checkInbox(alpha.id, binding.generation, binding.sessionId, 20)
   assert.equal(inbox.messages.length, 1)
+  assert.equal(inbox.contexts.length, 1)
+  assert.equal(inbox.contexts[0].target.id, channel.id)
+  assert.equal(inbox.contexts[0].members.find(member => member.actor.id === beta.id).actor.handle, 'beta')
   await core.markModelSeen(inbox.id, alpha.id, binding.generation, binding.sessionId)
 
   const direct = await core.createDirect(alpha.id, beta.id)
@@ -141,6 +171,7 @@ try {
   assert(snapshot.tasks.some(current => current.messageId === task.messageId))
   const changes = await core.listChanges(owner.id, '0', 500)
   assert(changes.some(change => change.kind === 'message_created'))
+  assert(changes.some(change => change.kind === 'agent_profile_changed'))
   assert(changes.some(change => change.kind === 'task_updated'))
   assert(changes.some(change => change.kind === 'activity_done_changed'))
   const retentionFloor = await core.pruneChangesBefore(Date.now() + 1)

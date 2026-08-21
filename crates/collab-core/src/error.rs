@@ -31,6 +31,14 @@ pub enum CollabError {
         actual: i64,
     },
     #[error(
+        "agent profile '{agent_id}' version conflict: expected '{expected}', current version is '{actual}'"
+    )]
+    AgentProfileVersionConflict {
+        agent_id: String,
+        expected: i64,
+        actual: i64,
+    },
+    #[error(
         "change cursor '{after_seq}' is outside retained range '{minimum_cursor}'..='{maximum_cursor}'"
     )]
     ChangeCursorOutOfRange {
@@ -62,6 +70,7 @@ impl CollabError {
             Self::TaskAlreadyClaimed { .. } => "task_already_claimed",
             Self::TaskTransitionDenied { .. } => "task_transition_denied",
             Self::TaskVersionConflict { .. } => "task_version_conflict",
+            Self::AgentProfileVersionConflict { .. } => "agent_profile_version_conflict",
             Self::ChangeCursorOutOfRange { .. } => "change_cursor_resync_required",
             Self::RuntimeGenerationMismatch { .. } => "runtime_generation_mismatch",
             Self::SchemaVersionMismatch { .. } => "schema_version_mismatch",

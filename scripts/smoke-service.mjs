@@ -66,11 +66,16 @@ try {
     agent: runtimeAgent,
   })
   assert.equal(checked.messages.length, 1)
+  assert.equal(checked.contexts[0].target.name, 'design')
+  assert.equal(checked.contexts[0].members.find(member => member.actor.id === alpha.id).actor.handle, 'alpha')
   const execution = {
     callId: 'service-tool-call',
     signal: new AbortController().signal,
     agent: runtimeAgent,
   }
+  const identity = await scopedTools.get('identity_context').execute({ targetId: channel.id }, execution)
+  assert.equal(identity.agent.actor.handle, 'alpha')
+  assert.equal(identity.members.find(member => member.actor.id === owner.id).role, 'owner')
   const history = await scopedTools.get('message_read').execute({
     targetId: channel.id,
     afterSeq: '0',
@@ -109,6 +114,7 @@ try {
   for await (const _chunk of stream) {}
   const empty = await ctx.collab.checkInbox(alpha.id, binding.generation, binding.sessionId, 20)
   assert.equal(empty.messages.length, 0)
+  assert.deepEqual(empty.contexts, [])
 
   const named = await ctx.collab.createNamedAgent('Alpha Two')
   assert.equal(named.actor.displayName, 'Alpha Two')

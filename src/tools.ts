@@ -4,6 +4,78 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CollabRuntimeApi } from './contracts.ts'
 import type { RuntimeManager } from './runtime.ts'
 
+const ACTOR_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string', required: true },
+    kind: { type: 'string', required: true, enum: ['user', 'agent'] },
+    handle: { type: 'string', required: true },
+    displayName: { type: 'string', required: true },
+    createdAtMs: { type: 'number', required: true },
+  },
+} as const
+
+const TARGET_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string', required: true },
+    kind: { type: 'string', required: true, enum: ['channel', 'direct', 'thread'] },
+    name: { type: 'string', required: true },
+    parentTargetId: { type: 'string' },
+    rootMessageId: { type: 'string' },
+    createdBy: { type: 'string', required: true },
+    createdAtMs: { type: 'number', required: true },
+  },
+} as const
+
+const IDENTITY_CONTEXT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    agent: {
+      type: 'object',
+      required: true,
+      additionalProperties: false,
+      properties: {
+        actor: { ...ACTOR_SCHEMA, required: true },
+        workspacePath: { type: 'string', required: true },
+        lifecycle: { type: 'string', required: true, enum: ['active', 'archived'] },
+        charter: {
+          type: 'object',
+          required: true,
+          additionalProperties: false,
+          properties: {
+            schemaVersion: { type: 'integer', required: true },
+            summary: { type: 'string', required: true },
+            capabilities: { type: 'array', required: true, items: { type: 'string' } },
+            constraints: { type: 'array', required: true, items: { type: 'string' } },
+          },
+        },
+        version: { type: 'string', required: true },
+        createdAtMs: { type: 'number', required: true },
+        updatedAtMs: { type: 'number', required: true },
+      },
+    },
+    target: TARGET_SCHEMA,
+    membershipTarget: TARGET_SCHEMA,
+    members: {
+      type: 'array',
+      required: true,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          actor: { ...ACTOR_SCHEMA, required: true },
+          role: { type: 'string', required: true, enum: ['owner', 'member'] },
+          joinedAtMs: { type: 'number', required: true },
+        },
+      },
+    },
+  },
+} as const
+
 const MESSAGE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -135,6 +207,31 @@ export function installCollabTools(
   })
 
   agentCtx.tools.register(defineTool({
+    name: 'identity_context',
+    description: 'Read this stable Agent identity and, optionally, the authoritative current target name and role-bearing member roster. Use human-readable @handles from this result in collaboration messages; never address teammates by UUID in prose.',
+    parameters: {
+      targetId: { type: 'string', description: 'Exact UUID target id. Mutually exclusive with target.' },
+      target: { type: 'string', description: "Optional textual target: '#channel', 'dm:@handle', or '<base>:<message-short-id>'." },
+    },
+    output: {
+      schema: IDENTITY_CONTEXT_SCHEMA,
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
+      if (args.targetId === undefined && args.target === undefined) {
+        return collab.identityContext(binding.agentId)
+      }
+      const addressed = await resolveAgentTarget(collab, binding.agentId, {
+        targetId: args.targetId,
+        target: args.target,
+      })
+      return collab.identityContext(binding.agentId, addressed.targetId)
+    },
+  }))
+
+  agentCtx.tools.register(defineTool({
     name: 'message_check',
     description: 'Read pending collaboration messages addressed to this Agent. The wake notice contains no message bodies, so call this tool whenever the collab inbox says messages are pending.',
     parameters: {
@@ -160,6 +257,11 @@ export function installCollabTools(
                 message: { ...MESSAGE_SCHEMA, required: true },
               },
             },
+          },
+          contexts: {
+            type: 'array',
+            required: true,
+            items: IDENTITY_CONTEXT_SCHEMA,
           },
           checkedAtMs: { type: 'number', required: true },
         },

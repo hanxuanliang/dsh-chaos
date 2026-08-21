@@ -1,5 +1,6 @@
 import type {
   NativeCollabSnapshot,
+  NativeIdentityContext,
   NativeInboxBatch,
   NativeMessage,
   NativeTarget,
@@ -41,6 +42,7 @@ export interface CollabRuntimeApi {
     sessionId: string,
     limit: number,
   ): Promise<NativeInboxBatch>
+  identityContext(agentId: string, targetId?: string): Promise<NativeIdentityContext>
   markModelSeen(
     batchId: string,
     agentId: string,

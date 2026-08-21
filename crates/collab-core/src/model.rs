@@ -27,6 +27,85 @@ pub struct Actor {
     pub created_at_ms: i64,
 }
 
+/// Versioned, stable collaboration responsibilities for one Agent.
+///
+/// The Rust type is the contract; storage uses canonical JSON so future schema
+/// versions can add bounded fields without turning the charter into a free-form
+/// key/value bag.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AgentCharter {
+    pub schema_version: u32,
+    pub summary: String,
+    pub capabilities: Vec<String>,
+    pub constraints: Vec<String>,
+}
+
+impl Default for AgentCharter {
+    fn default() -> Self {
+        Self {
+            schema_version: 1,
+            summary: String::new(),
+            capabilities: Vec::new(),
+            constraints: Vec::new(),
+        }
+    }
+}
+
+/// Operational lifecycle of a stable Agent Profile.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentLifecycle {
+    Active,
+    Archived,
+}
+
+impl AgentLifecycle {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Archived => "archived",
+        }
+    }
+}
+
+/// Stable Agent identity and workspace state, independent from its DSH Session.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AgentProfile {
+    pub actor: Actor,
+    pub workspace_path: String,
+    pub lifecycle: AgentLifecycle,
+    pub charter: AgentCharter,
+    pub version: i64,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
+/// Role of one active target member.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MembershipRole {
+    Owner,
+    Member,
+}
+
+impl MembershipRole {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Member => "member",
+        }
+    }
+}
+
+/// One role-bearing target member, enriched with its stable human-readable identity.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TargetMember {
+    pub actor: Actor,
+    pub role: MembershipRole,
+    pub joined_at_ms: i64,
+}
+
 /// A collab target kind.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -58,12 +137,25 @@ pub struct Target {
     pub created_at_ms: i64,
 }
 
+/// Authoritative model-facing identity plus optional exact target context.
+///
+/// A Thread inherits its member roster from `membership_target`, which is its
+/// parent Channel or Direct target. For non-Thread targets both targets match.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct IdentityContext {
+    pub agent: AgentProfile,
+    pub target: Option<Target>,
+    pub membership_target: Option<Target>,
+    pub members: Vec<TargetMember>,
+}
+
 /// A durable UI invalidation kind. Change rows carry identifiers rather than
 /// mutable domain payloads; consumers re-read the authoritative projection.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeKind {
     ActorCreated,
+    AgentProfileChanged,
     TargetCreated,
     MembershipChanged,
     ThreadFollowChanged,
@@ -77,6 +169,7 @@ impl ChangeKind {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::ActorCreated => "actor_created",
+            Self::AgentProfileChanged => "agent_profile_changed",
             Self::TargetCreated => "target_created",
             Self::MembershipChanged => "membership_changed",
             Self::ThreadFollowChanged => "thread_follow_changed",
@@ -90,6 +183,7 @@ impl ChangeKind {
     pub(crate) fn parse(value: &str) -> Option<Self> {
         match value {
             "actor_created" => Some(Self::ActorCreated),
+            "agent_profile_changed" => Some(Self::AgentProfileChanged),
             "target_created" => Some(Self::TargetCreated),
             "membership_changed" => Some(Self::MembershipChanged),
             "thread_follow_changed" => Some(Self::ThreadFollowChanged),
@@ -249,6 +343,7 @@ pub struct InboxBatch {
     pub session_id: String,
     pub generation: i64,
     pub messages: Vec<InboxMessage>,
+    pub contexts: Vec<IdentityContext>,
     pub checked_at_ms: i64,
 }
 

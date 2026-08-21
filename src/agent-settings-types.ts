@@ -1,4 +1,4 @@
-import type { NativeActor, NativeRuntimeBinding } from './native.ts'
+import type { NativeActor, NativeAgentCharter, NativeRuntimeBinding } from './native.ts'
 
 /** Browser-safe presentation row from the official DSH Agent Preset roster. */
 export interface AgentPresetSummary {
@@ -15,6 +15,9 @@ export interface AgentProfile {
   actor: NativeActor
   binding?: NativeRuntimeBinding
   workspacePath: string
+  lifecycle: 'active' | 'archived'
+  charter: NativeAgentCharter
+  profileVersion: string
 }
 
 export interface AgentWorkspaceEntry {

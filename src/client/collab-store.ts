@@ -525,6 +525,7 @@ export class CollabStore {
         void this.reloadTargets()
         break
       case 'actor_created':
+      case 'agent_profile_changed':
         void this.client.actors().then((actors) => { this.set({ actors }) }, () => {})
         break
       case 'task_created':

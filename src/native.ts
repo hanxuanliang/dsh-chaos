@@ -10,6 +10,29 @@ export interface NativeActor {
   createdAtMs: number
 }
 
+export interface NativeAgentCharter {
+  schemaVersion: number
+  summary: string
+  capabilities: string[]
+  constraints: string[]
+}
+
+export interface NativeAgentProfile {
+  actor: NativeActor
+  workspacePath: string
+  lifecycle: 'active' | 'archived'
+  charter: NativeAgentCharter
+  version: string
+  createdAtMs: number
+  updatedAtMs: number
+}
+
+export interface NativeTargetMember {
+  actor: NativeActor
+  role: 'owner' | 'member'
+  joinedAtMs: number
+}
+
 export interface NativeThreadSummary {
   rootMessageId: string
   threadId: string
@@ -26,6 +49,13 @@ export interface NativeTarget {
   rootMessageId?: string
   createdBy: string
   createdAtMs: number
+}
+
+export interface NativeIdentityContext {
+  agent: NativeAgentProfile
+  target?: NativeTarget
+  membershipTarget?: NativeTarget
+  members: NativeTargetMember[]
 }
 
 export interface NativeMessage {
@@ -66,6 +96,7 @@ export interface NativeInboxBatch {
   sessionId: string
   generation: string
   messages: Array<{ deliveryId: string; message: NativeMessage }>
+  contexts: NativeIdentityContext[]
   checkedAtMs: number
 }
 
@@ -86,6 +117,7 @@ export interface NativeChangeEvent {
   seq: string
   kind:
     | 'actor_created'
+    | 'agent_profile_changed'
     | 'target_created'
     | 'membership_changed'
     | 'thread_follow_changed'
@@ -155,6 +187,20 @@ export interface NativeCollabHandle {
   createUser(handle: string, displayName: string): Promise<NativeActor>
   ensureUser(handle: string, displayName: string): Promise<NativeActor>
   createAgent(handle: string, displayName: string, workspacePath: string): Promise<NativeActor>
+  createAgentProfile(
+    handle: string,
+    displayName: string,
+    workspacePath: string,
+    charter: NativeAgentCharter,
+  ): Promise<NativeAgentProfile>
+  agentProfile(agentId: string): Promise<NativeAgentProfile>
+  updateAgentProfile(
+    agentId: string,
+    displayName: string,
+    charter: NativeAgentCharter,
+    expectedVersion: string,
+  ): Promise<NativeAgentProfile>
+  identityContext(agentId: string, targetId?: string): Promise<NativeIdentityContext>
   deleteAgent(agentId: string): Promise<void>
   createChannel(name: string, creatorId: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
@@ -203,6 +249,7 @@ export interface NativeCollabHandle {
   inboxDone(actorId: string, targetId: string, throughSeq: string): Promise<void>
   listActors(actorId: string): Promise<NativeActor[]>
   listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
+  listTargetMemberships(actorId: string, targetId: string): Promise<NativeTargetMember[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   pruneChangesBefore(beforeMs: number): Promise<string>

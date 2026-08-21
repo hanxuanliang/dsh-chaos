@@ -12,9 +12,10 @@ pub use napi_bridge::*;
 pub use error::{CollabError, Result};
 pub use model::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
-    Actor, ActorKind, ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, Message,
+    Actor, ActorKind, AgentCharter, AgentLifecycle, AgentProfile, ChangeEvent, ChangeKind,
+    CollabSnapshot, IdentityContext, InboxBatch, InboxMessage, MembershipRole, Message,
     MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
-    TargetKind, Task, TaskStatus, ThreadSummary,
+    TargetKind, TargetMember, Task, TaskStatus, ThreadSummary,
 };
 
 use std::collections::BTreeSet;
@@ -29,7 +30,7 @@ use turso::{Connection, Row};
 use uuid::Uuid;
 
 use crate::schema::{
-    META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_VERSION,
+    META_SCHEMA, SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_VERSION,
 };
 
 const CHANGE_RETENTION_FLOOR_KEY: &str = "change_retention_floor";
@@ -181,7 +182,7 @@ impl CollabCore {
 
     /// Create the one local human/user actor.
     pub async fn create_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
-        self.create_actor(ActorKind::User, handle, display_name, None)
+        self.create_actor(ActorKind::User, handle, display_name, None, None)
             .await
     }
 
@@ -192,9 +193,120 @@ impl CollabCore {
         display_name: &str,
         workspace_path: &str,
     ) -> Result<Actor> {
+        let charter = AgentCharter::default();
         require_non_empty("workspace_path", workspace_path)?;
-        self.create_actor(ActorKind::Agent, handle, display_name, Some(workspace_path))
-            .await
+        self.create_actor(
+            ActorKind::Agent,
+            handle,
+            display_name,
+            Some(workspace_path),
+            Some(&charter),
+        )
+        .await
+    }
+
+    /// Create a stable Agent with its first versioned Charter.
+    pub async fn create_agent_profile(
+        &self,
+        handle: &str,
+        display_name: &str,
+        workspace_path: &str,
+        charter: AgentCharter,
+    ) -> Result<AgentProfile> {
+        require_non_empty("workspace_path", workspace_path)?;
+        let charter = normalize_charter(charter)?;
+        let actor = self
+            .create_actor(
+                ActorKind::Agent,
+                handle,
+                display_name,
+                Some(workspace_path),
+                Some(&charter),
+            )
+            .await?;
+        self.agent_profile(&actor.id).await
+    }
+
+    /// Read one active stable Agent Profile independently from its DSH Session.
+    pub async fn agent_profile(&self, agent_id: &str) -> Result<AgentProfile> {
+        self.assert_open()?;
+        require_non_empty("agent_id", agent_id)?;
+        let connection = self.connection.lock().await;
+        find_agent_profile(&connection, agent_id).await
+    }
+
+    /// Replace the mutable display name and Charter under an optimistic Profile fence.
+    pub async fn update_agent_profile(
+        &self,
+        agent_id: &str,
+        display_name: &str,
+        charter: AgentCharter,
+        expected_version: i64,
+    ) -> Result<AgentProfile> {
+        self.assert_open()?;
+        require_non_empty("agent_id", agent_id)?;
+        require_non_empty("display_name", display_name)?;
+        if expected_version <= 0 {
+            return Err(CollabError::InvalidArgument(
+                "expected_version must be positive".into(),
+            ));
+        }
+        let display_name = display_name.trim();
+        let charter = normalize_charter(charter)?;
+        let charter_json = encode_charter(&charter)?;
+        let now = now_ms()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let current = find_agent_profile(&transaction, agent_id).await?;
+        if current.version != expected_version {
+            return Err(CollabError::AgentProfileVersionConflict {
+                agent_id: agent_id.to_owned(),
+                expected: expected_version,
+                actual: current.version,
+            });
+        }
+        let next_version = current.version + 1;
+        transaction
+            .execute(
+                "UPDATE actors SET display_name = ?2 WHERE id = ?1",
+                (agent_id, display_name),
+            )
+            .await?;
+        transaction
+            .execute(
+                "UPDATE agents
+                 SET charter_json = ?2, profile_version = ?3, updated_at_ms = ?4
+                 WHERE actor_id = ?1",
+                (agent_id, charter_json.as_str(), next_version, now),
+            )
+            .await?;
+        let actor_ids = all_actor_ids(&transaction).await?;
+        insert_change(
+            &transaction,
+            ChangeKind::AgentProfileChanged,
+            None,
+            agent_id,
+            &actor_ids,
+            now,
+        )
+        .await?;
+        let profile = find_agent_profile(&transaction, agent_id).await?;
+        transaction.commit().await?;
+        Ok(profile)
+    }
+
+    /// Return the caller's stable identity and optional exact target roster.
+    pub async fn identity_context(
+        &self,
+        agent_id: &str,
+        target_id: Option<&str>,
+    ) -> Result<IdentityContext> {
+        self.assert_open()?;
+        require_non_empty("agent_id", agent_id)?;
+        let connection = self.connection.lock().await;
+        identity_context_for(&connection, agent_id, target_id).await
     }
 
     /// Delete one Agent's operational state. The actor row and its messages
@@ -866,6 +978,22 @@ impl CollabCore {
         Ok(members)
     }
 
+    /// List the role-bearing active roster for an exact target. Thread rosters
+    /// are inherited from their parent Channel or Direct target.
+    pub async fn list_target_memberships(
+        &self,
+        actor_id: &str,
+        target_id: &str,
+    ) -> Result<Vec<TargetMember>> {
+        self.assert_open()?;
+        require_non_empty("actor_id", actor_id)?;
+        require_non_empty("target_id", target_id)?;
+        let connection = self.connection.lock().await;
+        let route =
+            require_target_access(&connection, target_id, actor_id, "list members of").await?;
+        target_memberships(&connection, route.permission_target_id(target_id)).await
+    }
+
     /// Return one authorization-filtered bootstrap projection and the global
     /// durable change cursor observed in the same connection critical section.
     pub async fn snapshot(&self, actor_id: &str) -> Result<CollabSnapshot> {
@@ -1413,6 +1541,15 @@ impl CollabCore {
         }
         drop(rows);
 
+        let mut seen_target_ids = BTreeSet::new();
+        let mut contexts = Vec::new();
+        for item in &messages {
+            let target_id = item.message.target_id.as_str();
+            if seen_target_ids.insert(target_id.to_owned()) {
+                contexts.push(identity_context_for(&transaction, agent_id, Some(target_id)).await?);
+            }
+        }
+
         if messages.is_empty() {
             transaction.commit().await?;
             return Ok(InboxBatch {
@@ -1421,6 +1558,7 @@ impl CollabCore {
                 session_id: session_id.to_owned(),
                 generation,
                 messages,
+                contexts,
                 checked_at_ms: now,
             });
         }
@@ -1458,6 +1596,7 @@ impl CollabCore {
             session_id: session_id.to_owned(),
             generation,
             messages,
+            contexts,
             checked_at_ms: now,
         })
     }
@@ -2186,6 +2325,7 @@ impl CollabCore {
         handle: &str,
         display_name: &str,
         workspace_path: Option<&str>,
+        charter: Option<&AgentCharter>,
     ) -> Result<Actor> {
         self.assert_open()?;
         require_non_empty("handle", handle)?;
@@ -2217,14 +2357,28 @@ impl CollabCore {
             .await?;
         if let Some(workspace_path) = workspace_path {
             let resolved_path = workspace_path.replace("{id}", actor.id.as_str());
+            let charter = charter.ok_or_else(|| {
+                CollabError::InvalidArgument("Agent creation requires a Charter".into())
+            })?;
+            let charter_json = encode_charter(charter)?;
             transaction
                 .execute(
                     "INSERT INTO agents
-                     (actor_id, workspace_path, lifecycle, created_at_ms, updated_at_ms)
-                     VALUES (?1, ?2, 'active', ?3, ?3)",
-                    (actor.id.as_str(), resolved_path.as_str(), now),
+                     (actor_id, workspace_path, lifecycle, created_at_ms, updated_at_ms,
+                      charter_json, profile_version)
+                     VALUES (?1, ?2, 'active', ?3, ?3, ?4, 1)",
+                    (
+                        actor.id.as_str(),
+                        resolved_path.as_str(),
+                        now,
+                        charter_json.as_str(),
+                    ),
                 )
                 .await?;
+        } else if charter.is_some() {
+            return Err(CollabError::InvalidArgument(
+                "User creation cannot carry an Agent Charter".into(),
+            ));
         }
         let actor_ids = all_actor_ids(&transaction).await?;
         insert_change(
@@ -2503,6 +2657,7 @@ async fn migrate(connection: &mut Connection) -> Result<()> {
             3 => transaction.execute_batch(SCHEMA_V3).await?,
             4 => transaction.execute_batch(SCHEMA_V4).await?,
             5 => transaction.execute_batch(SCHEMA_V5).await?,
+            6 => transaction.execute_batch(SCHEMA_V6).await?,
             _ => {
                 return Err(CollabError::SchemaVersionMismatch {
                     found: version.to_string(),
@@ -2720,6 +2875,200 @@ fn actor_from_row(row: &Row) -> Result<Actor> {
         display_name: row.get(3)?,
         created_at_ms: row.get(4)?,
     })
+}
+
+const CHARTER_SUMMARY_MAX: usize = 4_000;
+const CHARTER_LIST_MAX: usize = 32;
+const CHARTER_CAPABILITY_MAX: usize = 80;
+const CHARTER_CONSTRAINT_MAX: usize = 500;
+
+fn normalize_charter(mut charter: AgentCharter) -> Result<AgentCharter> {
+    if charter.schema_version != 1 {
+        return Err(CollabError::InvalidArgument(format!(
+            "unsupported Charter schema version '{}'",
+            charter.schema_version
+        )));
+    }
+    charter.summary = charter.summary.trim().to_owned();
+    if charter.summary.chars().count() > CHARTER_SUMMARY_MAX {
+        return Err(CollabError::InvalidArgument(format!(
+            "Charter summary exceeds {CHARTER_SUMMARY_MAX} characters"
+        )));
+    }
+    charter.capabilities =
+        normalize_charter_list("capabilities", charter.capabilities, CHARTER_CAPABILITY_MAX)?;
+    charter.constraints =
+        normalize_charter_list("constraints", charter.constraints, CHARTER_CONSTRAINT_MAX)?;
+    Ok(charter)
+}
+
+fn normalize_charter_list(name: &str, values: Vec<String>, item_max: usize) -> Result<Vec<String>> {
+    if values.len() > CHARTER_LIST_MAX {
+        return Err(CollabError::InvalidArgument(format!(
+            "Charter {name} exceed {CHARTER_LIST_MAX} entries"
+        )));
+    }
+    let mut normalized = Vec::with_capacity(values.len());
+    let mut seen = BTreeSet::new();
+    for value in values {
+        let value = value.trim();
+        if value.is_empty() {
+            return Err(CollabError::InvalidArgument(format!(
+                "Charter {name} cannot contain blank entries"
+            )));
+        }
+        if value.chars().count() > item_max {
+            return Err(CollabError::InvalidArgument(format!(
+                "Charter {name} entry exceeds {item_max} characters"
+            )));
+        }
+        let key = value.to_lowercase();
+        if seen.insert(key) {
+            normalized.push(value.to_owned());
+        }
+    }
+    Ok(normalized)
+}
+
+fn encode_charter(charter: &AgentCharter) -> Result<String> {
+    serde_json::to_string(charter)
+        .map_err(|error| CollabError::Database(format!("encode Agent Charter: {error}")))
+}
+
+fn decode_charter(agent_id: &str, value: &str) -> Result<AgentCharter> {
+    let charter: AgentCharter = serde_json::from_str(value).map_err(|error| {
+        CollabError::Database(format!("Agent '{agent_id}' Charter is malformed: {error}"))
+    })?;
+    normalize_charter(charter).map_err(|error| {
+        CollabError::Database(format!("Agent '{agent_id}' Charter is invalid: {error}"))
+    })
+}
+
+fn parse_agent_lifecycle(agent_id: &str, value: &str) -> Result<AgentLifecycle> {
+    match value {
+        "active" => Ok(AgentLifecycle::Active),
+        "archived" => Ok(AgentLifecycle::Archived),
+        other => Err(CollabError::Database(format!(
+            "Agent '{agent_id}' has unknown lifecycle '{other}'"
+        ))),
+    }
+}
+
+async fn find_agent_profile(connection: &Connection, agent_id: &str) -> Result<AgentProfile> {
+    let mut rows = connection
+        .query(
+            "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                    agent.workspace_path, agent.lifecycle, agent.charter_json,
+                    agent.profile_version, agent.created_at_ms, agent.updated_at_ms
+             FROM agents agent
+             JOIN actors actor ON actor.id = agent.actor_id
+             WHERE agent.actor_id = ?1",
+            [agent_id],
+        )
+        .await?;
+    let Some(row) = rows.next().await? else {
+        return Err(not_found("agent profile", agent_id));
+    };
+    let id = row.get::<String>(0)?;
+    let kind_text = row.get::<String>(1)?;
+    let kind = parse_actor_kind(&id, &kind_text)?;
+    if kind != ActorKind::Agent {
+        return Err(CollabError::Database(format!(
+            "Agent Profile '{agent_id}' belongs to a non-Agent actor"
+        )));
+    }
+    let lifecycle_text = row.get::<String>(6)?;
+    let charter_json = row.get::<String>(7)?;
+    Ok(AgentProfile {
+        actor: Actor {
+            id,
+            kind,
+            handle: row.get(2)?,
+            display_name: row.get(3)?,
+            created_at_ms: row.get(4)?,
+        },
+        workspace_path: row.get(5)?,
+        lifecycle: parse_agent_lifecycle(agent_id, &lifecycle_text)?,
+        charter: decode_charter(agent_id, &charter_json)?,
+        version: row.get(8)?,
+        created_at_ms: row.get(9)?,
+        updated_at_ms: row.get(10)?,
+    })
+}
+
+async fn identity_context_for(
+    connection: &Connection,
+    agent_id: &str,
+    target_id: Option<&str>,
+) -> Result<IdentityContext> {
+    let agent = find_agent_profile(connection, agent_id).await?;
+    let Some(target_id) = target_id else {
+        return Ok(IdentityContext {
+            agent,
+            target: None,
+            membership_target: None,
+            members: Vec::new(),
+        });
+    };
+    require_non_empty("target_id", target_id)?;
+    let route =
+        require_target_access(connection, target_id, agent_id, "inspect identity in").await?;
+    let target = find_target(connection, target_id).await?;
+    let membership_target_id = route.permission_target_id(target_id);
+    let membership_target = if membership_target_id == target_id {
+        target.clone()
+    } else {
+        find_target(connection, membership_target_id).await?
+    };
+    let members = target_memberships(connection, membership_target_id).await?;
+    Ok(IdentityContext {
+        agent,
+        target: Some(target),
+        membership_target: Some(membership_target),
+        members,
+    })
+}
+
+fn parse_membership_role(target_id: &str, actor_id: &str, value: &str) -> Result<MembershipRole> {
+    match value {
+        "owner" => Ok(MembershipRole::Owner),
+        "member" => Ok(MembershipRole::Member),
+        other => Err(CollabError::Database(format!(
+            "target '{target_id}' member '{actor_id}' has unknown role '{other}'"
+        ))),
+    }
+}
+
+async fn target_memberships(connection: &Connection, target_id: &str) -> Result<Vec<TargetMember>> {
+    let mut rows = connection
+        .query(
+            "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                    membership.role, membership.joined_at_ms
+             FROM memberships membership
+             JOIN actors actor ON actor.id = membership.actor_id
+             WHERE membership.target_id = ?1 AND membership.left_at_ms IS NULL
+             ORDER BY actor.handle, actor.id",
+            [target_id],
+        )
+        .await?;
+    let mut members = Vec::new();
+    while let Some(row) = rows.next().await? {
+        let id = row.get::<String>(0)?;
+        let kind_text = row.get::<String>(1)?;
+        let role_text = row.get::<String>(5)?;
+        members.push(TargetMember {
+            actor: Actor {
+                kind: parse_actor_kind(&id, &kind_text)?,
+                id: id.clone(),
+                handle: row.get(2)?,
+                display_name: row.get(3)?,
+                created_at_ms: row.get(4)?,
+            },
+            role: parse_membership_role(target_id, &id, &role_text)?,
+            joined_at_ms: row.get(6)?,
+        });
+    }
+    Ok(members)
 }
 
 async fn find_actor(connection: &Connection, actor_id: &str) -> Result<Actor> {
@@ -3697,8 +4046,8 @@ mod tests {
             .bind_runtime(&alpha.id, "session-1", "openai", "codex", "default")
             .await?;
         core.send_message(SendMessageRequest {
-            target_id: channel.id,
-            author_id: user.id,
+            target_id: channel.id.clone(),
+            author_id: user.id.clone(),
             client_request_id: "generation-message".into(),
             text: "read me".into(),
         })
@@ -3713,6 +4062,15 @@ mod tests {
             .await?;
         let batch_id = batch.id.expect("batch with one message");
         assert_eq!(batch.messages.len(), 1);
+        assert_eq!(batch.contexts.len(), 1);
+        assert_eq!(batch.contexts[0].agent.actor.id, alpha.id);
+        assert_eq!(batch.contexts[0].target.as_ref(), Some(&channel));
+        assert!(
+            batch.contexts[0]
+                .members
+                .iter()
+                .any(|member| member.actor.id == user.id && member.role == MembershipRole::Owner)
+        );
 
         let second_binding = core
             .bind_runtime(&alpha.id, "session-2", "openai", "codex", "default")
@@ -4060,6 +4418,113 @@ mod tests {
         let kept = core.ensure_user("alice", "Updated User").await?;
         assert_eq!(kept.id, custom.id);
         assert_eq!(kept.display_name, "Custom Alice");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
+        let core = CollabCore::open_memory().await?;
+        let owner = core.create_user("owner", "Owner").await?;
+        let profile = core
+            .create_agent_profile(
+                "reviewer",
+                "Reviewer",
+                "/tmp/reviewer",
+                AgentCharter {
+                    schema_version: 1,
+                    summary: "  Review frontend behavior.  ".into(),
+                    capabilities: vec!["a11y".into(), " A11Y ".into(), "visual".into()],
+                    constraints: vec!["Yield backend implementation".into()],
+                },
+            )
+            .await?;
+        assert_eq!(profile.version, 1);
+        assert_eq!(profile.charter.summary, "Review frontend behavior.");
+        assert_eq!(profile.charter.capabilities, vec!["a11y", "visual"]);
+        assert_eq!(profile.lifecycle, AgentLifecycle::Active);
+
+        let updated = core
+            .update_agent_profile(
+                &profile.actor.id,
+                "Frontend Reviewer",
+                AgentCharter {
+                    schema_version: 1,
+                    summary: "Own interaction review".into(),
+                    capabilities: vec!["frontend".into()],
+                    constraints: Vec::new(),
+                },
+                profile.version,
+            )
+            .await?;
+        assert_eq!(updated.version, 2);
+        assert_eq!(updated.actor.id, profile.actor.id);
+        assert_eq!(updated.actor.handle, "reviewer");
+        assert_eq!(updated.actor.display_name, "Frontend Reviewer");
+        assert_eq!(updated.workspace_path, profile.workspace_path);
+        assert!(matches!(
+            core.update_agent_profile(
+                &profile.actor.id,
+                "Stale",
+                AgentCharter::default(),
+                profile.version,
+            )
+            .await,
+            Err(CollabError::AgentProfileVersionConflict {
+                expected: 1,
+                actual: 2,
+                ..
+            })
+        ));
+
+        let changes = core.list_changes(&owner.id, 0, 20).await?;
+        assert!(changes.iter().any(|change| {
+            change.kind == ChangeKind::AgentProfileChanged && change.entity_id == profile.actor.id
+        }));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn identity_context_returns_role_bearing_inherited_roster() -> Result<()> {
+        let (core, user, alpha, beta, channel) = fixture().await?;
+        let channel_context = core.identity_context(&alpha.id, Some(&channel.id)).await?;
+        assert_eq!(channel_context.agent.actor.handle, "alpha");
+        assert_eq!(channel_context.target.as_ref(), Some(&channel));
+        assert_eq!(channel_context.membership_target.as_ref(), Some(&channel));
+        assert_eq!(channel_context.members.len(), 3);
+        assert!(
+            channel_context.members.iter().any(|member| {
+                member.actor.id == user.id && member.role == MembershipRole::Owner
+            })
+        );
+        assert!(
+            channel_context
+                .members
+                .iter()
+                .any(|member| { member.actor.id == beta.id && member.actor.handle == "beta" })
+        );
+
+        let root = core
+            .send_message(SendMessageRequest {
+                target_id: channel.id.clone(),
+                author_id: user.id.clone(),
+                client_request_id: "identity-root".into(),
+                text: "Discuss in a Thread".into(),
+            })
+            .await?
+            .message;
+        let thread = core.create_thread(&root.id, &user.id).await?;
+        let thread_context = core.identity_context(&alpha.id, Some(&thread.id)).await?;
+        assert_eq!(thread_context.target.as_ref(), Some(&thread));
+        assert_eq!(thread_context.membership_target.as_ref(), Some(&channel));
+        assert_eq!(thread_context.members, channel_context.members);
+
+        let outsider = core
+            .create_agent("outsider-agent", "Outsider", "/tmp/outsider-agent")
+            .await?;
+        assert!(matches!(
+            core.identity_context(&outsider.id, Some(&channel.id)).await,
+            Err(CollabError::PermissionDenied { .. })
+        ));
         Ok(())
     }
 
@@ -4956,6 +5421,70 @@ mod tests {
         assert_eq!(changes.len(), 2);
         assert_eq!(changes[0].kind, ChangeKind::MessageCreated);
         assert_eq!(changes[1].kind, ChangeKind::ActivityDoneChanged);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn schema_v5_upgrades_agents_with_default_charter() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("v5.db");
+        let agent_id = "018f0000-0000-7000-8000-000000000011";
+        {
+            let database =
+                turso::Builder::new_local(path.to_str().ok_or_else(|| {
+                    CollabError::Filesystem("temporary path is not UTF-8".into())
+                })?)
+                .build()
+                .await?;
+            let mut connection = database.connect()?;
+            connection.execute_batch(META_SCHEMA).await?;
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .await?;
+            transaction.execute_batch(SCHEMA_V1).await?;
+            transaction.execute_batch(SCHEMA_V2).await?;
+            transaction.execute_batch(SCHEMA_V3).await?;
+            transaction.execute_batch(SCHEMA_V4).await?;
+            transaction.execute_batch(SCHEMA_V5).await?;
+            transaction
+                .execute(
+                    "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
+                     VALUES (?1, 'agent', 'legacy-agent', 'Legacy Agent', 1)",
+                    [agent_id],
+                )
+                .await?;
+            transaction
+                .execute(
+                    "INSERT INTO agents
+                     (actor_id, workspace_path, lifecycle, created_at_ms, updated_at_ms)
+                     VALUES (?1, '/tmp/legacy-agent', 'active', 1, 1)",
+                    [agent_id],
+                )
+                .await?;
+            transaction
+                .execute(
+                    "INSERT INTO collab_meta (key, value) VALUES ('schema_version', '5')",
+                    (),
+                )
+                .await?;
+            transaction.commit().await?;
+        }
+
+        let core = CollabCore::open(&path).await?;
+        let profile = core.agent_profile(agent_id).await?;
+        assert_eq!(profile.version, 1);
+        assert_eq!(profile.charter, AgentCharter::default());
+        let connection = core.connection.lock().await;
+        let mut rows = connection
+            .query(
+                "SELECT value FROM collab_meta WHERE key = 'schema_version'",
+                (),
+            )
+            .await?;
+        assert_eq!(
+            rows.next().await?.expect("schema row").get::<String>(0)?,
+            SCHEMA_VERSION.to_string()
+        );
         Ok(())
     }
 

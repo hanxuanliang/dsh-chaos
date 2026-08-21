@@ -67,7 +67,59 @@ class FakeCollab {
           createdAtMs: 1,
         },
       }],
+      contexts: [await this.identityContext(agentId, 'target-1')],
       checkedAtMs: 2,
+    }
+  }
+  async identityContext(agentId, targetId) {
+    return {
+      agent: {
+        actor: {
+          id: agentId,
+          kind: 'agent',
+          handle: 'alpha',
+          displayName: 'Alpha',
+          createdAtMs: 1,
+        },
+        workspacePath: '/tmp/dsh-chaos-agent-1',
+        lifecycle: 'active',
+        charter: {
+          schemaVersion: 1,
+          summary: 'Own implementation',
+          capabilities: ['rust'],
+          constraints: [],
+        },
+        version: '1',
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      },
+      ...(targetId === undefined ? {} : {
+        target: {
+          id: targetId,
+          kind: 'channel',
+          name: 'design',
+          createdBy: 'human-1',
+          createdAtMs: 1,
+        },
+        membershipTarget: {
+          id: targetId,
+          kind: 'channel',
+          name: 'design',
+          createdBy: 'human-1',
+          createdAtMs: 1,
+        },
+      }),
+      members: [{
+        actor: {
+          id: agentId,
+          kind: 'agent',
+          handle: 'alpha',
+          displayName: 'Alpha',
+          createdAtMs: 1,
+        },
+        role: 'member',
+        joinedAtMs: 1,
+      }],
     }
   }
   async markModelSeen(batchId, agentId, generation, sessionId) {
@@ -228,6 +280,7 @@ assert.equal(binding.preset, 'standard')
 assert.deepEqual(mountedPresets, ['standard'])
 assert.equal(runtimes.resolve(binding), fakeAgent)
 assert.deepEqual([...tools.keys()].sort(), [
+  'identity_context',
   'message_check',
   'message_read',
   'message_send',
@@ -253,6 +306,10 @@ const execution = {
 }
 const checked = await tools.get('message_check').execute({ limit: 7 }, execution)
 assert.equal(checked.messages[0].message.text, 'private body')
+assert.equal(checked.contexts[0].members[0].actor.handle, 'alpha')
+const identity = await tools.get('identity_context').execute({ targetId: 'target-1' }, execution)
+assert.equal(identity.target.name, 'design')
+assert.equal(identity.agent.actor.handle, 'alpha')
 assert.equal(collab.seen.length, 0, 'check alone must not mark model-seen')
 await runtimes.rearmUnconfirmed(fakeAgent)
 assert.equal(collab.rearms.length, 1, 'idle checked work must be re-armed')
