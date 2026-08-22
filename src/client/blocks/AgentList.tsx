@@ -1,55 +1,62 @@
-import type { JSX, ReactNode } from 'react'
-import { IconChevronDownOutline14, IconSearchOutline16, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { JSX } from 'react'
 import type { AgentProfile } from '../../agent-settings-types.ts'
 import type { ChaosTranslate } from '../locales.ts'
 import { AvatarChip } from '../atoms/AvatarChip.tsx'
+import { PanelHeader, Toolbar } from '../shared/layout/index.ts'
+import { EmptyState, EntityRow, SearchField, StatusChip } from '../shared/ui/index.ts'
 import css from './AgentList.module.css'
 
-export function AgentList({ profiles, total, query, selectedId, expandedContent, onQueryChange, onSelect, t }: {
+export function AgentList({ profiles, total, query, selectedId, onQueryChange, onSelect, t }: {
   profiles: AgentProfile[]
   total: number
   query: string
   selectedId: string | undefined
-  expandedContent?: ReactNode
   onQueryChange(value: string): void
   onSelect(profile: AgentProfile): void
   t: ChaosTranslate
 }): JSX.Element {
-  return <section className={css.list} aria-label={t('agents.title')}>
-    <label className={css.search}>
-      <IconSearchOutline16 size={16} />
-      <span className={css.srOnly}>{t('agents.search')}</span>
-      <input type="search" value={query} placeholder={t('agents.searchPlaceholder')}
-        onChange={event => { onQueryChange(event.target.value) }} />
-    </label>
-    <div className={css.listHeading}><strong>{t('agents.list')}</strong><span>{profiles.length === total ? total : `${profiles.length} / ${total}`}</span></div>
-    {profiles.length === 0
-      ? <p className={css.noResults}>{t('agents.searchEmpty')}</p>
-      : <div className={css.items} role="list" aria-label={t('agents.list')}>
-        {profiles.map(profile => {
-          const expanded = profile.actor.id === selectedId
-          return <article key={profile.actor.id} className={css.item} role="listitem" data-expanded={expanded ? 'true' : undefined}>
-            <button type="button" className={css.card}
-              data-agent-id={profile.actor.id}
-              data-selected={expanded ? 'true' : undefined}
-              aria-expanded={expanded}
-              aria-controls={expanded ? `chaos-agent-${profile.actor.id}-detail` : undefined}
-              onClick={() => { onSelect(profile) }}>
-              <AvatarChip handle={profile.actor.handle} displayName={profile.actor.displayName} size="lg" />
-              <span className={css.copy}>
-                <strong>{profile.actor.displayName}</strong>
-                <span>@{profile.actor.handle}</span>
-                <small>{profile.charter.summary}</small>
-              </span>
-              <span className={css.status}>
-                <StateDot state={profile.binding === undefined ? 'warning' : 'done'} size={8} />
-                <span>{profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')}</span>
-              </span>
-              <IconChevronDownOutline14 size={14} className={expanded ? css.chevronOpen : css.chevron} />
-            </button>
-            {expanded && expandedContent !== undefined && <div className={css.expanded}>{expandedContent}</div>}
-          </article>
-        })}
-      </div>}
-  </section>
+  return (
+    <section className={css.list} aria-label={t('agents.list')}>
+      <PanelHeader title={t('agents.list')} description={profiles.length === total ? String(total) : `${profiles.length} / ${total}`} />
+      <Toolbar start={(
+        <SearchField
+          className={css.search}
+          value={query}
+          onValueChange={onQueryChange}
+          label={t('agents.search')}
+          clearLabel={t('agents.clearSearch')}
+          placeholder={t('agents.searchPlaceholder')}
+        />
+      )} />
+      {profiles.length === 0
+        ? <EmptyState title={t('agents.searchEmpty')} compact />
+        : (
+          <div className={css.items} role="list" aria-label={t('agents.list')}>
+            {profiles.map(profile => {
+              const selected = profile.actor.id === selectedId
+              return (
+                <div key={profile.actor.id} role="listitem">
+                  <EntityRow
+                    className={css.row}
+                    leading={<AvatarChip handle={profile.actor.handle} displayName={profile.actor.displayName} size="lg" />}
+                    title={profile.actor.displayName}
+                    description={`@${profile.actor.handle} · ${profile.charter.summary}`}
+                    selected={selected}
+                    entityId={profile.actor.id}
+                    ariaLabel={profile.actor.displayName}
+                    onSelect={() => { onSelect(profile) }}
+                    actions={(
+                      <StatusChip
+                        tone={profile.binding === undefined ? 'warning' : 'success'}
+                        label={profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')}
+                      />
+                    )}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        )}
+    </section>
+  )
 }

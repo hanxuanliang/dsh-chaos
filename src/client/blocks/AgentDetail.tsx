@@ -7,23 +7,23 @@ import {
   IconFolderOpenOutline16,
   IconTrashOutline16,
   Menu,
-  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentMembership, AgentPresetSummary, AgentProfile } from '../../agent-settings-types.ts'
 import { ChaosClient, type LlmModelGroup } from '../api.ts'
 import type { ChaosTranslate } from '../locales.ts'
-import { ErrorBanner } from '../atoms/ErrorBanner.tsx'
-import { PillTabs } from '../atoms/PillTabs.tsx'
+import { PanelHeader, Toolbar } from '../shared/layout/index.ts'
+import { ErrorBanner, Field, IconButton, StatusChip, Tabs } from '../shared/ui/index.ts'
 import css from './AgentDetail.module.css'
 
 type Tab = 'identity' | 'runtime' | 'collaboration'
 
 function reasonText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
-export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspace, onNavigateChannel, onDelete, t }: {
+export function AgentDetail({ connection, profile, presets, onBack, onUpdated, onWorkspace, onNavigateChannel, onDelete, t }: {
   connection: ConnectionHandle
   profile: AgentProfile
   presets: AgentPresetSummary[]
+  onBack?: (() => void) | undefined
   onUpdated(profile: AgentProfile): void
   onWorkspace(): void
   onNavigateChannel(targetId: string): void
@@ -122,8 +122,22 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
 
   return (
     <section id={`chaos-agent-${profile.actor.id}-detail`} className={css.detail} aria-label={profile.actor.displayName}>
-      <div className={css.toolbar}>
-        <PillTabs align="lead" ariaLabel={t('agents.detailTabs')} items={([
+      <PanelHeader
+        className={css.detailHeader}
+        title={profile.actor.displayName}
+        description={`@${profile.actor.handle}`}
+        {...(onBack === undefined ? {} : { backLabel: t('agents.back'), onBack })}
+        actions={<>
+          <StatusChip tone={profile.binding === undefined ? 'warning' : 'success'} label={profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')} />
+          <IconButton label={t('agents.openWorkspace')} icon={<IconFolderOpenOutline16 size={16} />} onClick={onWorkspace} />
+          <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
+            onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}
+            items={[{ id: 'delete', label: t('agents.delete'), icon: <IconTrashOutline16 size={16} />, danger: true }]}
+            anchor={<IconButton label={t('agents.more')} icon={<IconEllipsisOutline16 size={16} />} selected={menuOpen} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }} />} />
+        </>}
+      />
+      <Toolbar start={(
+        <Tabs<Tab> label={t('agents.detailTabs')} value={tab} onValueChange={setTab} align="lead" items={([
           ['identity', t('agents.identity')],
           ['runtime', t('agents.runtime')],
           ['collaboration', t('agents.collaboration')],
@@ -132,19 +146,9 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
           label,
           active: tab === id,
           tabId: `chaos-agent-${profile.actor.id}-tab-${id}`,
-          controls: `chaos-agent-${profile.actor.id}-panel-${id}`,
-          onClick: () => { setTab(id) },
+          panelId: `chaos-agent-${profile.actor.id}-panel-${id}`,
         }))} />
-        <div className={css.actions}>
-          <Tooltip label={t('agents.openWorkspace')} side="bottom">
-            <button type="button" className={css.iconButton} aria-label={t('agents.openWorkspace')} onClick={onWorkspace}><IconFolderOpenOutline16 size={16} /></button>
-          </Tooltip>
-          <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
-            onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}
-            items={[{ id: 'delete', label: t('agents.delete'), icon: <IconTrashOutline16 size={16} />, danger: true }]}
-            anchor={<button type="button" className={css.iconButton} aria-label={t('agents.more')} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }}><IconEllipsisOutline16 size={16} /></button>} />
-        </div>
-      </div>
+      )} />
 
       <div className={css.sections}>
         {tab === 'identity' && <section id={`chaos-agent-${profile.actor.id}-panel-identity`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-identity`}>
@@ -153,8 +157,8 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
             <p>{t('agents.identityHint')}</p>
           </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
-          <label className={css.field}><span>{t('agents.name')}</span><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></label>
-          <label className={css.field}><span>{t('agents.charter')}</span><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></label>
+          <Field label={t('agents.name')} required><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></Field>
+          <Field label={t('agents.charter')} required><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
           <footer className={css.footer}>
             <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>
             <Button variant="primary" size="sm" disabled={!identityDirty || identitySaving || name.trim() === '' || description.trim() === ''} onClick={saveIdentity}>{identitySaving ? t('agents.saving') : t('agents.saveIdentity')}</Button>
@@ -170,9 +174,9 @@ export function AgentDetail({ connection, profile, presets, onUpdated, onWorkspa
           {catalogError !== null && <ErrorBanner>{t('create.routeFailed', { error: catalogError })} <button type="button" className={css.inlineAction} onClick={loadCatalog}>{t('create.routeRetry')}</button></ErrorBanner>}
           {catalog === null && catalogError === null && <p className={css.state} role="status">{t('create.routeLoading')}</p>}
           {catalog !== null && <div className={css.runtimeGrid}>
-            <label className={css.field}><span>{t('create.provider')}</span><select value={provider} disabled={runtimeSaving} onChange={event => { setProvider(event.target.value); setModel(''); setRuntimeError(null) }}><option value="" disabled>{t('create.providerPlaceholder')}</option>{catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-            <label className={css.field}><span>{t('create.model')}</span><select value={model} disabled={runtimeSaving || provider === ''} onChange={event => { setModel(event.target.value); setRuntimeError(null) }}><option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>{models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-            <label className={css.field}><span>{t('create.preset')}</span><select value={presetId} disabled={runtimeSaving} onChange={event => { setPresetId(event.target.value); setRuntimeError(null) }}>{presets.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>{item.name?.trim() || item.id}</option>)}</select></label>
+            <Field label={t('create.provider')} required><select value={provider} disabled={runtimeSaving} onChange={event => { setProvider(event.target.value); setModel(''); setRuntimeError(null) }}><option value="" disabled>{t('create.providerPlaceholder')}</option>{catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></Field>
+            <Field label={t('create.model')} required><select value={model} disabled={runtimeSaving || provider === ''} onChange={event => { setModel(event.target.value); setRuntimeError(null) }}><option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>{models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+            <Field label={t('create.preset')} required><select value={presetId} disabled={runtimeSaving} onChange={event => { setPresetId(event.target.value); setRuntimeError(null) }}>{presets.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>{item.name?.trim() || item.id}</option>)}</select></Field>
           </div>}
           <p className={css.runtimeWarning}>{t('agents.runtimeWarning')}</p>
           <footer className={css.footer}>

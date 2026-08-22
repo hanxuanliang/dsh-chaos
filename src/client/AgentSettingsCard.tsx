@@ -7,7 +7,8 @@ import { AgentCreateDialog } from './AgentCreateDialog.tsx'
 import type { ChaosTranslate } from './locales.ts'
 import { AgentDetail } from './blocks/AgentDetail.tsx'
 import { AgentList } from './blocks/AgentList.tsx'
-import streamCss from './blocks/MessageStream.module.css'
+import { ResponsiveDrilldown, SplitPane } from './shared/layout/index.ts'
+import { EmptyState, ErrorBanner, SkeletonList } from './shared/ui/index.ts'
 import css from './AgentSettingsCard.module.css'
 
 export interface AgentSettingsCardProps {
@@ -17,7 +18,6 @@ export interface AgentSettingsCardProps {
   t: ChaosTranslate
 }
 type Phase = 'loading' | 'ready' | 'error'
-const SKELETON_ROWS = [0, 1, 2]
 function errorText(reason: unknown): string { return reason instanceof Error ? reason.message : String(reason) }
 
 /** Identity-first expandable Agent settings surface. */
@@ -99,6 +99,37 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
       setDeleteAcknowledged(false)
     }, reason => { setActionError(errorText(reason)) }).finally(() => { setDeleting(false) })
   }
+  const closeDetail = (): void => {
+    const id = selectedId
+    setSelectedId(undefined)
+    window.requestAnimationFrame(() => {
+      const trigger = [...document.querySelectorAll<HTMLButtonElement>('[data-entity-id]')]
+        .find(button => button.dataset.entityId === id)
+      trigger?.focus()
+    })
+  }
+  const list = <AgentList profiles={filteredProfiles} total={profiles.length} query={query} selectedId={visibleSelected?.actor.id}
+    onQueryChange={setQuery}
+    onSelect={profile => { setSelectedId(profile.actor.id) }} t={t} />
+  const detail = visibleSelected === undefined
+    ? <EmptyState title={t('agents.select')} />
+    : <AgentDetail connection={connection} profile={visibleSelected} presets={presets}
+        onBack={closeDetail}
+        onUpdated={updateProfile}
+        onWorkspace={() => {
+          openPath(visibleSelected.workspacePath).catch(reason => { setActionError(t('agents.workspaceOpenFailed', { error: errorText(reason) })) })
+        }}
+        onNavigateChannel={navigateChannel}
+        onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />
+  const desktopDetail = visibleSelected === undefined
+    ? detail
+    : <AgentDetail connection={connection} profile={visibleSelected} presets={presets}
+        onUpdated={updateProfile}
+        onWorkspace={() => {
+          openPath(visibleSelected.workspacePath).catch(reason => { setActionError(t('agents.workspaceOpenFailed', { error: errorText(reason) })) })
+        }}
+        onNavigateChannel={navigateChannel}
+        onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />
 
   return (
     <section className={css.page} aria-label={t('agents.title')} aria-busy={phase === 'loading' || refreshing}>
@@ -106,23 +137,19 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
         <div className={css.titleBlock}><h1>{t('agents.title')}</h1><p>{t('agents.subtitle')}</p></div>
         <Button variant="outline" size="sm" icon={<IconPlusOutline16 size={16} />} onClick={() => { setCreateOpen(true); setActionError(null) }}>{t('agents.create')}</Button>
       </header>
-      {actionError !== null && <p className={css.banner} role="alert">{actionError}</p>}
+      {actionError !== null && <ErrorBanner>{actionError}</ErrorBanner>}
       {refreshing && <p className={css.refreshing} role="status">{t('agents.refreshing')}</p>}
-      {phase === 'loading' && <div className={css.skeleton} role="status" aria-label={t('agents.loadingAria')}>{SKELETON_ROWS.map(index => <div key={index} className={streamCss.skeletonRow} />)}</div>}
-      {phase === 'error' && <div className={css.empty} role="alert"><p className={css.emptyText}>{t('agents.loadFailed', { error: loadError ?? '' })}</p><Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button></div>}
-      {phase === 'ready' && profiles.length === 0 && <div className={css.empty}><p className={css.emptyText}>{t('agents.empty')}</p><Button variant="outline" size="sm" onClick={() => { setCreateOpen(true) }}>{t('agents.create')}</Button></div>}
+      {phase === 'loading' && <SkeletonList className={css.skeleton} rows={4} label={t('agents.loadingAria')} />}
+      {phase === 'error' && <EmptyState title={t('agents.loadFailed', { error: loadError ?? '' })} action={<Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button>} />}
+      {phase === 'ready' && profiles.length === 0 && <EmptyState title={t('agents.empty')} action={<Button variant="outline" size="sm" onClick={() => { setCreateOpen(true) }}>{t('agents.create')}</Button>} />}
       {phase === 'ready' && profiles.length > 0 && <div className={css.workspace}>
-        <AgentList profiles={filteredProfiles} total={profiles.length} query={query} selectedId={visibleSelected?.actor.id}
-          onQueryChange={setQuery}
-          onSelect={profile => { setSelectedId(current => current === profile.actor.id ? undefined : profile.actor.id) }}
-          expandedContent={visibleSelected === undefined ? undefined : <AgentDetail connection={connection} profile={visibleSelected} presets={presets}
-            onUpdated={updateProfile}
-            onWorkspace={() => {
-              openPath(visibleSelected.workspacePath).catch(reason => { setActionError(t('agents.workspaceOpenFailed', { error: errorText(reason) })) })
-            }}
-            onNavigateChannel={navigateChannel}
-            onDelete={() => { setDeleteProfile(visibleSelected); setDeleteAcknowledged(false) }} t={t} />} t={t} />
-      </div>}
+          <ResponsiveDrilldown
+            desktop={<SplitPane id="agent-settings" leading={list} trailing={desktopDetail} leadingDefault={280} leadingMin={240} leadingMax={360} trailingMin={420} separatorLabel={t('agents.resize')} />}
+            list={list}
+            detail={detail}
+            detailOpen={visibleSelected !== undefined}
+          />
+        </div>}
       {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
         presetsError={presetsError} onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
       {deleteProfile !== null && <RiskConfirmation open title={t('agents.deleteTitle', { name: deleteProfile.actor.displayName })}

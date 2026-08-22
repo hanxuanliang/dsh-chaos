@@ -4,10 +4,7 @@
 .titleBlock { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .titleBlock h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; }
 .titleBlock p { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; }
-.banner { margin: 0; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, transparent); border-radius: 8px; padding: 8px 12px; color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-interactive-bg-hover-danger, transparent); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 .refreshing { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; }
-.workspace { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 14px; }
-.skeleton, .empty { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 12px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 12px; padding: 32px 16px; }
-.skeleton { align-items: stretch; }
-.emptyText { margin: 0; max-width: 56ch; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; text-align: center; }
-@media (max-width: 760px) { .page { gap: 12px; } }
+.workspace { display: flex; width: 100%; height: min(620px, calc(100vh - 220px)); min-width: 0; min-height: 420px; overflow: hidden; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); }
+.skeleton { border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); }
+@media (max-width: 700px) { .page { gap: 12px; } .workspace { height: min(640px, calc(100vh - 180px)); min-height: 360px; } }

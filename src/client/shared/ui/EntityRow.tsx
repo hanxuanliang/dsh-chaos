@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from 'react'
 import { classNames } from '../class-names.ts'
 import css from './EntityRow.module.css'
 
-export function EntityRow({ leading, title, description, meta, actions, selected, onSelect, className, ariaLabel }: {
+export function EntityRow({ leading, title, description, meta, actions, selected, onSelect, className, ariaLabel, entityId }: {
   leading?: ReactNode
   title: ReactNode
   description?: ReactNode
@@ -12,6 +12,7 @@ export function EntityRow({ leading, title, description, meta, actions, selected
   onSelect?(): void
   className?: string | undefined
   ariaLabel?: string | undefined
+  entityId?: string | undefined
 }): JSX.Element {
   const copy = (
     <>
@@ -34,6 +35,7 @@ export function EntityRow({ leading, title, description, meta, actions, selected
             className={css.content}
             aria-label={ariaLabel}
             aria-current={selected === true ? 'true' : undefined}
+            data-entity-id={entityId}
             onClick={onSelect}
           >
             {copy}
