@@ -30,7 +30,6 @@ mod delivery;
 mod error;
 mod membership;
 mod message;
-mod model;
 #[cfg(feature = "napi")]
 mod napi_bridge;
 mod profile;
@@ -50,20 +49,18 @@ pub use activity::{
 pub use actor::{Actor, ActorKind};
 pub use changefeed::{ChangeEvent, ChangeKind, CollabSnapshot};
 pub use db::CollabCore;
+pub use delivery::{InboxBatch, InboxMessage, PendingWake};
 pub use error::{CollabError, Result};
 pub use membership::{AgentMembership, IdentityContext, MembershipRole, TargetMember};
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
-pub use model::{InboxBatch, InboxMessage, PendingWake};
 pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
 pub use runtime::RuntimeBinding;
 pub use target::{Target, TargetKind};
 pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
 
-use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use turso::transaction::TransactionBehavior;
 use uuid::Uuid;
 
 pub(crate) fn new_id() -> String {
