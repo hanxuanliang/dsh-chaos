@@ -37,7 +37,6 @@ pub use thread::ThreadSummary;
 
 use std::collections::BTreeSet;
 
-use serde::{Deserialize, Serialize};
 use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
 

@@ -1,7 +1,7 @@
 use crate::changefeed::insert_change;
 use crate::ids::{ActorId, ThreadId};
 use crate::membership::{Membership, active_member_ids};
-use crate::message::message_target_author;
+use crate::message::store::MessageStore;
 use crate::target::{is_active_member, require_target};
 use crate::{
     Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
@@ -19,8 +19,9 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = Actor::require(connection, &actor_id).await?;
-            let (parent_target_id, root_author_id) =
-                message_target_author(connection, root_message_id).await?;
+            let (parent_target_id, root_author_id) = MessageStore::new(connection)
+                .target_and_author(root_message_id)
+                .await?;
             if require_target(connection, &parent_target_id).await? == TargetKind::Thread {
                 return Err(CollabError::InvalidArgument(
                     "Threads cannot be nested under Thread messages".into(),
