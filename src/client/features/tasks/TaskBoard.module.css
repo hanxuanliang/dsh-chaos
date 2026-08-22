@@ -1,4 +1,4 @@
-/* TaskBoard: board + filters + status menu + same-canvas task detail. */
+/* TaskBoard: board + filters + status menu + focused task detail card. */
 /* ---- tasks board (P0-4) -------------------------------------------------- */
 /* Anatomy: dsh-web-ui/packages/dsh-task-board board.module.css remapped to the
  * panel's padding/scale. .panel prefixes per S5 (taskCard is a button). */
@@ -68,85 +68,47 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.taskDetailSurface {
+.taskDetailDialog {
   --dsh-chaos-lane-review: #7287fd;
+  width: min(520px, calc(100vw - 32px));
+  max-width: min(520px, calc(100vw - 32px));
+}
+.taskDetailDialogContent {
   display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
   flex-direction: column;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-base);
-}
-.taskDetailError { margin: 10px 16px 0; }
-.taskDetailLayout {
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  overflow: hidden;
-}
-.taskDetailMain {
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
+  gap: 0;
+  padding-bottom: 20px;
 }
 .taskDetailContent {
-  width: min(100%, 760px);
-  margin: 0 auto;
-  padding: 36px 40px 64px;
+  padding: 4px 0 20px;
 }
-.taskDetailEyebrow {
-  margin: 0 0 8px;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 17px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.taskDetailContent h1 {
-  margin: 0;
+.taskDetailContent h3 {
+  margin: 0 0 10px;
   color: var(--dsw-alias-label-primary);
-  font-size: 24px;
-  font-weight: 650;
-  line-height: 32px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
   overflow-wrap: anywhere;
 }
 .taskDetailDescription {
-  margin: 18px 0 24px;
+  margin: 0 0 18px;
   color: var(--dsw-alias-label-secondary);
-  font-size: 14px;
-  line-height: 24px;
+  font-size: 13px;
+  line-height: 21px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.taskDetailContent h1 + :global(button) { margin-top: 24px; }
-.taskDetailProperties {
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  border-left: 1px solid var(--dsw-alias-border-l1);
-  padding: 20px 16px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-base) 94%, var(--dsw-alias-interactive-bg-hover));
-}
-.taskDetailProperties h2 {
-  margin: 0 0 16px;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
-}
+.taskDetailContent h3 + :global(button) { margin-top: 8px; }
+.taskDetailDivider { height: 1px; margin: 0 0 18px; background: var(--dsw-alias-border-l1); }
 .taskDetailMeta {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   margin: 0;
 }
 .taskDetailRow {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-height: 28px;
@@ -186,19 +148,6 @@
 .statusDot[data-status='in_review'] { background: var(--dsh-chaos-lane-review); }
 .statusDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
 
-@media (max-width: 700px) {
-  .taskDetailLayout {
-    display: block;
-    overflow-y: auto;
-  }
-  .taskDetailMain { overflow: visible; }
-  .taskDetailContent { padding: 24px 18px 32px; }
-  .taskDetailContent h1 { font-size: 20px; line-height: 28px; }
-  .taskDetailProperties {
-    overflow: visible;
-    border-top: 1px solid var(--dsw-alias-border-l1);
-    border-left: 0;
-    padding: 20px 18px 32px;
-  }
-  .taskDetailRow { grid-template-columns: 100px minmax(0, 1fr); }
+@media (max-width: 520px) {
+  .taskDetailRow { grid-template-columns: 92px minmax(0, 1fr); }
 }

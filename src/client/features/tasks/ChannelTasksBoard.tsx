@@ -14,9 +14,9 @@
  *     done → in_progress   (reopen)
  *   Special case: todo(unassigned) → in_progress goes through task.claim so
    * the move attaches an assignee (spec §3.1's drop-to-progress rule).
- * - Task info drills into a same-canvas detail view. The main column shows the
- *   source content while the properties rail keeps status and assignee live.
- *   Its source action opens Messages and highlights the anchor.
+ * - Task info opens in a focused card dialog. A divider separates the source
+ *   content from live status, assignee, author, and timestamp metadata. The
+ *   source action opens Messages and highlights the anchor.
  * - Data truth: NativeTask is message-anchored; tasksByMessage refetches on
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
@@ -30,7 +30,7 @@ import { KanbanLane, KanbanLaneGrid } from './KanbanLane.tsx'
 import { ErrorBanner } from '../../shared/ui/index.ts'
 import { Toolbar } from '../../shared/layout/index.ts'
 import { AssigneeFilter } from './AssigneeFilter.tsx'
-import { TaskDetailView } from './TaskDetailView.tsx'
+import { TaskDetailDialog } from './TaskDetailDialog.tsx'
 import { TASK_LANES, TASK_LANE_LABEL_KEY, TASK_TRANSITIONS, formatTaskTime, splitTaskAnchor, type TaskStatus } from './task-model.ts'
 
 export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, onFocusHandled, onOpenMessage }: {
@@ -150,28 +150,6 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
     window.requestAnimationFrame(() => { cardRefs.current.get(messageId)?.focus() })
   }
 
-  if (selected !== undefined) {
-    const anchor = splitTaskAnchor(anchorOf(selected))
-    return (
-      <TaskDetailView
-        task={selected}
-        title={anchor.title === '' ? `#${selected.number}` : anchor.title}
-        description={anchor.excerpt}
-        assigneeLabel={assigneeLabelOf(selected)}
-        createdByLabel={createdByLabelOf(selected)}
-        selfActor={state.actors.find(a => a.id === state.selfId)}
-        agents={members}
-        error={moveError}
-        t={t}
-        onMove={(target) => { move(selected, target) }}
-        onClaim={(actorId) => { setMoveError(undefined); store.claimTask(selected.messageId, actorId).catch(surfaceError) }}
-        onUnclaim={() => { setMoveError(undefined); store.unclaimTask(selected.messageId).catch(surfaceError) }}
-        onOpenAnchor={() => { setSelectedMessageId(undefined); onOpenMessage(selected.messageId) }}
-        onBack={closeDetail}
-      />
-    )
-  }
-
   return (
     <div className={css.taskBoard}>
       <Toolbar className={css.taskBoardHeader} start={<AssigneeFilter t={t} members={members} value={assigneeFilter} onChange={setAssigneeFilter} />} />
@@ -233,6 +211,27 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
           )
         })}
       </KanbanLaneGrid>
+      {selected !== undefined && (() => {
+        const anchor = splitTaskAnchor(anchorOf(selected))
+        return (
+          <TaskDetailDialog
+            task={selected}
+            title={anchor.title === '' ? `#${selected.number}` : anchor.title}
+            description={anchor.excerpt}
+            assigneeLabel={assigneeLabelOf(selected)}
+            createdByLabel={createdByLabelOf(selected)}
+            selfActor={state.actors.find(a => a.id === state.selfId)}
+            agents={members}
+            error={moveError}
+            t={t}
+            onMove={(target) => { move(selected, target) }}
+            onClaim={(actorId) => { setMoveError(undefined); store.claimTask(selected.messageId, actorId).catch(surfaceError) }}
+            onUnclaim={() => { setMoveError(undefined); store.unclaimTask(selected.messageId).catch(surfaceError) }}
+            onOpenAnchor={() => { setSelectedMessageId(undefined); onOpenMessage(selected.messageId) }}
+            onClose={closeDetail}
+          />
+        )
+      })()}
     </div>
   )
 }
