@@ -139,6 +139,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   min-height: 0;
   flex: 1;
 }
+.mobileChannelsButton { display: none; flex: none; }
 .main {
   display: flex;
   min-width: 0;
@@ -194,5 +195,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .statusMenuItem:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
+}
+
+@media (max-width: 700px) {
+  .mobileChannelsButton { display: inline-flex; }
 }
 .activityList { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow-y: auto; }

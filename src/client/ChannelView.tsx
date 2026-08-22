@@ -17,6 +17,7 @@ import { ThreadPanel } from './ThreadPanel.tsx'
 import css from './blocks/ChannelView.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
 import { IconMembers } from './atoms/DomainIcons.tsx'
+import { ResponsiveDrilldown, SplitPane } from './shared/layout/index.ts'
 
 export interface ChannelViewProps {
   t: ChaosTranslate
@@ -33,9 +34,11 @@ export interface ChannelViewProps {
   onPendingThreadConsumed?(): void
   /** Optional host-surface actions rendered in the Channel header action row. */
   headerActions?: ReactNode
+  /** Optional leading navigation rendered before the Channel title. */
+  headerLeading?: ReactNode
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions }: ChannelViewProps): JSX.Element {
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks' | 'activity'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
@@ -78,6 +81,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
   // tasks 模式满铺 (无 thread 并存)。
   const channelHead = (
     <header className={css.channelHead}>
+      {headerLeading}
       <h3 className={css.channelTitle}>
         <span className={css.channelHash} aria-hidden="true">#</span>
         {channel.name}
@@ -152,7 +156,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
 
 /**
  * ChannelChatPane — channel 内容区唯一来源(plocal shell main 对照):
- * [ .channelMainRow: .channelMainCol(MessageStream + composer) | ThreadPanel? ]
+ * [ .channelMainRow: SplitPane(.channelMainCol | ThreadPanel)? ]
  * 「先展示 channel, 有 thread 才在右侧展开」。ChannelView messages tab 自己用
  * 它; Activity 右栏 dock 也用同一组件, 不再手拼第二套。
  */
@@ -173,9 +177,8 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
   onRootJump(messageId: string): void
   composerDisabled: boolean
 }): JSX.Element {
-  return (
-    <div className={css.channelMainRow}>
-      <div className={css.channelMainCol}>
+  const mainPane = (
+    <div className={css.channelMainCol}>
         {channelHead}
         <MessageStream jumpMessageId={jumpMessageId} onJumpHandled={onJumpHandled}
           t={t}
@@ -196,19 +199,56 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
             disabled={composerDisabled}
           />
         </div>
-      </div>
-      {thread !== undefined && (
-        <ThreadPanel
-          t={t}
-          store={store}
-          state={state}
-          thread={thread}
-          parentChannelId={channel.id}
-          activeLocale={activeLocale}
-          onRootJump={onRootJump}
-          onClose={onCloseThread}
-        />
-      )}
+    </div>
+  )
+  if (thread === undefined) return <div className={css.channelMainRow}>{mainPane}</div>
+
+  const threadPane = (
+    <ThreadPanel
+      t={t}
+      store={store}
+      state={state}
+      thread={thread}
+      parentChannelId={channel.id}
+      activeLocale={activeLocale}
+      onRootJump={onRootJump}
+      onClose={onCloseThread}
+    />
+  )
+  const mobileThreadPane = (
+    <ThreadPanel
+      t={t}
+      store={store}
+      state={state}
+      thread={thread}
+      parentChannelId={channel.id}
+      activeLocale={activeLocale}
+      onRootJump={onRootJump}
+      onClose={onCloseThread}
+      back
+    />
+  )
+  return (
+    <div className={css.channelMainRow}>
+      <ResponsiveDrilldown
+        desktop={(
+          <SplitPane
+            id={`channel-thread:${channel.id}`}
+            leading={mainPane}
+            trailing={threadPane}
+            fixedSide="trailing"
+            leadingMin={320}
+            trailingDefault={360}
+            trailingMin={300}
+            trailingMax={520}
+            separatorLabel={t('thread.resize')}
+          />
+        )}
+        list={mainPane}
+        detail={mobileThreadPane}
+        detailOpen
+        breakpoint={640}
+      />
     </div>
   )
 }

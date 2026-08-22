@@ -169,3 +169,6 @@
   line-height: 18px;
 }
 
+@media (max-width: 700px) {
+  .rail { width: 100%; border-right: 0; }
+}

@@ -1,6 +1,6 @@
 /**
- * Thread panel (P0-5) — spec §2.1: 360px full-height right column taking over
- * the main area's right side whenever a thread is open.
+ * Thread panel content. Its width and responsive placement are owned by the
+ * shared SplitPane / ResponsiveDrilldown composition in ChannelChatPane.
  *
  * Anatomy (spec §2.1 ASCII):
  *   ┌ 线程 [×]
@@ -19,8 +19,8 @@
  * - Composer deliberately has NO As-task toggle: tasks anchor top-level
  *   channel messages, and thread replies are not top-level.
  */
-import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
-import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { JSX } from 'react'
+import { IconChevronLeftOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../native.ts'
 import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
@@ -31,19 +31,7 @@ import css from './blocks/ThreadPanel.module.css'
 import { RootCard } from './blocks/RootCard.tsx'
 import { IconButton } from './shared/ui/index.ts'
 
-const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
-const THREAD_WIDTH_MIN = 340
-const THREAD_WIDTH_MAX = 900
-
-function readThreadWidth(): number {
-  try {
-    const raw = window.localStorage.getItem(THREAD_WIDTH_KEY)
-    const parsed = raw === null ? NaN : Number.parseInt(raw, 10)
-    return Number.isFinite(parsed) ? Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, parsed)) : 480
-  } catch { return 360 }
-}
-
-export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose }: {
+export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose, back = false }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
@@ -53,6 +41,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
   /** Root card click: close panel + land the root with the jump flash. */
   onRootJump: (messageId: string) => void
   onClose: () => void
+  back?: boolean | undefined
 }): JSX.Element {
   const rootMessage: NativeMessage | undefined = thread.rootMessageId === undefined
     ? undefined
@@ -71,52 +60,12 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
     return names
   })()  // names 让 root 卡里的 @提及高亮与主流一致——root 完整渲染也含 markdown。
 
-  const [width, setWidth] = useState(readThreadWidth)
-  const [dragging, setDragging] = useState(false)
-  const dragStartX = useRef(0)
-  const dragStartWidth = useRef(width)
-
-  /** 左缘分隔条拖拽：plocal 现象用户反馈——thread 太小时必须可拉。 */
-  const startDrag = useCallback((clientX: number) => {
-    dragStartX.current = clientX
-    dragStartWidth.current = width
-    setDragging(true)
-  }, [width])
-
-  useEffect(() => {
-    if (!dragging) return
-    const onMove = (event: MouseEvent): void => {
-      const next = dragStartWidth.current + (dragStartX.current - event.clientX)
-      setWidth(Math.min(THREAD_WIDTH_MAX, Math.max(THREAD_WIDTH_MIN, next)))
-    }
-    const onUp = (): void => {
-      setDragging(false)
-      setWidth(current => {
-        try { window.localStorage.setItem(THREAD_WIDTH_KEY, String(current)) } catch { /* best-effort */ }
-        return current
-      })
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragging])
-
   return (
-    <aside className={css.threadPanel} style={{ position: 'relative', width }} aria-label={t('thread.title')}>
-      <div
-        className={css.threadResizeHandle}
-        data-dragging={dragging || undefined}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize thread panel"
-        onMouseDown={(event) => { event.preventDefault(); startDrag(event.clientX) }}
-      />
+    <aside className={css.threadPanel} aria-label={t('thread.title')}>
       <header className={css.threadHead}>
+        {back && <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconChevronLeftOutline14 size={14} />} onClick={onClose} />}
         <span className={css.threadTitle}>{t('thread.title')}</span>
-        <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconCloseOutline16 size={16} />} onClick={onClose} />
+        {!back && <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconCloseOutline16 size={16} />} onClick={onClose} />}
       </header>
       {thread.rootMessageId !== undefined && (
         <RootCard
