@@ -6,7 +6,24 @@ use crate::membership::Membership;
 use crate::target::TargetRoute;
 use crate::{Actor, CollabError, Result, TargetKind};
 
-string_id!(ThreadId, "thread_target_id");
+/// Stable Thread target identifier, non-blank by construction.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) struct ThreadId(String);
+
+impl ThreadId {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        if value.trim().is_empty() {
+            return Err(CollabError::InvalidArgument(
+                "thread_target_id must not be blank".into(),
+            ));
+        }
+        Ok(Self(value.to_owned()))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// Batch Thread preview for one root Message: count plus recent distinct repliers.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
