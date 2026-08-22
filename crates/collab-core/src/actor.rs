@@ -172,14 +172,12 @@ impl<'connection> ActorStore<'connection> {
     }
 
     pub(crate) async fn has_active_agent_row(&self, id: &ActorId) -> Result<bool> {
-        let mut rows = self
-            .connection
-            .query(
+        self.connection
+            .exists(
                 "SELECT 1 FROM agents WHERE actor_id = ?1 AND lifecycle = 'active'",
                 [id.as_str()],
             )
-            .await?;
-        Ok(rows.next().await?.is_some())
+            .await
     }
 
     pub(crate) async fn insert(&self, actor: &Actor) -> Result<()> {

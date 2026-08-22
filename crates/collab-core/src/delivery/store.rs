@@ -1,9 +1,9 @@
 //! Wake ledger, inbox batch, and model-seen persistence.
 
-use turso::Connection;
+use turso::{Connection, Row};
 
 use crate::actor::ActorKind;
-use crate::db::QueryRows;
+use crate::db::{FromRow, QueryRows};
 use crate::message::NewMessage;
 use crate::message::Recipient;
 use crate::message::stored_text;
@@ -12,6 +12,68 @@ use crate::{CollabError, InboxMessage, Message, PendingWake, Result};
 /// The authorized, not-yet-model-seen delivery ledger for one Agent.
 pub(crate) struct DeliveryStore<'connection> {
     connection: &'connection Connection,
+}
+
+/// Column projection for one queued inbox delivery joined with its Message.
+struct InboxMessageRow {
+    delivery_id: String,
+    seq: i64,
+    id: String,
+    target_id: String,
+    author_id: String,
+    client_request_id: String,
+    body_json: String,
+    created_at_ms: i64,
+}
+
+impl FromRow for InboxMessageRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            delivery_id: row.get(0)?,
+            seq: row.get(1)?,
+            id: row.get(2)?,
+            target_id: row.get(3)?,
+            author_id: row.get(4)?,
+            client_request_id: row.get(5)?,
+            body_json: row.get(6)?,
+            created_at_ms: row.get(7)?,
+        })
+    }
+}
+
+impl InboxMessageRow {
+    fn into_message(self) -> Result<InboxMessage> {
+        let text = stored_text(&self.body_json, "message body")?;
+        Ok(InboxMessage {
+            delivery_id: self.delivery_id,
+            message: Message {
+                seq: self.seq,
+                id: self.id,
+                target_id: self.target_id,
+                author_id: self.author_id,
+                client_request_id: self.client_request_id,
+                text,
+                created_at_ms: self.created_at_ms,
+            },
+        })
+    }
+}
+
+/// Column projection for an inbox batch's fenced identity.
+struct InboxBatchRow {
+    agent_id: String,
+    session_id: String,
+    generation: i64,
+}
+
+impl FromRow for InboxBatchRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            agent_id: row.get(0)?,
+            session_id: row.get(1)?,
+            generation: row.get(2)?,
+        })
+    }
 }
 
 impl<'connection> DeliveryStore<'connection> {
@@ -59,20 +121,16 @@ impl<'connection> DeliveryStore<'connection> {
 
     /// The durable pending watermark held by one Agent's wake state.
     pub(crate) async fn durable_pending_seq(&self, agent_id: &str) -> Result<i64> {
-        let mut rows = self
-            .connection
-            .query(
+        self.connection
+            .query_row::<i64>(
                 "SELECT pending_seq FROM agent_wake_state WHERE agent_id = ?1",
                 [agent_id],
             )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::NotFound {
+            .await?
+            .ok_or_else(|| CollabError::NotFound {
                 entity: "wake state",
                 id: agent_id.to_owned(),
-            });
-        };
-        Ok(row.get::<i64>(0)?)
+            })
     }
 
     /// Record that the exact current Session generation accepted a
@@ -137,9 +195,9 @@ impl<'connection> DeliveryStore<'connection> {
         agent_id: &str,
         limit: u32,
     ) -> Result<Vec<InboxMessage>> {
-        let mut rows = self
+        let rows = self
             .connection
-            .query(
+            .query_rows::<InboxMessageRow>(
                 "SELECT d.id, m.seq, m.id, m.target_id, m.author_id,
                         m.client_request_id, m.body_json, m.created_at_ms
                  FROM deliveries d
@@ -153,24 +211,9 @@ impl<'connection> DeliveryStore<'connection> {
                 (agent_id, i64::from(limit)),
             )
             .await?;
-        let mut messages = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let delivery_id = row.get::<String>(0)?;
-            let body_json = row.get::<String>(6)?;
-            messages.push(InboxMessage {
-                delivery_id,
-                message: Message {
-                    seq: row.get(1)?,
-                    id: row.get(2)?,
-                    target_id: row.get(3)?,
-                    author_id: row.get(4)?,
-                    client_request_id: row.get(5)?,
-                    text: stored_text(&body_json, "message body")?,
-                    created_at_ms: row.get(7)?,
-                },
-            });
-        }
-        Ok(messages)
+        rows.into_iter()
+            .map(InboxMessageRow::into_message)
+            .collect()
     }
 
     /// Persist one returned inbox batch with its durable check timestamp.
@@ -226,23 +269,22 @@ impl<'connection> DeliveryStore<'connection> {
         session_id: &str,
         generation: i64,
     ) -> Result<()> {
-        let mut rows = self
+        let InboxBatchRow {
+            agent_id: batch_agent,
+            session_id: batch_session,
+            generation: batch_generation,
+        } = self
             .connection
-            .query(
+            .query_row::<InboxBatchRow>(
                 "SELECT agent_id, session_id, generation
                  FROM inbox_batches WHERE id = ?1",
                 [batch_id],
             )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::NotFound {
+            .await?
+            .ok_or_else(|| CollabError::NotFound {
                 entity: "inbox batch",
                 id: batch_id.to_owned(),
-            });
-        };
-        let batch_agent = row.get::<String>(0)?;
-        let batch_session = row.get::<String>(1)?;
-        let batch_generation = row.get::<i64>(2)?;
+            })?;
         if batch_agent != agent_id || batch_session != session_id || batch_generation != generation
         {
             return Err(CollabError::RuntimeGenerationMismatch {
