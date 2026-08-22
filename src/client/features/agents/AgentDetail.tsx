@@ -38,6 +38,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
   const [description, setDescription] = useState(profile.charter.summary)
   const [identitySaving, setIdentitySaving] = useState(false)
   const [identityError, setIdentityError] = useState<string | null>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [provider, setProvider] = useState(profile.binding?.provider ?? '')
   const [model, setModel] = useState(profile.binding?.model ?? '')
   const [presetId, setPresetId] = useState(profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? '')
@@ -65,6 +66,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
       : current)
     if (changedAgent) {
       setIdentityError(null)
+      setAvatarError(null)
       setRuntimeError(null)
       membershipsRequest.current += 1
       setMemberships(null)
@@ -135,6 +137,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
         className={css.detailHeader}
         title={profile.actor.displayName}
         description={`@${profile.actor.handle}`}
+        leading={<AgentAvatarEditor client={client} profile={profile} onUpdated={onUpdated} onError={setAvatarError} t={t} />}
         {...(onBack === undefined ? {} : { backLabel: t('agents.back'), onBack })}
         actions={<>
           <StatusChip tone={profile.binding === undefined ? 'warning' : 'success'} label={profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')} />
@@ -145,6 +148,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
             anchor={<IconButton label={t('agents.more')} icon={<IconEllipsisOutline16 size={16} />} selected={menuOpen} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }} />} />
         </>}
       />
+      {avatarError !== null && <div className={css.headerError}><ErrorBanner>{avatarError}</ErrorBanner></div>}
       <Toolbar start={(
         <Tabs<Tab> label={t('agents.detailTabs')} value={tab} onValueChange={setTab} align="lead" items={([
           ['identity', t('agents.identity')],
@@ -166,7 +170,6 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
             <p>{t('agents.identityHint')}</p>
           </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
-          <AgentAvatarEditor client={client} profile={profile} onUpdated={onUpdated} t={t} />
           <Field label={t('agents.name')} required><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></Field>
           <Field label={t('agents.charter')} required><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
           <footer className={css.footer}>

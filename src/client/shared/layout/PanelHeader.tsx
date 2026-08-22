@@ -4,9 +4,10 @@ import { classNames } from '../class-names.ts'
 import { IconButton } from '../ui/IconButton.tsx'
 import css from './PanelHeader.module.css'
 
-export function PanelHeader({ title, description, actions, backLabel, onBack, className }: {
+export function PanelHeader({ title, description, leading, actions, backLabel, onBack, className }: {
   title: ReactNode
   description?: ReactNode
+  leading?: ReactNode
   actions?: ReactNode
   backLabel?: string | undefined
   onBack?(): void
@@ -17,6 +18,7 @@ export function PanelHeader({ title, description, actions, backLabel, onBack, cl
       {onBack !== undefined && backLabel !== undefined && (
         <IconButton label={backLabel} icon={<IconChevronLeftOutline14 size={14} />} onClick={onBack} />
       )}
+      {leading !== undefined && <div className={css.leading}>{leading}</div>}
       <div className={css.copy}>
         <h2>{title}</h2>
         {description !== undefined && <p>{description}</p>}
