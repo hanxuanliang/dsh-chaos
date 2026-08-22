@@ -8,7 +8,22 @@ use crate::{ChangeKind, CollabError, Result, new_id};
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 
-string_id!(ActorId, "actor_id");
+/// Stable actor identifier, non-blank by construction.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) struct ActorId(String);
+
+impl ActorId {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        if value.trim().is_empty() {
+            return Err(CollabError::InvalidArgument("actor_id must not be blank".into()));
+        }
+        Ok(Self(value.to_owned()))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// A stable collab actor kind.
 #[derive(Clone, Copy, Debug, serde::Deserialize, Eq, PartialEq, serde::Serialize)]

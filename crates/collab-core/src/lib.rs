@@ -1,27 +1,5 @@
 //! Transactional local collaboration core for the DSH collab plugin.
 
-macro_rules! string_id {
-    ($name:ident, $label:literal) => {
-        #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-        pub(crate) struct $name(String);
-
-        impl $name {
-            pub(crate) fn parse(value: &str) -> Result<Self> {
-                if value.trim().is_empty() {
-                    return Err(CollabError::InvalidArgument(
-                        concat!($label, " must not be blank").into(),
-                    ));
-                }
-                Ok(Self(value.to_owned()))
-            }
-
-            pub(crate) fn as_str(&self) -> &str {
-                &self.0
-            }
-        }
-    };
-}
-
 /// Reject blank string arguments at an API boundary. The failure names each
 /// argument after its own expression; pass `name = value` only when the
 /// expression is not the parameter name itself, and `"label" = value` when
