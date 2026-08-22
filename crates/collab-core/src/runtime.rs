@@ -49,7 +49,8 @@ impl CollabCore {
         model: &str,
         preset: &str,
     ) -> Result<RuntimeBinding> {
-        require_non_blank!(agent_id, session_id, provider, model, preset);
+        let _ = ActorId::parse(agent_id)?;
+        require_non_blank!(session_id, provider, model, preset);
         let now = now_ms()?;
         self.write(async |connection| {
             Actor::require_agent(connection, &ActorId::parse(agent_id)?).await?;
@@ -81,7 +82,8 @@ impl CollabCore {
         session_id: &str,
         preset: &str,
     ) -> Result<RuntimeBinding> {
-        require_non_blank!(agent_id, session_id, preset);
+        let _ = ActorId::parse(agent_id)?;
+        require_non_blank!(session_id, preset);
         self.write(async |connection| {
             let current = binding_for_agent(connection, agent_id)
                 .await?
@@ -105,7 +107,7 @@ impl CollabCore {
 
     /// Return the current runtime binding for one stable Agent.
     pub async fn runtime_binding(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
-        require_non_blank!(agent_id);
+        let _ = ActorId::parse(agent_id)?;
         self.read(async |connection| binding_for_agent(connection, agent_id).await)
             .await
     }
@@ -115,7 +117,7 @@ impl CollabCore {
         &self,
         session_id: &str,
     ) -> Result<Option<RuntimeBinding>> {
-        require_non_blank!(session_id);
+        let _ = ActorId::parse(session_id)?;
         self.read(async |connection| binding_for_session(connection, session_id).await)
             .await
     }

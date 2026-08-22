@@ -15,7 +15,9 @@ pub(crate) struct ActorId(String);
 impl ActorId {
     pub(crate) fn parse(value: &str) -> Result<Self> {
         if value.trim().is_empty() {
-            return Err(CollabError::InvalidArgument("actor_id must not be blank".into()));
+            return Err(CollabError::InvalidArgument(
+                "actor_id must not be blank".into(),
+            ));
         }
         Ok(Self(value.to_owned()))
     }
