@@ -12,7 +12,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useState, type JSX } from 'react'
-import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './blocks/ActivityView.module.css'
 import type { ChaosTranslate } from './locales.ts'
@@ -118,14 +118,14 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
         ]}
       />
       {unreadCount > 0 && (
-        <button
-          type="button"
-          className={css.markAllButton}
+        <Button
+          variant="outline"
+          size="sm"
           disabled={busy !== undefined}
           onClick={() => { markAllDone() }}
         >
           {t('activity.markAllRead')}
-        </button>
+        </Button>
       )}
     </div>
   )

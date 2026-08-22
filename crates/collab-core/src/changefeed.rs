@@ -12,8 +12,6 @@ use crate::task::store::TaskStore;
 use crate::thread::store::ThreadStore;
 use crate::{CollabCore, CollabError, Result, Target, Task};
 
-// ── 类型 ─────────────────────────────────────────────────────────────────────
-
 /// A durable UI invalidation kind. Change rows carry identifiers rather than
 /// mutable domain payloads; consumers re-read the authoritative projection.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -81,8 +79,6 @@ pub struct CollabSnapshot {
     pub tasks: Vec<Task>,
 }
 
-// ── 证据 ─────────────────────────────────────────────────────────────────────
-
 impl FromRow for ChangeEvent {
     fn from_row(row: &Row) -> Result<Self> {
         let seq = row.get::<i64>(0)?;
@@ -101,8 +97,6 @@ impl FromRow for ChangeEvent {
         })
     }
 }
-
-// ── 能力 ─────────────────────────────────────────────────────────────────────
 
 impl CollabCore {
     /// Return one authorization-filtered bootstrap projection and the global
@@ -204,8 +198,6 @@ impl CollabCore {
         .await
     }
 }
-
-// ── 存储 ─────────────────────────────────────────────────────────────────────
 
 /// The collab_meta key holding the durable change replay floor.
 const CHANGE_RETENTION_FLOOR_KEY: &str = "change_retention_floor";
