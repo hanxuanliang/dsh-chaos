@@ -15,9 +15,10 @@ export function AgentList({ profiles, total, query, selectedId, onQueryChange, o
   onSelect(profile: AgentProfile): void
   t: ChaosTranslate
 }): JSX.Element {
+  const count = profiles.length === total ? String(total) : `${profiles.length} / ${total}`
   return (
     <section className={css.list} aria-label={t('agents.list')}>
-      <PanelHeader title={t('agents.list')} description={profiles.length === total ? String(total) : `${profiles.length} / ${total}`} />
+      <PanelHeader title={<>{t('agents.list')} <span className={css.count}>· {count}</span></>} />
       <Toolbar start={(
         <SearchField
           className={css.search}
