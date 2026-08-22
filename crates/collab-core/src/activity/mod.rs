@@ -5,5 +5,9 @@ mod model;
 mod query;
 mod store;
 
+pub use model::{
+    ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
+};
+
 #[cfg(test)]
 mod tests;

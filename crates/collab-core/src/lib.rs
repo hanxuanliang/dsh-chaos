@@ -24,15 +24,19 @@ mod thread;
 #[cfg(feature = "napi")]
 pub use napi_bridge::*;
 
+pub use activity::{
+    ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
+};
 pub use core::CollabCore;
 pub use error::{CollabError, Result};
+pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub use model::{
-    ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
-    Actor, ActorKind, AgentCharter, AgentLifecycle, AgentMembership, AgentProfile, ChangeEvent,
-    ChangeKind, CollabSnapshot, IdentityContext, InboxBatch, InboxMessage, MembershipRole, Message,
-    MessageTail, PendingWake, RuntimeBinding, SendMessageRequest, SendMessageResult, Target,
-    TargetKind, TargetMember, Task, TaskStatus,
+    Actor, ActorKind, AgentMembership, ChangeEvent, ChangeKind, CollabSnapshot, IdentityContext,
+    InboxBatch, InboxMessage, MembershipRole, PendingWake, RuntimeBinding, Target, TargetKind,
+    TargetMember,
 };
+pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
+pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
 
 use std::collections::BTreeSet;
