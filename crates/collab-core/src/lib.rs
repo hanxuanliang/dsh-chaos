@@ -31,7 +31,7 @@ mod error;
 mod membership;
 mod message;
 #[cfg(feature = "napi")]
-mod napi_bridge;
+mod napi;
 mod profile;
 mod runtime;
 mod target;
@@ -41,7 +41,7 @@ mod test_support;
 mod thread;
 
 #[cfg(feature = "napi")]
-pub use napi_bridge::*;
+pub use napi::*;
 
 pub use activity::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
