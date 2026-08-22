@@ -50,12 +50,13 @@ pub use activity::{
 pub use actor::{Actor, ActorKind};
 pub use db::CollabCore;
 pub use error::{CollabError, Result};
+pub use membership::{AgentMembership, IdentityContext, MembershipRole, TargetMember};
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub use model::{
-    AgentMembership, ChangeEvent, ChangeKind, CollabSnapshot, IdentityContext, InboxBatch,
-    InboxMessage, MembershipRole, PendingWake, RuntimeBinding, Target, TargetKind, TargetMember,
+    ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, PendingWake, RuntimeBinding,
 };
 pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
+pub use target::{Target, TargetKind};
 pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
 
@@ -66,8 +67,6 @@ use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
 use uuid::Uuid;
 
-use actor::*;
-use changefeed::*;
 use membership::*;
 use message::*;
 use runtime::*;

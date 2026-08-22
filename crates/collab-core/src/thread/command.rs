@@ -1,8 +1,8 @@
 use crate::actor::ActorId;
 use crate::changefeed::insert_change;
-use crate::membership::{Membership, active_member_ids};
+use crate::membership::{Membership, active_member_ids, is_active_member};
 use crate::message::store::MessageStore;
-use crate::target::{is_active_member, require_target};
+use crate::target::require_target;
 use crate::{
     Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
 };
