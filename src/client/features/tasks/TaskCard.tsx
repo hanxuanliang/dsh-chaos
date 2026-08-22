@@ -33,7 +33,6 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
       data-status={task.status}
       data-dragging={dragging ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
-      aria-haspopup="dialog"
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
