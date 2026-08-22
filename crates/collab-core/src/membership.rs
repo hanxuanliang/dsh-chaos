@@ -263,7 +263,6 @@ impl CollabCore {
         actor_id: &str,
         target_id: &str,
     ) -> Result<Vec<TargetMember>> {
-        require_non_blank!(actor_id, target_id);
         self.read(async |connection| {
             let route = require_target_access(connection, target_id, actor_id).await?;
             target_memberships(connection, route.permission_target_id(target_id)).await
@@ -279,7 +278,6 @@ impl CollabCore {
         actor_id: &str,
         agent_id: &str,
     ) -> Result<Vec<AgentMembership>> {
-        require_non_blank!(actor_id, agent_id);
         self.read(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             ProfileStore::new(connection)

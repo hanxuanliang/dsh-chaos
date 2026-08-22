@@ -26,7 +26,6 @@ impl CollabCore {
         target_id: &str,
         through_seq: i64,
     ) -> Result<()> {
-        require_non_blank!(actor_id, target_id);
         if through_seq <= 0 {
             return Err(CollabError::InvalidArgument(
                 "through_seq must be a positive integer".into(),
@@ -91,7 +90,6 @@ impl CollabCore {
         limit: u32,
         cursor: Option<&str>,
     ) -> Result<ActivityInboxPage> {
-        require_non_blank!(actor_id);
         if limit == 0 || limit > 50 {
             return Err(CollabError::InvalidArgument(
                 "limit must be between 1 and 50".into(),

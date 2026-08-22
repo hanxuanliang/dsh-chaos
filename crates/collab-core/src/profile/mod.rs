@@ -88,7 +88,6 @@ impl CollabCore {
         charter: AgentCharter,
         expected_version: i64,
     ) -> Result<AgentProfile> {
-        require_non_blank!(agent_id, display_name);
         if expected_version <= 0 {
             return Err(CollabError::InvalidArgument(
                 "expected_version must be positive".into(),
@@ -131,7 +130,7 @@ impl CollabCore {
     /// Delete one Agent's operational state. The actor row and its messages
     /// stay so history never points at a missing author.
     pub async fn delete_agent(&self, actor_id: &str) -> Result<()> {
-        require_non_blank!(actor_id);
+        let _ = ActorId::parse(actor_id)?;
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
@@ -218,7 +217,6 @@ impl CollabCore {
 
     /// List every live Agent Profile in one coherent directory read.
     pub async fn list_agent_profiles(&self, actor_id: &str) -> Result<Vec<AgentProfile>> {
-        require_non_blank!(actor_id);
         self.read(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             ProfileStore::new(connection).directory().await
