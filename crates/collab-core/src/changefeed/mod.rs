@@ -1,6 +1,7 @@
 //! Durable, recipient-filtered change notifications for client synchronization.
 
 use super::*;
+use crate::ids::ActorId;
 use crate::task::store::TaskStore;
 
 impl CollabCore {
@@ -44,7 +45,7 @@ impl CollabCore {
             ));
         }
         let connection = self.connection.lock().await;
-        require_actor(&connection, actor_id).await?;
+        Actor::require(&connection, &ActorId::parse(actor_id)?).await?;
         let minimum_cursor = change_retention_floor(&connection).await?;
         let maximum_cursor = latest_change_seq(&connection).await?;
         if after_seq < minimum_cursor || after_seq > maximum_cursor {

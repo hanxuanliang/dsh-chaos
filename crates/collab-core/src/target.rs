@@ -25,7 +25,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_actor(&transaction, creator_id).await?;
+        Actor::require(&transaction, &ActorId::parse(creator_id)?).await?;
         transaction
             .execute(
                 "INSERT INTO targets
@@ -82,8 +82,8 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_actor(&transaction, actor_id).await?;
-        require_actor(&transaction, peer_id).await?;
+        Actor::require(&transaction, &ActorId::parse(actor_id)?).await?;
+        Actor::require(&transaction, &ActorId::parse(peer_id)?).await?;
 
         let mut rows = transaction
             .query(
