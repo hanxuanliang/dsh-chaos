@@ -27,6 +27,18 @@ impl TargetKind {
             Self::Thread => "thread",
         }
     }
+
+    /// Decode one row's kind text, rejecting unknown values.
+    pub(crate) fn parse(target_id: &str, value: &str) -> Result<Self> {
+        match value {
+            "channel" => Ok(Self::Channel),
+            "direct" => Ok(Self::Direct),
+            "thread" => Ok(Self::Thread),
+            other => Err(CollabError::Database(format!(
+                "target '{target_id}' has unknown kind '{other}'"
+            ))),
+        }
+    }
 }
 
 /// A stable exact collab target.
@@ -67,7 +79,7 @@ impl TargetRoute {
                 entity: "active target",
                 id: target_id.to_owned(),
             })?;
-        let kind = parse_target_kind(target_id, &kind_text)?;
+        let kind = TargetKind::parse(target_id, &kind_text)?;
         if kind == TargetKind::Thread && parent_target_id.is_none() {
             return Err(CollabError::Database(format!(
                 "Thread target '{target_id}' has no parent target"
@@ -90,7 +102,7 @@ impl TargetRoute {
                     entity: "active Thread parent target",
                     id: parent_target_id.to_owned(),
                 })?;
-            let parent_kind = parse_target_kind(parent_target_id, &parent_kind_text)?;
+            let parent_kind = TargetKind::parse(parent_target_id, &parent_kind_text)?;
             if parent_kind == TargetKind::Thread {
                 return Err(CollabError::Database(format!(
                     "Thread target '{target_id}' has a Thread parent"
@@ -106,34 +118,6 @@ impl TargetRoute {
     pub(crate) fn permission_target_id<'a>(&'a self, exact_target_id: &'a str) -> &'a str {
         self.parent_target_id.as_deref().unwrap_or(exact_target_id)
     }
-}
-
-pub(crate) fn parse_target_kind(target_id: &str, value: &str) -> Result<TargetKind> {
-    match value {
-        "channel" => Ok(TargetKind::Channel),
-        "direct" => Ok(TargetKind::Direct),
-        "thread" => Ok(TargetKind::Thread),
-        other => Err(CollabError::Database(format!(
-            "target '{target_id}' has unknown kind '{other}'"
-        ))),
-    }
-}
-
-pub(crate) async fn require_target(connection: &Connection, target_id: &str) -> Result<TargetKind> {
-    Ok(TargetRoute::require(connection, target_id).await?.kind)
-}
-
-/// Certify that `actor_id` exists and is an active member of `target_id`'s
-/// permission target, returning the resolved route.
-pub(crate) async fn require_target_access(
-    connection: &Connection,
-    target_id: &str,
-    actor_id: &str,
-) -> Result<TargetRoute> {
-    let route = TargetRoute::require(connection, target_id).await?;
-    let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-    Membership::require(connection, route.permission_target_id(target_id), &actor).await?;
-    Ok(route)
 }
 
 /// One access's complete evidence: the loaded actor plus its proven route and
@@ -296,7 +280,7 @@ impl TargetRow {
             created_at_ms,
         } = self;
         Ok(Target {
-            kind: parse_target_kind(&id, &kind_text)?,
+            kind: TargetKind::parse(&id, &kind_text)?,
             id,
             name,
             parent_target_id,

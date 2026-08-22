@@ -9,7 +9,7 @@ use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::membership::MembershipStore;
 use crate::target::TargetStore;
 use crate::task::store::TaskStore;
-use crate::thread::followed_thread_ids_for_actor;
+use crate::thread::store::ThreadStore;
 use crate::{CollabCore, CollabError, Result, Target, Task};
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
@@ -112,7 +112,9 @@ impl CollabCore {
             let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             let cursor = ChangeStore::new(connection).latest_change_seq().await?;
             let targets = TargetStore::new(connection).for_actor(actor_id).await?;
-            let followed_thread_ids = followed_thread_ids_for_actor(connection, actor_id).await?;
+            let followed_thread_ids = ThreadStore::new(connection)
+                .followed_thread_ids(&ActorId::parse(actor_id)?)
+                .await?;
             let tasks = TaskStore::new(connection)
                 .tasks_for_actor(actor_id, None)
                 .await?;

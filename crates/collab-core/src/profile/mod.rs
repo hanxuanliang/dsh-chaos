@@ -5,7 +5,7 @@ pub(crate) mod store;
 
 pub use model::{AgentCharter, AgentLifecycle, AgentProfile};
 
-use crate::actor::{ActorId, insert_actor};
+use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
 use crate::membership::MembershipStore;
 use crate::{
@@ -13,7 +13,6 @@ use crate::{
     now_ms,
 };
 
-use model::{encode_charter, normalize_charter};
 use store::ProfileStore;
 
 impl CollabCore {
@@ -21,7 +20,7 @@ impl CollabCore {
     pub async fn create_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
         let now = now_ms()?;
         self.write(async |connection| {
-            insert_actor(connection, ActorKind::User, handle, display_name, now).await
+            Actor::insert(connection, ActorKind::User, handle, display_name, now).await
         })
         .await
     }
@@ -50,7 +49,7 @@ impl CollabCore {
         workspace_path: &str,
         charter: AgentCharter,
     ) -> Result<AgentProfile> {
-        let charter = normalize_charter(charter)?;
+        let charter = charter.normalize()?;
         let actor = self
             .create_agent_actor(handle, display_name, workspace_path, &charter)
             .await?;
@@ -67,11 +66,11 @@ impl CollabCore {
         charter: &AgentCharter,
     ) -> Result<Actor> {
         NonBlank::parse("workspace_path", workspace_path)?;
-        let charter_json = encode_charter(charter)?;
+        let charter_json = charter.encode()?;
         let now = now_ms()?;
         self.write(async |connection| {
             let actor =
-                insert_actor(connection, ActorKind::Agent, handle, display_name, now).await?;
+                Actor::insert(connection, ActorKind::Agent, handle, display_name, now).await?;
             let workspace_path = workspace_path.replace("{id}", actor.id.as_str());
             ProfileStore::new(connection)
                 .insert_agent(&actor.id, &workspace_path, &charter_json, now)
@@ -95,8 +94,8 @@ impl CollabCore {
             ));
         }
         let display_name = display_name.trim();
-        let charter = normalize_charter(charter)?;
-        let charter_json = encode_charter(&charter)?;
+        let charter = charter.normalize()?;
+        let charter_json = charter.encode()?;
         let now = now_ms()?;
         self.write(async |connection| {
             let store = ProfileStore::new(connection);
@@ -191,7 +190,7 @@ impl CollabCore {
                 return Ok(actor);
             }
 
-            insert_actor(connection, ActorKind::User, handle, display_name, now).await
+            Actor::insert(connection, ActorKind::User, handle, display_name, now).await
         })
         .await
     }

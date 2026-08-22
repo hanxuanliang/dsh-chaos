@@ -8,7 +8,7 @@ pub(crate) use model::{NewMessage, Recipient, StoredTextBody, stored_text};
 
 use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
-use crate::target::require_target_access;
+use crate::target::AccessGrant;
 use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
 use crate::{ChangeKind, CollabCore, CollabError, NonBlank, Result, TargetKind, new_id, now_ms};
@@ -38,8 +38,9 @@ impl CollabCore {
 
         let now = now_ms()?;
         self.write(async |connection| {
-            let route =
-                require_target_access(connection, &request.target_id, &request.author_id).await?;
+            let route = AccessGrant::require(connection, &request.target_id, &request.author_id)
+                .await?
+                .route;
             let store = MessageStore::new(connection);
 
             if let Some(message) = store
@@ -144,7 +145,7 @@ impl CollabCore {
         message_id: &str,
     ) -> Result<Message> {
         self.read(async |connection| {
-            require_target_access(connection, target_id, actor_id).await?;
+            AccessGrant::require(connection, target_id, actor_id).await?;
             MessageStore::new(connection)
                 .require_in_target(target_id, message_id)
                 .await
@@ -171,7 +172,7 @@ impl CollabCore {
             ));
         }
         self.read(async |connection| {
-            require_target_access(connection, target_id, actor_id).await?;
+            AccessGrant::require(connection, target_id, actor_id).await?;
             MessageStore::new(connection)
                 .page_after(target_id, after_seq, limit)
                 .await
@@ -195,7 +196,7 @@ impl CollabCore {
             ));
         }
         self.read(async |connection| {
-            require_target_access(connection, target_id, actor_id).await?;
+            AccessGrant::require(connection, target_id, actor_id).await?;
             let store = MessageStore::new(connection);
             let count = store.count_in_target(target_id).await?;
             let messages = store.tail(target_id, limit).await?;

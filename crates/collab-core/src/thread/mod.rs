@@ -10,7 +10,7 @@ use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
 use crate::membership::{Membership, MembershipStore};
 use crate::message::store::MessageStore;
-use crate::target::{TargetStore, require_target};
+use crate::target::{TargetRoute, TargetStore};
 use crate::{
     Actor, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, new_id,
     now_ms,
@@ -31,7 +31,11 @@ impl CollabCore {
             let (parent_target_id, root_author_id) = MessageStore::new(connection)
                 .target_and_author(root_message_id)
                 .await?;
-            if require_target(connection, &parent_target_id).await? == TargetKind::Thread {
+            if TargetRoute::require(connection, &parent_target_id)
+                .await?
+                .kind
+                == TargetKind::Thread
+            {
                 return Err(CollabError::InvalidArgument(
                     "Threads cannot be nested under Thread messages".into(),
                 ));
@@ -149,16 +153,4 @@ impl CollabCore {
         })
         .await
     }
-}
-
-// ── 能力（域公开函数） ─────────────────────────────────────────────────────────
-
-pub(crate) async fn followed_thread_ids_for_actor(
-    connection: &turso::Connection,
-    actor_id: &str,
-) -> Result<Vec<String>> {
-    let actor_id = ActorId::parse(actor_id)?;
-    ThreadStore::new(connection)
-        .followed_thread_ids(&actor_id)
-        .await
 }
