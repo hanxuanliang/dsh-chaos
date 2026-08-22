@@ -111,7 +111,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 
 .panel *, .panel *::before, .panel *::after { box-sizing: border-box; }
-.panel button { color: inherit; font: inherit; }
+:where(.panel) :where(button) { color: inherit; font: inherit; }
 
 .header {
   display: flex;

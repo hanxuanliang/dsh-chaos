@@ -1,0 +1,4 @@
+.toolbar { display: flex; min-height: 40px; flex: none; align-items: center; gap: var(--chaos-space-2); padding: 5px 10px; }
+.start, .end { display: flex; min-width: 0; align-items: center; gap: var(--chaos-space-2); }
+.start { flex: 1; }
+.end { flex: none; margin-left: auto; }

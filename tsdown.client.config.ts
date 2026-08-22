@@ -40,6 +40,7 @@ export default {
     // require("react-markdown") missed the module table). Force-inline.
     alwaysBundle: [
       /^react-markdown($|\/)/,
+      /^react-resizable-panels($|\/)/,
       /^remark-gfm($|\/)/,
       /^remark-breaks($|\/)/,
     ],

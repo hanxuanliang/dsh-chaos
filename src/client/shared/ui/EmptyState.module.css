@@ -1,0 +1,6 @@
+.empty { display: flex; min-height: 180px; align-items: center; justify-content: center; flex-direction: column; padding: 32px 20px; color: var(--dsw-alias-label-tertiary); text-align: center; }
+.empty[data-compact='true'] { min-height: 96px; padding: 20px 16px; }
+.icon { display: inline-flex; margin-bottom: 10px; color: var(--dsw-alias-label-tertiary); }
+.empty strong { color: var(--dsw-alias-label-secondary); font-size: 13px; font-weight: 600; line-height: 20px; }
+.empty p { max-width: 360px; margin: 4px 0 0; font-size: 12px; line-height: 18px; }
+.action { margin-top: 12px; }

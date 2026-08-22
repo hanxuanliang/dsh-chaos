@@ -16,6 +16,8 @@ import type { ChaosTranslate } from './locales.ts'
 import { ChaosClient } from './api.ts'
 import { CollabStore } from './collab-store.ts'
 import css from './CollabPanel.module.css'
+import foundations from './shared/styles/foundations.module.css'
+import { classNames } from './shared/class-names.ts'
 import { CollabPanel } from './CollabPanel.tsx'
 import { CollabPanelController } from './panel-controller.ts'
 import { mountCollabSidebarEntry } from './collab-entry.ts'
@@ -61,7 +63,7 @@ function mountPanel(
     if (body === undefined) return
     container = document.createElement('div')
     container.dataset.dshChaosPanel = ''
-    container.className = css.panel ?? ''
+    container.className = classNames(css.panel, foundations.scope)
     body.append(container)
     root = createRoot(container)
     root.render(

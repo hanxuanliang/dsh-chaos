@@ -1,0 +1,5 @@
+.header { display: flex; min-height: 48px; flex: none; align-items: center; gap: var(--chaos-space-2); border-bottom: 1px solid var(--dsw-alias-border-l1); padding: 7px 10px 7px 16px; }
+.copy { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+.copy h2 { margin: 0; overflow: hidden; color: var(--dsw-alias-label-primary); font-size: 14px; font-weight: 600; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.copy p { margin: 0; overflow: hidden; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: inline-flex; flex: none; align-items: center; gap: var(--chaos-space-1); }

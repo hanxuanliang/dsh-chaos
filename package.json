@@ -106,6 +106,7 @@
   },
   "dependencies": {
     "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^4.12.3",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   }
