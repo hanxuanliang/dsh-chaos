@@ -29,6 +29,7 @@ import { ChannelComposer } from './ChannelComposer.tsx'
 import { avatarSeed } from './avatar.ts'
 import css from './blocks/ThreadPanel.module.css'
 import { RootCard } from './blocks/RootCard.tsx'
+import { IconButton } from './shared/ui/index.ts'
 
 const THREAD_WIDTH_KEY = 'dsh-chaos:threadPanelWidth'
 const THREAD_WIDTH_MIN = 340
@@ -115,9 +116,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
       />
       <header className={css.threadHead}>
         <span className={css.threadTitle}>{t('thread.title')}</span>
-        <button type="button" className={css.threadClose} aria-label={t('thread.close')} onClick={onClose}>
-          <IconCloseOutline16 />
-        </button>
+        <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconCloseOutline16 size={16} />} onClick={onClose} />
       </header>
       {thread.rootMessageId !== undefined && (
         <RootCard

@@ -11,7 +11,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useRef, useState, type JSX } from 'react'
-import { Button, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCheckOutline16, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './blocks/ActivityView.module.css'
 import type { ChaosTranslate } from './locales.ts'
@@ -116,30 +116,27 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   }
   const filter = state.activityFilter
   const unreadCount = state.activityCount
-  const filterTabs = (
-    <div className={css.activityFilterRow}>
-      <SegmentedControl
-        label={t('activity.filtersAria')}
-        value={filter}
-        onValueChange={value => { void store.setActivityFilter(value) }}
-        items={[
-          { id: 'unread', label: unreadCount > 0 ? `${t('activity.filterUnread')} (${unreadCount})` : t('activity.filterUnread') },
-          { id: 'all', label: t('activity.filterAll') },
-        ]}
-      />
-      {unreadCount > 0 && (
-        <Button
-          className={css.markAllButton}
-          variant="outline"
-          size="sm"
-          disabled={busy !== undefined}
-          onClick={() => { markAllDone() }}
-        >
-          {t('activity.markAllRead')}
-        </Button>
-      )}
-    </div>
-  )
+  const filters = <SegmentedControl
+    label={t('activity.filtersAria')}
+    value={filter}
+    onValueChange={value => { void store.setActivityFilter(value) }}
+    items={[
+      { id: 'unread', label: unreadCount > 0 ? `${t('activity.filterUnread')} (${unreadCount})` : t('activity.filterUnread') },
+      { id: 'all', label: t('activity.filterAll') },
+    ]}
+  />
+  const markAll = unreadCount > 0 ? (
+    <Button
+      className={css.markAllButton}
+      variant="ghost"
+      size="sm"
+      icon={<IconCheckOutline16 size={14} />}
+      disabled={busy !== undefined}
+      onClick={() => { markAllDone() }}
+    >
+      {t('activity.markAllRead')}
+    </Button>
+  ) : undefined
   const rows = (
     <div className={cardCss.list} role="list">
       {items.map((item) => (
@@ -162,7 +159,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   const listPane = (
     <section className={css.activityListCol} aria-label={t('activity.title')}>
       <PanelHeader title={t('activity.title')} />
-      <Toolbar start={filterTabs} />
+      <Toolbar start={filters} end={markAll} />
       {error !== undefined && <ErrorBanner className={css.activityError}>{error}</ErrorBanner>}
       {items.length === 0 ? <EmptyState title={t('activity.empty')} /> : rows}
     </section>
@@ -192,16 +189,11 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
             state={state}
             channel={dockChannel as NativeTarget}
             activeLocale={activeLocale}
+            headerActions={<span className={css.desktopClose}><IconButton label={t('activity.closeDock')} icon={<IconCloseOutline16 size={16} />} onClick={closeDock} /></span>}
           />
         ) : (
           <EmptyState title={t('activity.empty')} />
         )}
-        <IconButton
-          className={css.activityDockClose}
-          label={t('activity.closeDock')}
-          icon={<IconCloseOutline16 size={16} />}
-          onClick={closeDock}
-        />
       </div>
     </section>
   )
