@@ -156,18 +156,12 @@ pub(crate) async fn find_actor_by_handle(
         .await
 }
 
-pub(crate) async fn require_actor(connection: &Connection, actor_id: &str) -> Result<ActorKind> {
-    let mut rows = connection
-        .query("SELECT kind FROM actors WHERE id = ?1", [actor_id])
-        .await?;
-    let Some(row) = rows.next().await? else {
-        return Err(not_found("actor", actor_id));
-    };
-    parse_actor_kind(actor_id, &row.get::<String>(0)?)
-}
-
 pub(crate) async fn require_agent(connection: &Connection, agent_id: &str) -> Result<()> {
-    if require_actor(connection, agent_id).await? != ActorKind::Agent {
+    if Actor::require(connection, &ActorId::parse(agent_id)?)
+        .await?
+        .kind
+        != ActorKind::Agent
+    {
         return Err(not_found("agent", agent_id));
     }
     let mut rows = connection

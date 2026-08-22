@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::db::{FromRow, QueryRows};
+use crate::ids::ActorId;
 use crate::profile::store::ProfileStore;
 
 /// Presence proof that one Actor is an active member of one target. Obtained
@@ -47,7 +48,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        let actor_kind = require_actor(&transaction, actor_id).await?;
+        let actor = Actor::require(&transaction, &ActorId::parse(actor_id)?).await?;
         if require_target(&transaction, target_id).await? != TargetKind::Channel {
             return Err(CollabError::InvalidArgument(
                 "add_member only supports Channel targets".into(),
@@ -69,7 +70,7 @@ impl CollabCore {
                 (target_id, actor_id, now),
             )
             .await?;
-        if actor_kind == ActorKind::Agent {
+        if actor.kind == ActorKind::Agent {
             transaction
                 .execute(
                     "UPDATE agent_wake_state
@@ -98,7 +99,7 @@ impl CollabCore {
     pub async fn list_actors(&self, actor_id: &str) -> Result<Vec<Actor>> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
-        require_actor(&connection, actor_id).await?;
+        Actor::require(&connection, &ActorId::parse(actor_id)?).await?;
         connection
             .query_rows::<Actor>(
                 "SELECT id, kind, handle, display_name, created_at_ms
@@ -162,7 +163,7 @@ impl CollabCore {
         require_non_empty("actor_id", actor_id)?;
         require_non_empty("agent_id", agent_id)?;
         let connection = self.connection.lock().await;
-        require_actor(&connection, actor_id).await?;
+        Actor::require(&connection, &ActorId::parse(actor_id)?).await?;
         ProfileStore::new(&connection)
             .require_profile(agent_id)
             .await?;
