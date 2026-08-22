@@ -243,6 +243,21 @@ pub(crate) struct ActivityStore<'connection> {
     connection: &'connection Connection,
 }
 
+/// Column projection for one active conversation's Done-fence target.
+struct ActiveConversationRow {
+    target_id: String,
+    last_activity_seq: i64,
+}
+
+impl FromRow for ActiveConversationRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            target_id: row.get(0)?,
+            last_activity_seq: row.get(1)?,
+        })
+    }
+}
+
 impl<'connection> ActivityStore<'connection> {
     pub(crate) const fn new(connection: &'connection Connection) -> Self {
         Self { connection }
@@ -293,9 +308,9 @@ impl<'connection> ActivityStore<'connection> {
     /// Every active unread conversation for the actor: (target_id, last_seq)
     /// pairs, in id order. Drives inbox_done_all.
     pub(crate) async fn active_conversations(&self, actor_id: &str) -> Result<Vec<(String, i64)>> {
-        let mut rows = self
+        let rows = self
             .connection
-            .query(
+            .query_rows::<ActiveConversationRow>(
                 &format!(
                     "{} SELECT active.id, active.last_activity_seq FROM active ORDER BY active.id",
                     active_set(ACTIVITY_UNREAD_FILTER)
@@ -303,11 +318,10 @@ impl<'connection> ActivityStore<'connection> {
                 [actor_id],
             )
             .await?;
-        let mut out = Vec::new();
-        while let Some(row) = rows.next().await? {
-            out.push((row.get(0)?, row.get(1)?));
-        }
-        Ok(out)
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.target_id, row.last_activity_seq))
+            .collect())
     }
 
     /// The newest Message sequence of one target, `None` when it has none.

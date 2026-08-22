@@ -159,6 +159,27 @@ pub(crate) struct RuntimeStore<'connection> {
     connection: &'connection Connection,
 }
 
+/// Column projection for a runtime binding row.
+struct RuntimeBindingRow {
+    session_id: String,
+    generation: i64,
+}
+
+impl FromRow for RuntimeBindingRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            session_id: row.get(0)?,
+            generation: row.get(1)?,
+        })
+    }
+}
+
+impl RuntimeBindingRow {
+    fn into_parts(self) -> (String, i64) {
+        (self.session_id, self.generation)
+    }
+}
+
 impl<'connection> RuntimeStore<'connection> {
     pub(crate) const fn new(connection: &'connection Connection) -> Self {
         Self { connection }
@@ -199,17 +220,14 @@ impl<'connection> RuntimeStore<'connection> {
 
     /// The generation counter for one Agent; zero before the first bind.
     pub(crate) async fn current_generation(&self, agent_id: &str) -> Result<i64> {
-        let mut rows = self
+        Ok(self
             .connection
-            .query(
+            .query_row::<i64>(
                 "SELECT generation FROM runtime_bindings WHERE agent_id = ?1",
                 [agent_id],
             )
-            .await?;
-        match rows.next().await? {
-            Some(row) => Ok(row.get(0)?),
-            None => Ok(0),
-        }
+            .await?
+            .unwrap_or(0))
     }
 
     /// Fail unless the durable binding for `agent_id` is exactly the fenced
@@ -220,21 +238,18 @@ impl<'connection> RuntimeStore<'connection> {
         generation: i64,
         session_id: &str,
     ) -> Result<()> {
-        let mut rows = self
+        let binding = self
             .connection
-            .query(
+            .query_row::<RuntimeBindingRow>(
                 "SELECT session_id, generation FROM runtime_bindings WHERE agent_id = ?1",
                 [agent_id],
             )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::NotFound {
+            .await?
+            .ok_or_else(|| CollabError::NotFound {
                 entity: "runtime binding",
                 id: agent_id.to_owned(),
-            });
-        };
-        let current_session = row.get::<String>(0)?;
-        let current_generation = row.get::<i64>(1)?;
+            })?;
+        let (current_session, current_generation) = binding.into_parts();
         if current_session != session_id || current_generation != generation {
             return Err(CollabError::RuntimeGenerationMismatch {
                 agent_id: agent_id.to_owned(),

@@ -1,7 +1,9 @@
 //! Target identity, authorization routes, and Channel/Direct creation.
 
 use serde::{Deserialize, Serialize};
-use turso::Connection;
+use turso::{Connection, Row};
+
+use crate::db::{FromRow, QueryRows};
 
 use crate::actor::{Actor, ActorId};
 use crate::changefeed::ChangeStore;
@@ -51,22 +53,20 @@ impl TargetRoute {
     /// Load one active target's authorization route, failing when absent.
     /// Existence and topology proof: a Thread must carry a non-Thread parent.
     pub(crate) async fn require(connection: &Connection, target_id: &str) -> Result<Self> {
-        let mut rows = connection
-            .query(
+        let RouteRow {
+            kind_text,
+            parent_target_id,
+        } = connection
+            .query_row::<RouteRow>(
                 "SELECT kind, parent_target_id
                  FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
                 [target_id],
             )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::NotFound {
+            .await?
+            .ok_or_else(|| CollabError::NotFound {
                 entity: "active target",
                 id: target_id.to_owned(),
-            });
-        };
-        let kind_text = row.get::<String>(0)?;
-        let parent_target_id = row.get::<Option<String>>(1)?;
-        drop(rows);
+            })?;
         let kind = parse_target_kind(target_id, &kind_text)?;
         if kind == TargetKind::Thread && parent_target_id.is_none() {
             return Err(CollabError::Database(format!(
@@ -79,20 +79,17 @@ impl TargetRoute {
             )));
         }
         if let Some(parent_target_id) = parent_target_id.as_deref() {
-            let mut parent_rows = connection
-                .query(
+            let parent_kind_text = connection
+                .query_row::<String>(
                     "SELECT kind FROM targets
                      WHERE id = ?1 AND archived_at_ms IS NULL",
                     [parent_target_id],
                 )
-                .await?;
-            let Some(parent_row) = parent_rows.next().await? else {
-                return Err(CollabError::NotFound {
+                .await?
+                .ok_or_else(|| CollabError::NotFound {
                     entity: "active Thread parent target",
                     id: parent_target_id.to_owned(),
-                });
-            };
-            let parent_kind_text = parent_row.get::<String>(0)?;
+                })?;
             let parent_kind = parse_target_kind(parent_target_id, &parent_kind_text)?;
             if parent_kind == TargetKind::Thread {
                 return Err(CollabError::Database(format!(
@@ -243,19 +240,16 @@ impl CollabCore {
                 (&peer, &actor)
             };
 
-            let mut rows = connection
-                .query(
+            let existing_pair = connection
+                .query_row::<String>(
                     "SELECT target_id FROM direct_pairs
                      WHERE actor_low_id = ?1 AND actor_high_id = ?2",
                     (low.id.as_str(), high.id.as_str()),
                 )
                 .await?;
-            if let Some(row) = rows.next().await? {
-                let target_id = row.get::<String>(0)?;
-                drop(rows);
+            if let Some(target_id) = existing_pair {
                 return TargetStore::new(connection).find(&target_id).await;
             }
-            drop(rows);
 
             let target = Target {
                 id: new_id(),
@@ -323,31 +317,22 @@ pub(crate) struct TargetStore<'connection> {
     connection: &'connection Connection,
 }
 
-impl<'connection> TargetStore<'connection> {
-    pub(crate) const fn new(connection: &'connection Connection) -> Self {
-        Self { connection }
-    }
+/// Column projection for one Target row.
+struct TargetRow {
+    id: String,
+    kind_text: String,
+    name: String,
+    parent_target_id: Option<String>,
+    root_message_id: Option<String>,
+    created_by: String,
+    created_at_ms: i64,
+}
 
-    pub(crate) async fn find(&self, target_id: &str) -> Result<Target> {
-        let mut rows = self
-            .connection
-            .query(
-                "SELECT id, kind, name, parent_target_id, root_message_id,
-                        created_by, created_at_ms
-                 FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
-                [target_id],
-            )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::NotFound {
-                entity: "active target",
-                id: target_id.to_owned(),
-            });
-        };
-        let kind_text = row.get::<String>(1)?;
-        Ok(Target {
+impl FromRow for TargetRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
             id: row.get(0)?,
-            kind: parse_target_kind(target_id, &kind_text)?,
+            kind_text: row.get(1)?,
             name: row.get(2)?,
             parent_target_id: row.get(3)?,
             root_message_id: row.get(4)?,
@@ -355,11 +340,72 @@ impl<'connection> TargetStore<'connection> {
             created_at_ms: row.get(6)?,
         })
     }
+}
+
+impl TargetRow {
+    fn into_target(self) -> Result<Target> {
+        let Self {
+            id,
+            kind_text,
+            name,
+            parent_target_id,
+            root_message_id,
+            created_by,
+            created_at_ms,
+        } = self;
+        Ok(Target {
+            kind: parse_target_kind(&id, &kind_text)?,
+            id,
+            name,
+            parent_target_id,
+            root_message_id,
+            created_by,
+            created_at_ms,
+        })
+    }
+}
+
+/// Column projection for a Target authorization route.
+struct RouteRow {
+    kind_text: String,
+    parent_target_id: Option<String>,
+}
+
+impl FromRow for RouteRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            kind_text: row.get(0)?,
+            parent_target_id: row.get(1)?,
+        })
+    }
+}
+
+impl<'connection> TargetStore<'connection> {
+    pub(crate) const fn new(connection: &'connection Connection) -> Self {
+        Self { connection }
+    }
+
+    pub(crate) async fn find(&self, target_id: &str) -> Result<Target> {
+        self.connection
+            .query_row::<TargetRow>(
+                "SELECT id, kind, name, parent_target_id, root_message_id,
+                        created_by, created_at_ms
+                 FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
+                [target_id],
+            )
+            .await?
+            .map(|row| row.into_target())
+            .transpose()?
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "active target",
+                id: target_id.to_owned(),
+            })
+    }
 
     pub(crate) async fn for_actor(&self, actor_id: &str) -> Result<Vec<Target>> {
-        let mut rows = self
+        let rows = self
             .connection
-            .query(
+            .query_rows::<TargetRow>(
                 "SELECT DISTINCT target.id, target.kind, target.name,
                         target.parent_target_id, target.root_message_id,
                         target.created_by, target.created_at_ms
@@ -379,20 +425,6 @@ impl<'connection> TargetStore<'connection> {
                 [actor_id],
             )
             .await?;
-        let mut targets = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let id = row.get::<String>(0)?;
-            let kind_text = row.get::<String>(1)?;
-            targets.push(Target {
-                kind: parse_target_kind(&id, &kind_text)?,
-                id,
-                name: row.get(2)?,
-                parent_target_id: row.get(3)?,
-                root_message_id: row.get(4)?,
-                created_by: row.get(5)?,
-                created_at_ms: row.get(6)?,
-            });
-        }
-        Ok(targets)
+        rows.into_iter().map(TargetRow::into_target).collect()
     }
 }

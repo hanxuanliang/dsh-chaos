@@ -17,6 +17,9 @@ pub(crate) trait QueryRows {
 
     /// Decode the first row of a query, yielding `None` when no row exists.
     async fn query_row<T: FromRow>(&self, sql: &str, params: impl IntoParams) -> Result<Option<T>>;
+
+    /// Report whether a query produces at least one row.
+    async fn exists(&self, sql: &str, params: impl IntoParams) -> Result<bool>;
 }
 
 impl QueryRows for Connection {
@@ -35,6 +38,29 @@ impl QueryRows for Connection {
             Some(row) => T::from_row(&row).map(Some),
             None => Ok(None),
         }
+    }
+
+    async fn exists(&self, sql: &str, params: impl IntoParams) -> Result<bool> {
+        let mut rows = self.query(sql, params).await?;
+        Ok(rows.next().await?.is_some())
+    }
+}
+
+impl FromRow for Option<i64> {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(row.get(0)?)
+    }
+}
+
+impl FromRow for i64 {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(row.get(0)?)
+    }
+}
+
+impl FromRow for String {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(row.get(0)?)
     }
 }
 

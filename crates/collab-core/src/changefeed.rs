@@ -178,16 +178,15 @@ impl CollabCore {
             let current_floor = ChangeStore::new(connection)
                 .change_retention_floor()
                 .await?;
-            let mut rows = connection
-                .query(
-                    "SELECT MIN(seq) FROM change_events WHERE created_at_ms >= ?1",
-                    [before_ms],
-                )
-                .await?;
-            let first_retained_seq =
-                require_scalar_row(rows.next().await?, "change retention query")?
-                    .get::<Option<i64>>(0)?;
-            drop(rows);
+            let first_retained_seq = require_scalar_row(
+                connection
+                    .query_row::<Option<i64>>(
+                        "SELECT MIN(seq) FROM change_events WHERE created_at_ms >= ?1",
+                        [before_ms],
+                    )
+                    .await?,
+                "change retention query",
+            )?;
             let prune_through = match first_retained_seq {
                 Some(first_retained_seq) => first_retained_seq - 1,
                 None => ChangeStore::new(connection).latest_change_seq().await?,
@@ -230,30 +229,28 @@ impl<'connection> ChangeStore<'connection> {
 
     /// The newest durable change cursor, never below the retention floor.
     pub(crate) async fn latest_change_seq(&self) -> Result<i64> {
-        let mut rows = self
-            .connection
-            .query("SELECT COALESCE(MAX(seq), 0) FROM change_events", ())
-            .await?;
-        let latest =
-            require_scalar_row(rows.next().await?, "change sequence query")?.get::<i64>(0)?;
-        drop(rows);
+        let latest = require_scalar_row(
+            self.connection
+                .query_row::<i64>("SELECT COALESCE(MAX(seq), 0) FROM change_events", ())
+                .await?,
+            "change sequence query",
+        )?;
         Ok(latest.max(self.change_retention_floor().await?))
     }
 
     /// The oldest cursor still safe for incremental replay.
     pub(crate) async fn change_retention_floor(&self) -> Result<i64> {
-        let mut rows = self
+        let value = match self
             .connection
-            .query(
+            .query_row::<String>(
                 "SELECT value FROM collab_meta WHERE key = ?1",
                 [CHANGE_RETENTION_FLOOR_KEY],
             )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Ok(0);
+            .await?
+        {
+            Some(value) => value,
+            None => return Ok(0),
         };
-        let value = row.get::<String>(0)?;
-        drop(rows);
         let floor = value.parse::<i64>().map_err(|_| {
             CollabError::Database(format!(
                 "change retention floor '{value}' is not a signed 64-bit integer"
@@ -302,15 +299,9 @@ impl<'connection> ChangeStore<'connection> {
 
     /// Every durable actor id, in id order, for broadcast changes.
     pub(crate) async fn all_actor_ids(&self) -> Result<Vec<String>> {
-        let mut rows = self
-            .connection
-            .query("SELECT id FROM actors ORDER BY id", ())
-            .await?;
-        let mut actor_ids = Vec::new();
-        while let Some(row) = rows.next().await? {
-            actor_ids.push(row.get(0)?);
-        }
-        Ok(actor_ids)
+        self.connection
+            .query_rows::<String>("SELECT id FROM actors ORDER BY id", ())
+            .await
     }
 
     /// Append one change event addressed to an explicit recipient snapshot and
@@ -323,23 +314,18 @@ impl<'connection> ChangeStore<'connection> {
         recipient_ids: &[String],
         now: i64,
     ) -> Result<i64> {
-        let mut rows = self
-            .connection
-            .query(
-                "INSERT INTO change_events
-                 (kind, target_id, entity_id, created_at_ms)
-                 VALUES (?1, ?2, ?3, ?4)
-                 RETURNING seq",
-                (kind.as_str(), target_id, entity_id, now),
-            )
-            .await?;
-        let Some(row) = rows.next().await? else {
-            return Err(CollabError::Database(
-                "change insert returned no sequence".into(),
-            ));
-        };
-        let seq = row.get::<i64>(0)?;
-        drop(rows);
+        let seq = require_scalar_row(
+            self.connection
+                .query_row::<i64>(
+                    "INSERT INTO change_events
+                     (kind, target_id, entity_id, created_at_ms)
+                     VALUES (?1, ?2, ?3, ?4)
+                     RETURNING seq",
+                    (kind.as_str(), target_id, entity_id, now),
+                )
+                .await?,
+            "change insert",
+        )?;
         for actor_id in recipient_ids {
             self.connection
                 .execute(

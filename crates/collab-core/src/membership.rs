@@ -89,6 +89,115 @@ impl FromRow for RoleRow {
     }
 }
 
+/// Wide join projection for [`TargetMember`]: an Actor row with its role.
+struct MemberRow {
+    id: String,
+    kind_text: String,
+    handle: String,
+    display_name: String,
+    created_at_ms: i64,
+    role_text: String,
+    joined_at_ms: i64,
+}
+
+impl FromRow for MemberRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            id: row.get(0)?,
+            kind_text: row.get(1)?,
+            handle: row.get(2)?,
+            display_name: row.get(3)?,
+            created_at_ms: row.get(4)?,
+            role_text: row.get(5)?,
+            joined_at_ms: row.get(6)?,
+        })
+    }
+}
+
+impl MemberRow {
+    fn into_member(self, target_id: &str) -> Result<TargetMember> {
+        let Self {
+            id,
+            kind_text,
+            handle,
+            display_name,
+            created_at_ms,
+            role_text,
+            joined_at_ms,
+        } = self;
+        Ok(TargetMember {
+            actor: Actor {
+                kind: parse_actor_kind(&id, &kind_text)?,
+                id: id.clone(),
+                handle,
+                display_name,
+                created_at_ms,
+            },
+            role: parse_membership_role(target_id, &id, &role_text)?,
+            joined_at_ms,
+        })
+    }
+}
+
+/// Wide join projection for [`AgentMembership`]: a Target row with the Agent's
+/// role in it.
+struct AgentMembershipRow {
+    target_id: String,
+    kind_text: String,
+    name: String,
+    parent_target_id: Option<String>,
+    root_message_id: Option<String>,
+    created_by: String,
+    created_at_ms: i64,
+    role_text: String,
+    joined_at_ms: i64,
+}
+
+impl FromRow for AgentMembershipRow {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            target_id: row.get(0)?,
+            kind_text: row.get(1)?,
+            name: row.get(2)?,
+            parent_target_id: row.get(3)?,
+            root_message_id: row.get(4)?,
+            created_by: row.get(5)?,
+            created_at_ms: row.get(6)?,
+            role_text: row.get(7)?,
+            joined_at_ms: row.get(8)?,
+        })
+    }
+}
+
+impl AgentMembershipRow {
+    fn into_membership(self, agent_id: &str) -> Result<AgentMembership> {
+        let Self {
+            target_id,
+            kind_text,
+            name,
+            parent_target_id,
+            root_message_id,
+            created_by,
+            created_at_ms,
+            role_text,
+            joined_at_ms,
+        } = self;
+        Ok(AgentMembership {
+            target: Target {
+                id: target_id.clone(),
+                kind: parse_target_kind(&target_id, &kind_text)?,
+                name,
+                parent_target_id,
+                root_message_id,
+                created_by,
+                created_at_ms,
+            },
+            role: parse_membership_role(&target_id, agent_id, &role_text)?,
+            joined_at_ms,
+        })
+    }
+}
+
 /// Role-bearing presence proof that one Actor is an active member of one
 /// target. Obtained exclusively through [`Membership::require`] and
 /// [`Membership::require_owner`].
@@ -306,9 +415,9 @@ impl<'connection> MembershipStore<'connection> {
     }
 
     pub(crate) async fn target_memberships(&self, target_id: &str) -> Result<Vec<TargetMember>> {
-        let mut rows = self
+        let rows = self
             .connection
-            .query(
+            .query_rows::<MemberRow>(
                 "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
                         membership.role, membership.joined_at_ms
                  FROM memberships membership
@@ -318,41 +427,20 @@ impl<'connection> MembershipStore<'connection> {
                 [target_id],
             )
             .await?;
-        let mut members = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let id = row.get::<String>(0)?;
-            let kind_text = row.get::<String>(1)?;
-            let role_text = row.get::<String>(5)?;
-            members.push(TargetMember {
-                actor: Actor {
-                    kind: parse_actor_kind(&id, &kind_text)?,
-                    id: id.clone(),
-                    handle: row.get(2)?,
-                    display_name: row.get(3)?,
-                    created_at_ms: row.get(4)?,
-                },
-                role: parse_membership_role(target_id, &id, &role_text)?,
-                joined_at_ms: row.get(6)?,
-            });
-        }
-        Ok(members)
+        rows.into_iter()
+            .map(|row| row.into_member(target_id))
+            .collect()
     }
 
     pub(crate) async fn active_member_ids(&self, target_id: &str) -> Result<Vec<String>> {
-        let mut rows = self
-            .connection
-            .query(
+        self.connection
+            .query_rows::<String>(
                 "SELECT actor_id FROM memberships
                  WHERE target_id = ?1 AND left_at_ms IS NULL
                  ORDER BY actor_id",
                 [target_id],
             )
-            .await?;
-        let mut actor_ids = Vec::new();
-        while let Some(row) = rows.next().await? {
-            actor_ids.push(row.get(0)?);
-        }
-        Ok(actor_ids)
+            .await
     }
 
     pub(crate) async fn target_change_recipients(
@@ -365,19 +453,16 @@ impl<'connection> MembershipStore<'connection> {
         // Change events drive authorized UI invalidation, not attention delivery.
         // A Thread therefore addresses every active parent member even when they
         // unfollow it; only Message Delivery/wake snapshots are follower-scoped.
-        let mut rows = self
+        let member_ids = self
             .connection
-            .query(
+            .query_rows::<String>(
                 "SELECT actor_id
                  FROM memberships
                  WHERE target_id = ?1 AND left_at_ms IS NULL",
                 [route.permission_target_id(target_id)],
             )
             .await?;
-        while let Some(row) = rows.next().await? {
-            recipients.insert(row.get::<String>(0)?);
-        }
-        drop(rows);
+        recipients.extend(member_ids);
         recipients.extend(
             extra_actor_ids
                 .iter()
@@ -391,9 +476,9 @@ impl<'connection> MembershipStore<'connection> {
         actor_id: &str,
         agent_id: &str,
     ) -> Result<Vec<AgentMembership>> {
-        let mut rows = self
+        let rows = self
             .connection
-            .query(
+            .query_rows::<AgentMembershipRow>(
                 "SELECT target.id, target.kind, target.name, target.parent_target_id,
                         target.root_message_id, target.created_by, target.created_at_ms,
                         agent_membership.role, agent_membership.joined_at_ms
@@ -411,26 +496,9 @@ impl<'connection> MembershipStore<'connection> {
                 (actor_id, agent_id),
             )
             .await?;
-        let mut memberships = Vec::new();
-        while let Some(row) = rows.next().await? {
-            let target_id = row.get::<String>(0)?;
-            let kind_text = row.get::<String>(1)?;
-            let role_text = row.get::<String>(7)?;
-            memberships.push(AgentMembership {
-                target: Target {
-                    id: target_id.clone(),
-                    kind: parse_target_kind(&target_id, &kind_text)?,
-                    name: row.get(2)?,
-                    parent_target_id: row.get(3)?,
-                    root_message_id: row.get(4)?,
-                    created_by: row.get(5)?,
-                    created_at_ms: row.get(6)?,
-                },
-                role: parse_membership_role(&target_id, agent_id, &role_text)?,
-                joined_at_ms: row.get(8)?,
-            });
-        }
-        Ok(memberships)
+        rows.into_iter()
+            .map(|row| row.into_membership(agent_id))
+            .collect()
     }
 
     pub(crate) async fn identity_context_for(
@@ -470,14 +538,12 @@ impl<'connection> MembershipStore<'connection> {
     }
 
     pub(crate) async fn is_active_member(&self, target_id: &str, actor_id: &str) -> Result<bool> {
-        let mut rows = self
-            .connection
-            .query(
+        self.connection
+            .exists(
                 "SELECT 1 FROM memberships
                  WHERE target_id = ?1 AND actor_id = ?2 AND left_at_ms IS NULL",
                 (target_id, actor_id),
             )
-            .await?;
-        Ok(rows.next().await?.is_some())
+            .await
     }
 }
