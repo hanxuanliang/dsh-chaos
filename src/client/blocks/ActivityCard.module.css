@@ -131,7 +131,22 @@
 
 .done:hover {
   background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-state-success-primary);
+}
+
+.doneGlyph {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  transition: transform var(--chaos-motion-fast) ease, background-color var(--chaos-motion-fast) ease;
+}
+
+.done:hover .doneGlyph {
+  transform: scale(1.07);
+  background: var(--dsw-alias-state-success-primary);
 }
 
 .row[data-done='true'] {
