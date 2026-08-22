@@ -116,3 +116,7 @@
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-state-success-primary);
 }
+
+.row[data-done='true'] {
+  opacity: 0.55;
+}

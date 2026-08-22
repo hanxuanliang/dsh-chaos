@@ -517,13 +517,19 @@ export class CollabService extends Service {
     return this.requireHandle().readMessagesTail(actorId, targetId, limit)
   }
 
-  inboxList(actorId: string, limit = 20, cursor?: string) {
-    return this.requireHandle().inboxList(actorId, limit, cursor)
+  inboxList(actorId: string, limit = 20, cursor?: string, filter?: 'all' | 'unread') {
+    return this.requireHandle().inboxList(actorId, limit, cursor, filter)
   }
 
   async inboxDone(actorId: string, targetId: string, throughSeq: string) {
     await this.requireHandle().inboxDone(actorId, targetId, throughSeq)
     this.publishChange()
+  }
+
+  async inboxDoneAll(actorId: string) {
+    const advanced = await this.requireHandle().inboxDoneAll(actorId)
+    this.publishChange()
+    return advanced
   }
 
   listActors(actorId: string) {

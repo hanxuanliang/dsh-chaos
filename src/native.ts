@@ -180,6 +180,8 @@ export interface NativeActivityInboxItem {
   lastActivitySeq: string
   replyCount?: string
   task?: NativeActivityInboxTask
+  /** All 视图下:该会话 Done fence 已覆盖最新活动。 */
+  done?: boolean
 }
 
 export interface NativeActivityInboxPage {
@@ -252,8 +254,9 @@ export interface NativeCollabHandle {
   readMessage(actorId: string, targetId: string, messageId: string): Promise<NativeMessage>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
-  inboxList(actorId: string, limit: number, cursor?: string): Promise<NativeActivityInboxPage>
+  inboxList(actorId: string, limit: number, cursor?: string, filter?: 'all' | 'unread'): Promise<NativeActivityInboxPage>
   inboxDone(actorId: string, targetId: string, throughSeq: string): Promise<void>
+  inboxDoneAll(actorId: string): Promise<number>
   listActors(actorId: string): Promise<NativeActor[]>
   listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
   listTargetMemberships(actorId: string, targetId: string): Promise<NativeTargetMember[]>

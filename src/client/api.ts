@@ -110,8 +110,16 @@ export class ChaosClient {
   }
 
   /** crates inbox_list: 活动会话(page)——Done 是 per-actor done_through_seq 语义,新来活动自动复活。 */
-  inboxList(limit = 30, cursor?: string): Promise<NativeActivityInboxPage> {
-    return this.call('inbox.list', cursor === undefined ? { limit } : { limit, cursor })
+  inboxList(limit = 30, cursor?: string, filter?: 'all' | 'unread'): Promise<NativeActivityInboxPage> {
+    const input: Record<string, unknown> = filter === undefined
+      ? (cursor === undefined ? { limit } : { limit, cursor })
+      : (cursor === undefined ? { limit, filter } : { limit, cursor, filter })
+    return this.call('inbox.list', input)
+  }
+
+  /** crates inbox_done_all: 全部 active 会话 Done fence 前进到最新。 */
+  inboxDoneAll(): Promise<number> {
+    return this.call('inbox.doneAll', {})
   }
 
   /** inbox_done(targetId + throughSeq 由行上的 lastActivitySeq 给定——按页面拍时结构调用,不取最新)。 */

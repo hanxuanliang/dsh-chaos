@@ -57,7 +57,7 @@ async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Resul
         })
         .await?;
 
-    let page = core.inbox_list(&user.id, 20, None).await?;
+    let page = core.inbox_list(&user.id, 20, None, None).await?;
     assert_eq!(page.active_count, 4);
     assert_eq!(page.items.len(), 4);
 
@@ -120,7 +120,7 @@ async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Resul
     let alpha_cursor_before_done = core.snapshot(&alpha.id).await?.cursor;
     core.inbox_done(&user.id, &task_channel.id, task_message.message.seq)
         .await?;
-    let after_done = core.inbox_list(&user.id, 20, None).await?;
+    let after_done = core.inbox_list(&user.id, 20, None, None).await?;
     assert_eq!(after_done.active_count, 3);
     assert!(
         after_done
@@ -156,7 +156,7 @@ async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Resul
         .await?;
     core.inbox_done(&user.id, &task_channel.id, task_message.message.seq)
         .await?;
-    let after_reopen = core.inbox_list(&user.id, 20, None).await?;
+    let after_reopen = core.inbox_list(&user.id, 20, None, None).await?;
     assert_eq!(after_reopen.active_count, 4);
     assert_eq!(
         after_reopen
@@ -198,7 +198,7 @@ async fn activity_inbox_enforces_membership_and_thread_follow_scope() -> Result<
         .await?;
 
     assert!(
-        core.inbox_list(&user.id, 20, None)
+        core.inbox_list(&user.id, 20, None, None)
             .await?
             .items
             .iter()
@@ -206,7 +206,7 @@ async fn activity_inbox_enforces_membership_and_thread_follow_scope() -> Result<
     );
     core.unfollow_thread(&thread.id, &user.id).await?;
     assert!(
-        core.inbox_list(&user.id, 20, None)
+        core.inbox_list(&user.id, 20, None, None)
             .await?
             .items
             .iter()
@@ -219,7 +219,7 @@ async fn activity_inbox_enforces_membership_and_thread_follow_scope() -> Result<
     ));
     core.follow_thread(&thread.id, &user.id).await?;
     assert!(
-        core.inbox_list(&user.id, 20, None)
+        core.inbox_list(&user.id, 20, None, None)
             .await?
             .items
             .iter()
@@ -227,7 +227,7 @@ async fn activity_inbox_enforces_membership_and_thread_follow_scope() -> Result<
     );
 
     assert!(
-        core.inbox_list(&outsider.id, 20, None)
+        core.inbox_list(&outsider.id, 20, None, None)
             .await?
             .items
             .is_empty()
@@ -260,15 +260,15 @@ async fn activity_inbox_cursor_pages_without_duplicates_or_skips() -> Result<()>
     }
     expected.reverse();
 
-    let first = core.inbox_list(&user.id, 2, None).await?;
+    let first = core.inbox_list(&user.id, 2, None, None).await?;
     assert_eq!(first.active_count, 5);
     assert_eq!(first.items.len(), 2);
     let second = core
-        .inbox_list(&user.id, 2, first.next_cursor.as_deref())
+        .inbox_list(&user.id, 2, first.next_cursor.as_deref(), None)
         .await?;
     assert_eq!(second.items.len(), 2);
     let third = core
-        .inbox_list(&user.id, 2, second.next_cursor.as_deref())
+        .inbox_list(&user.id, 2, second.next_cursor.as_deref(), None)
         .await?;
     assert_eq!(third.items.len(), 1);
     assert!(third.next_cursor.is_none());
@@ -286,15 +286,87 @@ async fn activity_inbox_cursor_pages_without_duplicates_or_skips() -> Result<()>
     assert_eq!(unique.len(), actual.len());
 
     assert!(matches!(
-        core.inbox_list(&user.id, 0, None).await,
+        core.inbox_list(&user.id, 0, None, None).await,
         Err(CollabError::InvalidArgument(_))
     ));
     assert!(matches!(
-        core.inbox_list(&user.id, 20, Some("bad-cursor")).await,
+        core.inbox_list(&user.id, 20, Some("bad-cursor"), None)
+            .await,
         Err(CollabError::InvalidArgument(_))
     ));
     assert!(matches!(
         core.inbox_done(&user.id, &expected[0], i64::MAX).await,
+        Err(CollabError::InvalidArgument(_))
+    ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn inbox_filters_all_unread_and_mark_all_done() -> Result<()> {
+    let World {
+        core, user, alpha, ..
+    } = World::create().await?;
+    let channel = core.create_channel("f-all", &user.id).await?;
+    for index in 0..3 {
+        core.send_message(SendMessageRequest {
+            target_id: channel.id.clone(),
+            author_id: user.id.clone(),
+            client_request_id: format!("fa-{index}"),
+            text: format!("msg {index}"),
+        })
+        .await?;
+    }
+    let direct = core.create_direct(&user.id, &alpha.id).await?;
+    core.send_message(SendMessageRequest {
+        target_id: direct.id.clone(),
+        author_id: alpha.id.clone(),
+        client_request_id: "fa-d".into(),
+        text: "direct msg".into(),
+    })
+    .await?;
+
+    // Unread default: both conversations visible, none marked done.
+    let unread = core.inbox_list(&user.id, 20, None, None).await?;
+    assert_eq!(unread.items.len(), 2);
+    assert!(unread.items.iter().all(|item| !item.done));
+    assert_eq!(unread.active_count, 2);
+
+    // All filter: same set (nothing done yet), still no done flags.
+    let all = core.inbox_list(&user.id, 20, None, Some("all")).await?;
+    assert_eq!(all.items.len(), 2);
+    assert!(all.items.iter().all(|item| !item.done));
+    assert_eq!(all.active_count, 2);
+
+    // Mark all: fences advance, unread drains, All shows done flags.
+    let advanced = core.inbox_done_all(&user.id).await?;
+    assert_eq!(advanced, 2);
+    let unread_after = core.inbox_list(&user.id, 20, None, None).await?;
+    assert!(unread_after.items.is_empty());
+    assert_eq!(unread_after.active_count, 0);
+    let all_after = core.inbox_list(&user.id, 20, None, Some("all")).await?;
+    assert_eq!(all_after.items.len(), 2);
+    assert!(all_after.items.iter().all(|item| item.done));
+
+    // Repeat call is a no-op returning zero.
+    let repeat = core.inbox_done_all(&user.id).await?;
+    assert_eq!(repeat, 0);
+
+    // New activity revives only that conversation, with done now false.
+    core.send_message(SendMessageRequest {
+        target_id: channel.id.clone(),
+        author_id: user.id.clone(),
+        client_request_id: "fa-revive".into(),
+        text: "revive".into(),
+    })
+    .await?;
+    let revived = core.inbox_list(&user.id, 20, None, None).await?;
+    assert_eq!(revived.items.len(), 1);
+    assert_eq!(revived.items[0].conversation_id, channel.id);
+    assert!(!revived.items[0].done);
+
+    // Unknown filter text is rejected at the boundary.
+    assert!(matches!(
+        core.inbox_list(&user.id, 20, None, Some("bogus")).await,
         Err(CollabError::InvalidArgument(_))
     ));
     Ok(())

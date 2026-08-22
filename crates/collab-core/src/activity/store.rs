@@ -11,8 +11,11 @@ use crate::{
 
 use super::model::ActivityCursor;
 
-const ACTIVITY_INBOX_CANDIDATES_CTE: &str = r#"
-WITH eligible AS (
+/// Build the `active` conversation set for one filter. `unread_filter` is
+/// the Unread CTE's WHERE clause, or an empty string for All.
+fn active_set(unread_filter: &str) -> String {
+    format!(
+        r#"WITH eligible AS (
   SELECT target.id,
          target.kind,
          target.name,
@@ -51,12 +54,21 @@ WITH eligible AS (
          eligible.name,
          eligible.parent_target_id,
          eligible.root_message_id,
-         latest_activity.last_activity_seq
+         latest_activity.last_activity_seq,
+         eligible.done_through_seq
   FROM eligible
   JOIN latest_activity ON latest_activity.target_id = eligible.id
-  WHERE latest_activity.last_activity_seq > eligible.done_through_seq
+  {unread_filter}
 )
-"#;
+"#,
+        unread_filter = unread_filter
+    )
+}
+
+/// The Unread filter: only conversations whose latest activity is newer than
+/// the actor's Done fence.
+const ACTIVITY_UNREAD_FILTER: &str =
+    "WHERE latest_activity.last_activity_seq > eligible.done_through_seq";
 
 const ACTIVITY_INBOX_ITEMS_SELECT: &str = r#"
 SELECT active.id,
@@ -88,7 +100,8 @@ SELECT active.id,
        END AS reply_count,
        task.number AS task_number,
        task.status AS task_status,
-       assignee.display_name AS task_assignee_name
+       assignee.display_name AS task_assignee_name,
+       (active.done_through_seq >= active.last_activity_seq) AS done
 FROM active
 JOIN messages AS latest
   ON latest.target_id = active.id AND latest.seq = active.last_activity_seq
@@ -205,6 +218,7 @@ impl FromRow for ActivityInboxItem {
             last_activity_seq,
             reply_count,
             task,
+            done: row.get(15)?,
         })
     }
 }
@@ -238,7 +252,10 @@ impl<'connection> ActivityStore<'connection> {
         let row = self
             .connection
             .query_row::<CountRow>(
-                &format!("{ACTIVITY_INBOX_CANDIDATES_CTE} SELECT COUNT(*) FROM active"),
+                &format!(
+                    "{} SELECT COUNT(*) FROM active",
+                    active_set(ACTIVITY_UNREAD_FILTER)
+                ),
                 [actor_id],
             )
             .await?;
@@ -252,22 +269,45 @@ impl<'connection> ActivityStore<'connection> {
         actor_id: &str,
         cursor: Option<&ActivityCursor>,
         limit: u32,
+        unread: bool,
     ) -> Result<Vec<ActivityInboxItem>> {
         let cursor_seq = cursor.map_or(0, |cursor| cursor.last_activity_seq);
         let cursor_target_id = cursor.map_or("", |cursor| cursor.conversation_id.as_str());
+        let unread_filter = if unread { ACTIVITY_UNREAD_FILTER } else { "" };
         self.connection
             .query_rows(
                 &format!(
-                    "{ACTIVITY_INBOX_CANDIDATES_CTE}{ACTIVITY_INBOX_ITEMS_SELECT}
+                    "{}{ACTIVITY_INBOX_ITEMS_SELECT}
                      WHERE (?2 = 0)
                         OR active.last_activity_seq < ?2
                         OR (active.last_activity_seq = ?2 AND active.id > ?3)
                      ORDER BY active.last_activity_seq DESC, active.id ASC
-                     LIMIT ?4"
+                     LIMIT ?4",
+                    active_set(unread_filter)
                 ),
                 (actor_id, cursor_seq, cursor_target_id, i64::from(limit) + 1),
             )
             .await
+    }
+
+    /// Every active unread conversation for the actor: (target_id, last_seq)
+    /// pairs, in id order. Drives inbox_done_all.
+    pub(crate) async fn active_conversations(&self, actor_id: &str) -> Result<Vec<(String, i64)>> {
+        let mut rows = self
+            .connection
+            .query(
+                &format!(
+                    "{} SELECT active.id, active.last_activity_seq FROM active ORDER BY active.id",
+                    active_set(ACTIVITY_UNREAD_FILTER)
+                ),
+                [actor_id],
+            )
+            .await?;
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().await? {
+            out.push((row.get(0)?, row.get(1)?));
+        }
+        Ok(out)
     }
 
     /// The newest Message sequence of one target, `None` when it has none.
