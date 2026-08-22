@@ -2,6 +2,47 @@ use serde::{Deserialize, Serialize};
 
 use crate::{CollabError, Result};
 
+/// A committed immutable text message.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Message {
+    /// Global monotonic database sequence. Expose it as a decimal string over
+    /// NAPI so JavaScript never loses integer precision.
+    pub seq: i64,
+    pub id: String,
+    pub target_id: String,
+    pub author_id: String,
+    pub client_request_id: String,
+    pub text: String,
+    pub created_at_ms: i64,
+}
+
+/// Authoritative tail page of one target: the exact total message count plus
+/// the latest messages in ascending order, read from one consistent snapshot.
+/// `count` is always exact, even when it exceeds `messages.len()`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct MessageTail {
+    pub count: i64,
+    pub messages: Vec<Message>,
+}
+
+/// One idempotent send command.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SendMessageRequest {
+    pub target_id: String,
+    pub author_id: String,
+    pub client_request_id: String,
+    pub text: String,
+}
+
+/// Durable send result plus post-commit runtime effects.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SendMessageResult {
+    pub message: Message,
+    pub recipient_ids: Vec<String>,
+    pub wake_agent_ids: Vec<String>,
+    pub replayed: bool,
+}
+
 /// The stored body envelope of one immutable Message.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct StoredTextBody {

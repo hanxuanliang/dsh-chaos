@@ -5,6 +5,7 @@ mod model;
 mod query;
 pub(crate) mod store;
 
+pub use model::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub(crate) use model::{StoredTextBody, stored_text};
 
 #[cfg(test)]
