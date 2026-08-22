@@ -2,7 +2,10 @@
 
 use turso::Connection;
 
+use crate::actor::ActorKind;
 use crate::db::QueryRows;
+use crate::message::NewMessage;
+use crate::message::Recipient;
 use crate::message::stored_text;
 use crate::{CollabError, InboxMessage, Message, PendingWake, Result};
 
@@ -278,5 +281,124 @@ impl<'connection> DeliveryStore<'connection> {
             )
             .await?;
         Ok(())
+    }
+}
+
+impl DeliveryStore<'_> {
+    /// Active members of one Channel/Direct, excluding the author.
+    pub(crate) async fn active_target_recipients(
+        &self,
+        target_id: &str,
+        author_id: &str,
+    ) -> Result<Vec<Recipient>> {
+        self.connection
+            .query_rows(
+                "SELECT a.id, a.kind
+                 FROM memberships m
+                 JOIN actors a ON a.id = m.actor_id
+                 WHERE m.target_id = ?1
+                   AND m.left_at_ms IS NULL
+                   AND a.id <> ?2
+                 ORDER BY a.id",
+                (target_id, author_id),
+            )
+            .await
+    }
+
+    /// Following, still-member recipients of one Thread, excluding the author.
+    pub(crate) async fn active_thread_recipients(
+        &self,
+        thread_target_id: &str,
+        author_id: &str,
+        permission_target_id: &str,
+    ) -> Result<Vec<Recipient>> {
+        self.connection
+            .query_rows(
+                "SELECT a.id, a.kind
+                 FROM thread_follows f
+                 JOIN actors a ON a.id = f.actor_id
+                 JOIN memberships m
+                   ON m.target_id = ?3 AND m.actor_id = f.actor_id
+                 WHERE f.thread_target_id = ?1
+                   AND f.unfollowed_at_ms IS NULL
+                   AND m.left_at_ms IS NULL
+                   AND a.id <> ?2
+                 ORDER BY a.id",
+                (thread_target_id, author_id, permission_target_id),
+            )
+            .await
+    }
+
+    /// Commit the recipient snapshot: one Delivery per recipient and a
+    /// level-triggered wake watermark per Agent, returning both id lists.
+    pub(crate) async fn record_deliveries(
+        &self,
+        message: &NewMessage,
+        message_seq: i64,
+        recipients: &[Recipient],
+    ) -> Result<(Vec<String>, Vec<String>)> {
+        let mut recipient_ids = Vec::with_capacity(recipients.len());
+        let mut wake_agent_ids = Vec::new();
+        for recipient in recipients {
+            self.connection
+                .execute(
+                    "INSERT INTO deliveries
+                     (id, message_id, message_seq, target_id, recipient_id, committed_at_ms)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    (
+                        crate::new_id(),
+                        message.id.as_str(),
+                        message_seq,
+                        message.target_id.as_str(),
+                        recipient.id.as_str(),
+                        message.created_at_ms,
+                    ),
+                )
+                .await?;
+            if recipient.kind == ActorKind::Agent.as_str() {
+                self.connection
+                    .execute(
+                        "INSERT INTO agent_wake_state
+                         (agent_id, pending_seq, notified_seq, notified_generation, attempt_count)
+                         VALUES (?1, ?2, 0, 0, 0)
+                         ON CONFLICT(agent_id) DO UPDATE SET
+                           pending_seq = MAX(agent_wake_state.pending_seq, excluded.pending_seq)",
+                        (recipient.id.as_str(), message_seq),
+                    )
+                    .await?;
+                wake_agent_ids.push(recipient.id.clone());
+            }
+            recipient_ids.push(recipient.id.clone());
+        }
+        Ok((recipient_ids, wake_agent_ids))
+    }
+}
+
+impl DeliveryStore<'_> {
+    /// The recipient snapshot recorded for `message_id`, split into every
+    /// recipient and the Agent subset that carries a wake watermark.
+    pub(crate) async fn recorded_recipients(
+        &self,
+        message_id: &str,
+    ) -> Result<(Vec<String>, Vec<String>)> {
+        let rows: Vec<Recipient> = self
+            .connection
+            .query_rows(
+                "SELECT d.recipient_id, a.kind
+                 FROM deliveries d JOIN actors a ON a.id = d.recipient_id
+                 WHERE d.message_id = ?1
+                 ORDER BY d.recipient_id",
+                [message_id],
+            )
+            .await?;
+        let mut recipient_ids = Vec::with_capacity(rows.len());
+        let mut wake_agent_ids = Vec::new();
+        for recipient in rows {
+            if recipient.kind == ActorKind::Agent.as_str() {
+                wake_agent_ids.push(recipient.id.clone());
+            }
+            recipient_ids.push(recipient.id);
+        }
+        Ok((recipient_ids, wake_agent_ids))
     }
 }

@@ -59,6 +59,22 @@ pub(crate) fn stored_text(body_json: &str, context: &str) -> Result<String> {
 
 /// One immutable Message staged for insertion: the stored body is encoded and
 /// the timestamp fixed before the write transaction begins.
+/// One active recipient selected for a Message: id plus Actor kind for the
+/// wake-watermark split.
+pub(crate) struct Recipient {
+    pub(crate) id: String,
+    pub(crate) kind: String,
+}
+
+impl crate::db::FromRow for Recipient {
+    fn from_row(row: &turso::Row) -> crate::Result<Self> {
+        Ok(Self {
+            id: row.get(0)?,
+            kind: row.get(1)?,
+        })
+    }
+}
+
 pub(crate) struct NewMessage {
     pub(crate) id: String,
     pub(crate) target_id: String,

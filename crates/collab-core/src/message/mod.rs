@@ -4,7 +4,7 @@ mod model;
 pub(crate) mod store;
 
 pub use model::{Message, MessageTail, SendMessageRequest, SendMessageResult};
-pub(crate) use model::{StoredTextBody, stored_text};
+pub(crate) use model::{NewMessage, Recipient, StoredTextBody, stored_text};
 
 use crate::actor::ActorId;
 use crate::changefeed::insert_target_change;
@@ -13,7 +13,7 @@ use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
 use crate::{ChangeKind, CollabCore, CollabError, Result, TargetKind, new_id, now_ms};
 
-use model::{NewMessage, SendFailpoint};
+use model::SendFailpoint;
 use store::MessageStore;
 
 #[cfg(test)]
@@ -49,7 +49,9 @@ impl CollabCore {
                 .await?
             {
                 let (recipient_ids, wake_agent_ids) =
-                    store.recorded_recipients(&message.id).await?;
+                    crate::delivery::store::DeliveryStore::new(connection)
+                        .recorded_recipients(&message.id)
+                        .await?;
                 return Ok(SendMessageResult {
                     message,
                     recipient_ids,
@@ -88,8 +90,9 @@ impl CollabCore {
                 return Err(CollabError::InjectedSendFailure);
             }
 
+            let delivery = crate::delivery::store::DeliveryStore::new(connection);
             let recipients = if route.kind == TargetKind::Thread {
-                store
+                delivery
                     .active_thread_recipients(
                         &request.target_id,
                         &request.author_id,
@@ -97,11 +100,11 @@ impl CollabCore {
                     )
                     .await?
             } else {
-                store
+                delivery
                     .active_target_recipients(&request.target_id, &request.author_id)
                     .await?
             };
-            let (recipient_ids, wake_agent_ids) = store
+            let (recipient_ids, wake_agent_ids) = delivery
                 .record_deliveries(&draft, message_seq, &recipients)
                 .await?;
             insert_target_change(
