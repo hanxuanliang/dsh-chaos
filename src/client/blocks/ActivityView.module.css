@@ -47,3 +47,26 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Keep this action visually level with the adjacent All / Unread pills. */
+.activityView .markAllButton {
+  height: auto;
+  border: none;
+  border-radius: 5px;
+  padding: 3px 8px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.activityView .markAllButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.activityView .markAllButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
