@@ -119,6 +119,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       />
       {unreadCount > 0 && (
         <Button
+          className={css.markAllButton}
           variant="outline"
           size="sm"
           disabled={busy !== undefined}
