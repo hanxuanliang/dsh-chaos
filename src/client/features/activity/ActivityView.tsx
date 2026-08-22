@@ -56,8 +56,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const lastTriggerId = useRef<string | null>(null)
-  const actorNamesById = new Map<string, string>()
-  for (const a of state.actors) actorNamesById.set(a.id, a.displayName)
+  const actorsById = new Map(state.actors.map(actor => [actor.id, actor]))
 
   const [dock, setDock] = useState<Dock | undefined>(undefined)
   const items = useMemo(
@@ -154,7 +153,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
           busy={busy === item.conversationId}
           thread={item.rootMessageId === undefined ? undefined : state.threads.find(th => th.rootMessageId === item.rootMessageId)}
           summary={item.rootMessageId === undefined ? undefined : state.threadSummariesByRoot[item.rootMessageId]}
-          actorNamesById={actorNamesById}
+          actorsById={actorsById}
           onOpen={trigger => { open(item, trigger) }}
           onDone={() => { markDone(item) }}
         />

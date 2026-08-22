@@ -8,31 +8,27 @@
 .card[data-plugin='dsh-chaos'] {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 11px 12px;
   font: inherit;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-base);
   cursor: pointer;
   text-align: left;
-  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .card[data-plugin='dsh-chaos']:hover {
   border-color: var(--dsw-alias-border-l3);
-  box-shadow: var(--dsw-shadow-lv2);
-  transform: translateY(-1px);
+  background: var(--dsw-alias-interactive-bg-hover);
+  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
 }
 
 .card[data-plugin='dsh-chaos']:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
-}
-
-.card[data-plugin='dsh-chaos'][data-status='in_progress'] {
-  border-color: var(--dsw-alias-state-warn-primary);
 }
 
 .card[data-plugin='dsh-chaos'][data-highlighted='true'] {
@@ -52,9 +48,9 @@
 .cardTitle {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 19px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -63,13 +59,14 @@
   display: -webkit-box;
   overflow: hidden;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 17px;
   color: var(--dsw-alias-label-secondary);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.cardMeta {
+.cardTop,
+.cardFooter {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -77,17 +74,34 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.cardNumber { flex: none; }
+.cardTop { min-height: 16px; }
+.cardNumber { flex: none; font-weight: 500; }
+.cardTime { flex: none; margin-left: auto; }
+.cardFooter { min-height: 20px; padding-top: 1px; }
 
 .cardAssignee {
+  display: inline-flex;
   flex: 1;
   min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.cardAssignee > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cardTime {
+.cardSource {
+  display: inline-grid;
   flex: none;
   margin-left: auto;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  opacity: .55;
+  transition: color 120ms ease, opacity 120ms ease;
 }
+
+.card:hover .cardSource,
+.card:focus-visible .cardSource { color: var(--dsw-alias-label-secondary); opacity: 1; }

@@ -40,6 +40,10 @@ try {
   }, alphaProfile.version)
   assert.equal(updatedAlpha.version, '2')
   assert.equal(updatedAlpha.actor.displayName, 'Alpha Reviewer')
+  const avatar = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+  const avatarAlpha = await core.updateAgentAvatar(alpha.id, avatar, updatedAlpha.version)
+  assert.equal(avatarAlpha.version, '3')
+  assert.equal(avatarAlpha.actor.avatarDataUrl, avatar)
   await assert.rejects(
     core.updateAgentProfile(alpha.id, 'Stale Alpha', alphaProfile.charter, alphaProfile.version),
     /agent_profile_version_conflict/,
@@ -49,9 +53,11 @@ try {
   await core.addMember(channel.id, beta.id, owner.id)
   const identity = await core.identityContext(alpha.id, channel.id)
   assert.equal(identity.agent.actor.displayName, 'Alpha Reviewer')
+  assert.equal(identity.agent.actor.avatarDataUrl, avatar)
   assert.equal(identity.target.name, 'design')
   assert.equal(identity.members.find(member => member.actor.id === owner.id).role, 'owner')
   assert.equal(identity.members.find(member => member.actor.id === beta.id).actor.handle, 'beta')
+  assert.equal(identity.members.find(member => member.actor.id === alpha.id).actor.avatarDataUrl, avatar)
   assert.deepEqual(await core.listTargetMemberships(alpha.id, channel.id), identity.members)
 
   const sent = await core.sendMessage({

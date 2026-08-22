@@ -8,6 +8,7 @@ export interface NativeActor {
   handle: string
   displayName: string
   createdAtMs: number
+  avatarDataUrl?: string
 }
 
 export interface NativeAgentCharter {
@@ -207,6 +208,11 @@ export interface NativeCollabHandle {
     agentId: string,
     displayName: string,
     charter: NativeAgentCharter,
+    expectedVersion: string,
+  ): Promise<NativeAgentProfile>
+  updateAgentAvatar(
+    agentId: string,
+    avatarDataUrl: string | undefined,
     expectedVersion: string,
   ): Promise<NativeAgentProfile>
   identityContext(agentId: string, targetId?: string): Promise<NativeIdentityContext>

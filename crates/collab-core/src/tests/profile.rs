@@ -121,6 +121,68 @@ async fn agent_profile_directory_is_complete_and_handle_ordered() -> Result<()> 
 }
 
 #[tokio::test]
+async fn agent_avatar_is_validated_versioned_and_visible_in_actor_projections() -> Result<()> {
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
+    let profile = core.agent_profile(&alpha.id).await?;
+    let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+    let updated = core
+        .update_agent_avatar(&alpha.id, Some(png), profile.version)
+        .await?;
+    assert_eq!(updated.version, profile.version + 1);
+    assert_eq!(updated.actor.avatar_data_url.as_deref(), Some(png));
+
+    let actors = core.list_actors(&user.id).await?;
+    assert_eq!(
+        actors
+            .iter()
+            .find(|actor| actor.id == alpha.id)
+            .and_then(|actor| actor.avatar_data_url.as_deref()),
+        Some(png)
+    );
+    let members = core.list_target_members(&user.id, &channel.id).await?;
+    assert_eq!(
+        members
+            .iter()
+            .find(|actor| actor.id == alpha.id)
+            .and_then(|actor| actor.avatar_data_url.as_deref()),
+        Some(png)
+    );
+
+    assert!(matches!(
+        core.update_agent_avatar(&alpha.id, Some(png), profile.version)
+            .await,
+        Err(CollabError::AgentProfileVersionConflict {
+            expected: 1,
+            actual: 2,
+            ..
+        })
+    ));
+    assert!(matches!(
+        core.update_agent_avatar(
+            &alpha.id,
+            Some("data:image/png;base64,aGVsbG8="),
+            updated.version,
+        )
+        .await,
+        Err(CollabError::InvalidArgument(_))
+    ));
+
+    let cleared = core
+        .update_agent_avatar(&alpha.id, None, updated.version)
+        .await?;
+    assert_eq!(cleared.version, updated.version + 1);
+    assert_eq!(cleared.actor.avatar_data_url, None);
+    Ok(())
+}
+
+#[tokio::test]
 async fn delete_agent_removes_operational_state_but_keeps_history() -> Result<()> {
     let World {
         core,

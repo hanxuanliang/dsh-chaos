@@ -39,7 +39,7 @@ export function AgentList({ profiles, total, query, selectedId, onQueryChange, o
                 <div key={profile.actor.id} role="listitem">
                   <EntityRow
                     className={css.row}
-                    leading={<AvatarChip handle={profile.actor.handle} displayName={profile.actor.displayName} size="lg" />}
+                    leading={<AvatarChip handle={profile.actor.handle} displayName={profile.actor.displayName} avatarUrl={profile.actor.avatarDataUrl} size="lg" />}
                     title={profile.actor.displayName}
                     description={`@${profile.actor.handle} · ${profile.charter.summary}`}
                     selected={selected}

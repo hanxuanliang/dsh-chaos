@@ -61,6 +61,7 @@ pub struct Actor {
     pub handle: String,
     pub display_name: String,
     pub created_at_ms: i64,
+    pub avatar_data_url: Option<String>,
 }
 
 impl FromRow for Actor {
@@ -73,6 +74,7 @@ impl FromRow for Actor {
             handle: row.get(2)?,
             display_name: row.get(3)?,
             created_at_ms: row.get(4)?,
+            avatar_data_url: row.get(5)?,
         })
     }
 }
@@ -133,6 +135,7 @@ impl Actor {
             handle: handle.as_str().to_owned(),
             display_name: display_name.as_str().to_owned(),
             created_at_ms: now,
+            avatar_data_url: None,
         };
         ActorStore::new(connection).insert(&actor).await?;
         let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
@@ -156,7 +159,7 @@ impl<'connection> ActorStore<'connection> {
     pub(crate) async fn find_by_id(&self, id: &ActorId) -> Result<Option<Actor>> {
         self.connection
             .query_row::<Actor>(
-                "SELECT id, kind, handle, display_name, created_at_ms
+                "SELECT id, kind, handle, display_name, created_at_ms, avatar_data_url
                  FROM actors WHERE id = ?1",
                 [id.as_str()],
             )
@@ -166,7 +169,7 @@ impl<'connection> ActorStore<'connection> {
     pub(crate) async fn find_by_handle(&self, handle: &str) -> Result<Option<Actor>> {
         self.connection
             .query_row::<Actor>(
-                "SELECT id, kind, handle, display_name, created_at_ms
+                "SELECT id, kind, handle, display_name, created_at_ms, avatar_data_url
                  FROM actors WHERE handle = ?1",
                 [handle],
             )
@@ -205,6 +208,20 @@ impl<'connection> ActorStore<'connection> {
                 "UPDATE actors SET display_name = ?2 WHERE id = ?1",
                 (id.as_str(), display_name),
                 "actor rename",
+            )
+            .await
+    }
+
+    pub(crate) async fn update_avatar_data_url(
+        &self,
+        id: &ActorId,
+        avatar_data_url: Option<&str>,
+    ) -> Result<()> {
+        self.connection
+            .execute_one(
+                "UPDATE actors SET avatar_data_url = ?2 WHERE id = ?1",
+                (id.as_str(), avatar_data_url),
+                "actor avatar update",
             )
             .await
     }

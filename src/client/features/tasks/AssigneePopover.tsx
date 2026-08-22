@@ -32,7 +32,7 @@ function AssigneeRow({ actor, query, current, onPick }: {
   }
   return (
     <button type="button" role="menuitemradio" aria-checked={current} className={css.menuItem} data-current={current ? 'true' : undefined} onClick={onPick}>
-      <AvatarChip handle={actor.handle} displayName={actor.displayName} />
+      <AvatarChip handle={actor.handle} displayName={actor.displayName} avatarUrl={actor.avatarDataUrl} />
       <span className={css.rowLabel}>{actor.displayName || `@${actor.handle}`}</span>
       {current && <CheckGlyph />}
     </button>

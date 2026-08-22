@@ -12,12 +12,12 @@ import css from './MessageRow.module.css'
 import { IconReply } from './MessageIcons.tsx'
 
 /** spec §2.1 preview row: only a committed reply count may create this marker. */
-export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, variant = 'avatar' }: {
+export function ThreadPreview({ t, thread, summary, actorsById, onOpen, variant = 'avatar' }: {
   t: ChaosTranslate
   thread: NativeTarget | undefined
   /** Authoritative thread.summaries projection; absent/zero means no marker. */
   summary: NativeThreadSummary | undefined
-  actorNamesById: Map<string, string>
+  actorsById: Map<string, NativeActor>
   onOpen: (() => void) | undefined
   /** 'avatar'(默认,流)含小头像组; 'plain'=activity 同排号 task chip 写真相。 */
   variant?: 'avatar' | 'plain' | undefined
@@ -29,7 +29,7 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, vari
       {variant === 'avatar' && (
         <span className={css.previewAvatars} aria-hidden="true">
           {summary.recentReplierIds.map(id => (
-            <AvatarChip key={id} handle={id} displayName={actorNamesById.get(id) ?? id} size="xxsmall" title={actorNamesById.get(id) ?? id} />
+            <AvatarChip key={id} handle={actorsById.get(id)?.handle ?? id} displayName={actorsById.get(id)?.displayName ?? id} avatarUrl={actorsById.get(id)?.avatarDataUrl} size="xxsmall" title={actorsById.get(id)?.displayName ?? id} />
           ))}
         </span>
       )}
@@ -55,7 +55,7 @@ function ReplyButton({ title, onClick }: { title: string; onClick: () => void })
   )
 }
 
-export function MessageRow({ t, message, compact = false, author, bindingModel, task, assigneeHandle, thread, summary, actorNamesById, mentionNames, timeText, fullTimeTitle, onOpenTasks, onOpenThread }: {
+export function MessageRow({ t, message, compact = false, author, bindingModel, task, assigneeHandle, thread, summary, actorsById, mentionNames, timeText, fullTimeTitle, onOpenTasks, onOpenThread }: {
   t: ChaosTranslate
   message: NativeMessage
   /** 同一天同人 5 分钟内 → 无头行(headless): 左 gutter 时间(hover)。 */
@@ -66,7 +66,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   assigneeHandle: string | undefined
   thread: NativeTarget | undefined
   summary: NativeThreadSummary | undefined
-  actorNamesById: Map<string, string>
+  actorsById: Map<string, NativeActor>
   mentionNames: ReadonlySet<string>
   timeText: string
   fullTimeTitle: string
@@ -77,7 +77,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
     <div className={css.rowBody}>
       <MessageBody t={t} text={message.text} names={mentionNames} />
       {task !== undefined && <TaskChip task={task} assignee={assigneeHandle} onClick={() => { onOpenTasks(message.id) }} />}
-      <ThreadPreview t={t} thread={thread} summary={summary} actorNamesById={actorNamesById} onOpen={onOpenThread} />
+      <ThreadPreview t={t} thread={thread} summary={summary} actorsById={actorsById} onOpen={onOpenThread} />
     </div>
   )
   if (compact) {
@@ -94,7 +94,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   const displayName = author?.displayName ?? message.authorId
   return (
     <div className={css.row} data-message-id={message.id}>
-      <AvatarChip handle={handle} displayName={displayName} size="lg" />
+      <AvatarChip handle={handle} displayName={displayName} avatarUrl={author?.avatarDataUrl} size="lg" />
       <div className={css.main}>
         <div className={css.head}>
           <span className={css.name}>{displayName}</span>

@@ -123,11 +123,6 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
     for (const actor of state.actors) mapped.set(actor.id, actor)
     return mapped
   }, [state.actors])
-  const actorNamesById = useMemo(() => {
-    const mapped = new Map<string, string>()
-    for (const actor of state.actors) mapped.set(actor.id, actor.displayName)
-    return mapped
-  }, [state.actors])
   const mentionNames = useMemo(() => {
     const names = new Set<string>()
     for (const actor of state.actors) {
@@ -319,7 +314,7 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                     assigneeHandle={assignee}
                     thread={threadsByRoot.get(message.id)}
                     summary={state.threadSummariesByRoot[message.id]}
-                    actorNamesById={actorNamesById}
+                    actorsById={actorsById}
                     mentionNames={mentionNames}
                     timeText={timeLabel(message.createdAtMs)}
                     fullTimeTitle={fullTimeTitle(message.createdAtMs, activeLocale)}

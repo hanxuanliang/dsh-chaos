@@ -439,6 +439,30 @@ export class CollabService extends Service {
     }
   }
 
+  async updateAgentAvatar(
+    viewerId: string,
+    agentId: string,
+    avatarDataUrl: string | undefined,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile> {
+    await this.requireVisibleAgent(viewerId, agentId)
+    const updated = await this.requireHandle().updateAgentAvatar(
+      agentId,
+      avatarDataUrl,
+      expectedProfileVersion,
+    )
+    const binding = await this.requireHandle().runtimeBinding(agentId)
+    this.publishChange()
+    return {
+      actor: updated.actor,
+      workspacePath: updated.workspacePath,
+      lifecycle: updated.lifecycle,
+      charter: updated.charter,
+      profileVersion: updated.version,
+      ...(binding === undefined ? {} : { binding }),
+    }
+  }
+
   async replaceAgentRuntime(
     viewerId: string,
     agentId: string,

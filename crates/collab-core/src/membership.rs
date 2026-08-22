@@ -88,6 +88,7 @@ struct MemberRow {
     handle: String,
     display_name: String,
     created_at_ms: i64,
+    avatar_data_url: Option<String>,
     role_text: String,
     joined_at_ms: i64,
 }
@@ -100,8 +101,9 @@ impl FromRow for MemberRow {
             handle: row.get(2)?,
             display_name: row.get(3)?,
             created_at_ms: row.get(4)?,
-            role_text: row.get(5)?,
-            joined_at_ms: row.get(6)?,
+            avatar_data_url: row.get(5)?,
+            role_text: row.get(6)?,
+            joined_at_ms: row.get(7)?,
         })
     }
 }
@@ -114,6 +116,7 @@ impl MemberRow {
             handle,
             display_name,
             created_at_ms,
+            avatar_data_url,
             role_text,
             joined_at_ms,
         } = self;
@@ -124,6 +127,7 @@ impl MemberRow {
                 handle,
                 display_name,
                 created_at_ms,
+                avatar_data_url,
             },
             role: MembershipRole::parse(target_id, &id, &role_text)?,
             joined_at_ms,
@@ -299,7 +303,7 @@ impl CollabCore {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             connection
                 .query_rows::<Actor>(
-                    "SELECT id, kind, handle, display_name, created_at_ms
+                    "SELECT id, kind, handle, display_name, created_at_ms, avatar_data_url
                      FROM actors
                      WHERE kind = 'user' OR id IN (SELECT actor_id FROM agents)
                      ORDER BY handle, id",
@@ -325,7 +329,8 @@ impl CollabCore {
             }
             connection
                 .query_rows::<Actor>(
-                    "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms
+                    "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+                            actor.avatar_data_url
                      FROM memberships membership
                      JOIN actors actor ON actor.id = membership.actor_id
                      WHERE membership.target_id = ?1
@@ -392,7 +397,7 @@ impl<'connection> MembershipStore<'connection> {
             .connection
             .query_rows::<MemberRow>(
                 "SELECT actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
-                        membership.role, membership.joined_at_ms
+                        actor.avatar_data_url, membership.role, membership.joined_at_ms
                  FROM memberships membership
                  JOIN actors actor ON actor.id = membership.actor_id
                  WHERE membership.target_id = ?1 AND membership.left_at_ms IS NULL

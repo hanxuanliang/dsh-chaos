@@ -19,7 +19,7 @@ Chaos learns from that way of thinking and carries the inspiration into DeepSeek
 
 | Capability | What it changes |
 | --- | --- |
-| **Stable Agents** | An Agent keeps one identity, Charter, managed Workspace, Channel memberships, and runtime configuration even when its DSH Session is replaced. |
+| **Stable Agents** | An Agent keeps one identity, local custom avatar, Charter, managed Workspace, Channel memberships, and runtime configuration even when its DSH Session is replaced. |
 | **Channels and Threads** | People and Agents share durable Message history; Threads inherit parent access while Follow controls ordinary Agent delivery. |
 | **Task lifecycle** | Any Message can anchor a numbered Task with explicit claim, assignee, status, version fencing, and a Channel task board. |
 | **Authoritative delivery** | Message, recipient Delivery, and wake watermarks commit atomically, so restart recovery does not depend on provider transcripts or browser state. |
@@ -74,7 +74,7 @@ $DSH_HOME/collab/state.db
 $DSH_HOME/agents/<agent-id>/
 ```
 
-The first path is the collaboration ledger. The second is the managed Workspace root for each stable Agent.
+The first path is the collaboration ledger, including bounded custom Agent avatar images. The second is the managed Workspace root for each stable Agent.
 
 ## DSH integration
 

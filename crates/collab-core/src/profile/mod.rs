@@ -12,8 +12,52 @@ use crate::{
     Actor, ActorKind, ChangeKind, CollabCore, CollabError, IdentityContext, NonBlank, Result,
     now_ms,
 };
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 
 use store::ProfileStore;
+
+const AGENT_AVATAR_MAX_BYTES: usize = 256 * 1024;
+
+fn normalize_avatar_data_url(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value else { return Ok(None) };
+    let value = value.trim();
+    let (mime, encoded) = ["image/png", "image/jpeg", "image/webp"]
+        .into_iter()
+        .find_map(|mime| {
+            value
+                .strip_prefix(&format!("data:{mime};base64,"))
+                .map(|data| (mime, data))
+        })
+        .ok_or_else(|| {
+            CollabError::InvalidArgument(
+                "avatar must be a base64 PNG, JPEG, or WebP data URL".into(),
+            )
+        })?;
+    let bytes = STANDARD
+        .decode(encoded)
+        .map_err(|_| CollabError::InvalidArgument("avatar contains invalid base64 data".into()))?;
+    if bytes.is_empty() || bytes.len() > AGENT_AVATAR_MAX_BYTES {
+        return Err(CollabError::InvalidArgument(format!(
+            "avatar must contain 1..={AGENT_AVATAR_MAX_BYTES} bytes"
+        )));
+    }
+    let signature_matches = match mime {
+        "image/png" => bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        "image/jpeg" => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+        "image/webp" => bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP",
+        _ => false,
+    };
+    if !signature_matches {
+        return Err(CollabError::InvalidArgument(format!(
+            "avatar bytes do not match declared MIME type '{mime}'"
+        )));
+    }
+    Ok(Some(format!(
+        "data:{mime};base64,{}",
+        STANDARD.encode(bytes)
+    )))
+}
 
 impl CollabCore {
     /// Create the one local human/user actor.
@@ -114,6 +158,50 @@ impl CollabCore {
             store
                 .update_charter(agent_id, &charter_json, next_version, now)
                 .await?;
+            let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+            ChangeStore::new(connection)
+                .insert_change(
+                    ChangeKind::AgentProfileChanged,
+                    None,
+                    agent_id,
+                    &actor_ids,
+                    now,
+                )
+                .await?;
+            store.require_profile(agent_id).await
+        })
+        .await
+    }
+
+    /// Replace or clear one Agent's custom avatar under the same Profile fence.
+    pub async fn update_agent_avatar(
+        &self,
+        agent_id: &str,
+        avatar_data_url: Option<&str>,
+        expected_version: i64,
+    ) -> Result<AgentProfile> {
+        if expected_version <= 0 {
+            return Err(CollabError::InvalidArgument(
+                "expected_version must be positive".into(),
+            ));
+        }
+        let avatar_data_url = normalize_avatar_data_url(avatar_data_url)?;
+        let now = now_ms()?;
+        self.write(async |connection| {
+            let store = ProfileStore::new(connection);
+            let current = store.require_profile(agent_id).await?;
+            if current.version != expected_version {
+                return Err(CollabError::AgentProfileVersionConflict {
+                    agent_id: agent_id.to_owned(),
+                    expected: expected_version,
+                    actual: current.version,
+                });
+            }
+            let next_version = current.version + 1;
+            crate::actor::ActorStore::new(connection)
+                .update_avatar_data_url(&ActorId::parse(agent_id)?, avatar_data_url.as_deref())
+                .await?;
+            store.advance_version(agent_id, next_version, now).await?;
             let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
             ChangeStore::new(connection)
                 .insert_change(

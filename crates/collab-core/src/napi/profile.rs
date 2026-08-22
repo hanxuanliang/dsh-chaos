@@ -111,4 +111,19 @@ impl CollabHandle {
             .map(JsAgentProfile::from)
             .map_err(to_napi_error)
     }
+
+    #[napi]
+    pub async fn update_agent_avatar(
+        &self,
+        agent_id: String,
+        avatar_data_url: Option<String>,
+        expected_version: String,
+    ) -> Result<JsAgentProfile> {
+        let expected_version = parse_i64("expected_version", &expected_version)?;
+        self.core
+            .update_agent_avatar(&agent_id, avatar_data_url.as_deref(), expected_version)
+            .await
+            .map(JsAgentProfile::from)
+            .map_err(to_napi_error)
+    }
 }

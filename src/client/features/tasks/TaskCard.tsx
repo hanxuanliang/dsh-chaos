@@ -1,28 +1,24 @@
-/**
- * TaskCard — 看板任务卡。oil-creator 纸: 卡片根自带 data-plugin/data-surface
- * 标签, 规则 `.card[data-plugin='dsh-chaos']` 同为同元素的 0-2-0 特异性,
- * 宿主的 `.panel button{font:inherit}` 再也不到 .card 头上。
- * 原 classes: taskCard/taskCardTitle/taskCardExcerpt/taskCardMeta/
- *             taskCardNumber/taskCardAssignee/taskCardTime (独有 taskCardTime 的
- *             margin-left:auto + 性指定使分解)。
- */
+/** Compact Board card: identity/time, title/summary, then assignee/source. */
 import { forwardRef } from 'react'
-import type { NativeTask } from '../../../native.ts'
+import { IconLinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { NativeActor, NativeTask } from '../../../native.ts'
+import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
 import css from './TaskCard.module.css'
 
 export const TaskCard = forwardRef<HTMLButtonElement, {
   task: NativeTask
   title: string
   excerpt: string
-  assigneeLabel: string | undefined
+  assignee: NativeActor | undefined
   unassignedLabel: string
   timeLabel: string
+  sourceLabel: string
   dragging: boolean
   highlighted: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onOpen: () => void
-}>(function TaskCard({ task, title, excerpt, assigneeLabel, unassignedLabel, timeLabel, dragging, highlighted, onDragStart, onDragEnd, onOpen }, ref) {
+}>(function TaskCard({ task, title, excerpt, assignee, unassignedLabel, timeLabel, sourceLabel, dragging, highlighted, onDragStart, onDragEnd, onOpen }, ref) {
   return (
     <button
       ref={ref}
@@ -39,12 +35,20 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
       onDragEnd={onDragEnd}
       onClick={onOpen}
     >
+      <span className={css.cardTop}>
+        <span className={css.cardNumber}>#{task.number}</span>
+        <span className={css.cardTime}>{timeLabel}</span>
+      </span>
       <span className={css.cardTitle}>{title}</span>
       {excerpt !== '' && <span className={css.cardExcerpt}>{excerpt}</span>}
-      <span className={css.cardMeta}>
-        <span className={css.cardNumber}>#{task.number}</span>
-        <span className={css.cardAssignee}>{assigneeLabel ?? unassignedLabel}</span>
-        <span className={css.cardTime}>{timeLabel}</span>
+      <span className={css.cardFooter}>
+        <span className={css.cardAssignee}>
+          {assignee !== undefined && <AvatarChip handle={assignee.handle} displayName={assignee.displayName} avatarUrl={assignee.avatarDataUrl} />}
+          <span>{assignee === undefined ? unassignedLabel : `@${assignee.handle}`}</span>
+        </span>
+        <span className={css.cardSource} title={sourceLabel} aria-hidden="true">
+          <IconLinkOutline14 size={14} />
+        </span>
       </span>
     </button>
   )

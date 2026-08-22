@@ -155,6 +155,13 @@ try {
   assert.equal(updatedProfile.ok, true)
   assert.equal(updatedProfile.value.actor.displayName, 'Workspace Reviewer')
   assert.equal(updatedProfile.value.charter.summary, 'Review workspace behavior')
+  const avatar = await call('agent.avatar.update', {
+    agentId,
+    avatarDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    expectedProfileVersion: updatedProfile.value.profileVersion,
+  })
+  assert.equal(avatar.ok, true)
+  assert.equal(avatar.value.actor.avatarDataUrl.startsWith('data:image/png;base64,'), true)
   const staleProfile = await call('agent.profile.update', {
     agentId,
     displayName: 'Stale',

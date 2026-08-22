@@ -7,11 +7,11 @@ import { IconCheckOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { TaskChip } from '../tasks/TaskChip.tsx'
 import { ReplyExcerpt } from '../messages/ReplyExcerpt.tsx'
 import { ThreadPreview } from '../messages/MessageRow.tsx'
-import type { NativeActivityInboxItem, NativeTarget, NativeThreadSummary } from '../../../native.ts'
+import type { NativeActor, NativeActivityInboxItem, NativeTarget, NativeThreadSummary } from '../../../native.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import css from './ActivityCard.module.css'
 
-export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summary, actorNamesById, onOpen, onDone }: {
+export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summary, actorsById, onOpen, onDone }: {
   item: NativeActivityInboxItem
   t: ChaosTranslate
   /** 相对时间文案由 caller 组好(relativeTime)。 */
@@ -20,7 +20,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
   busy: boolean
   thread: NativeTarget | undefined
   summary: NativeThreadSummary | undefined
-  actorNamesById: Map<string, string>
+  actorsById: Map<string, NativeActor>
   onOpen: (trigger?: HTMLButtonElement) => void
   onDone: () => void
 }) {
@@ -51,7 +51,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
                   t={t}
                   thread={thread}
                   summary={summary}
-                  actorNamesById={actorNamesById}
+                  actorsById={actorsById}
                   onOpen={undefined}
                   variant="plain"
                 />
