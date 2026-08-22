@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use turso::{Connection, Row};
 
 use crate::actor::{Actor, ActorId};
-use crate::db::{FromRow, QueryRows};
+use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::{CollabCore, CollabError, NonBlank, Result, now_ms};
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ impl<'connection> RuntimeStore<'connection> {
     /// generation.
     pub(crate) async fn update_preset(&self, binding: &RuntimeBinding, preset: &str) -> Result<()> {
         self.connection
-            .execute(
+            .execute_one(
                 "UPDATE runtime_bindings SET preset = ?1
                  WHERE agent_id = ?2 AND generation = ?3 AND session_id = ?4",
                 (
@@ -299,8 +299,8 @@ impl<'connection> RuntimeStore<'connection> {
                     binding.generation,
                     binding.session_id.as_str(),
                 ),
+                "runtime preset update",
             )
-            .await?;
-        Ok(())
+            .await
     }
 }

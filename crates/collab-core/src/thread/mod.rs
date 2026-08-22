@@ -10,7 +10,7 @@ use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
 use crate::membership::{Membership, MembershipStore};
 use crate::message::store::MessageStore;
-use crate::target::require_target;
+use crate::target::{TargetStore, require_target};
 use crate::{
     Actor, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, new_id,
     now_ms,
@@ -53,21 +53,7 @@ impl CollabCore {
                 created_by: actor_id.as_str().to_owned(),
                 created_at_ms: now,
             };
-            connection
-                .execute(
-                    "INSERT INTO targets
-                     (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
-                     VALUES (?1, 'thread', ?2, ?3, ?4, ?5, ?6, NULL)",
-                    (
-                        target.id.as_str(),
-                        target.name.as_str(),
-                        parent_target_id.as_str(),
-                        root_message_id,
-                        actor_id.as_str(),
-                        now,
-                    ),
-                )
-                .await?;
+            TargetStore::new(connection).insert(&target).await?;
             store.ensure_following(&thread_id, &actor_id, now).await?;
             let root_author_id = ActorId::parse(&root_author_id)?;
             if root_author_id != actor_id
@@ -75,10 +61,13 @@ impl CollabCore {
                     .is_active_member(&parent_target_id, root_author_id.as_str())
                     .await?
             {
-                store.ensure_following(&thread_id, &root_author_id, now).await?;
+                store
+                    .ensure_following(&thread_id, &root_author_id, now)
+                    .await?;
             }
-            let parent_actor_ids =
-                MembershipStore::new(connection).active_member_ids(&parent_target_id).await?;
+            let parent_actor_ids = MembershipStore::new(connection)
+                .active_member_ids(&parent_target_id)
+                .await?;
             ChangeStore::new(connection)
                 .insert_change(
                     ChangeKind::TargetCreated,

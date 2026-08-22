@@ -194,18 +194,9 @@ impl CollabCore {
             if prune_through <= current_floor {
                 return Ok(current_floor);
             }
-            connection
-                .execute(
-                    "DELETE FROM change_recipients WHERE change_seq <= ?1",
-                    [prune_through],
-                )
-                .await?;
-            connection
-                .execute("DELETE FROM change_events WHERE seq <= ?1", [prune_through])
-                .await?;
-            ChangeStore::new(connection)
-                .set_retention_floor(prune_through)
-                .await?;
+            let store = ChangeStore::new(connection);
+            store.delete_changes_through(prune_through).await?;
+            store.set_retention_floor(prune_through).await?;
             Ok(prune_through)
         })
         .await
@@ -262,6 +253,22 @@ impl<'connection> ChangeStore<'connection> {
             )));
         }
         Ok(floor)
+    }
+
+    /// Delete the recipients and events of every change through one cursor.
+    /// The two deletes stay together: recipients first so no orphaned join
+    /// row survives a partial prune.
+    pub(crate) async fn delete_changes_through(&self, through_seq: i64) -> Result<()> {
+        self.connection
+            .execute(
+                "DELETE FROM change_recipients WHERE change_seq <= ?1",
+                [through_seq],
+            )
+            .await?;
+        self.connection
+            .execute("DELETE FROM change_events WHERE seq <= ?1", [through_seq])
+            .await?;
+        Ok(())
     }
 
     /// Persist the newest cursor that remains safe for incremental replay.

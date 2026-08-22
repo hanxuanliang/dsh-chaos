@@ -3,11 +3,11 @@
 use serde::{Deserialize, Serialize};
 use turso::{Connection, Row};
 
-use crate::db::{FromRow, QueryRows};
+use crate::db::{ExecuteOne, FromRow, QueryRows};
 
 use crate::actor::{Actor, ActorId};
 use crate::changefeed::ChangeStore;
-use crate::membership::{Membership, MembershipRole};
+use crate::membership::{Membership, MembershipRole, MembershipStore};
 use crate::{ChangeKind, CollabCore, CollabError, NonBlank, Result, new_id, now_ms};
 
 /// A collab target kind.
@@ -184,37 +184,13 @@ impl CollabCore {
         };
         self.write(async |connection| {
             Actor::require(connection, &creator_id).await?;
-            connection
-                .execute(
-                    "INSERT INTO targets
-                     (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
-                     VALUES (?1, ?2, ?3, NULL, NULL, ?4, ?5, NULL)",
-                    (
-                        target.id.as_str(),
-                        target.kind.as_str(),
-                        target.name.as_str(),
-                        target.created_by.as_str(),
-                        target.created_at_ms,
-                    ),
-                )
-                .await?;
-            connection
-                .execute(
-                    "INSERT INTO memberships
-                     (target_id, actor_id, role, joined_at_ms, left_at_ms)
-                     VALUES (?1, ?2, 'owner', ?3, NULL)",
-                    (target.id.as_str(), target.created_by.as_str(), now),
-                )
+            TargetStore::new(connection).insert(&target).await?;
+            MembershipStore::new(connection)
+                .insert(&target.id, &target.created_by, "owner", now)
                 .await?;
             ChangeStore::new(connection)
-                .insert_target_change(
-                ChangeKind::TargetCreated,
-                &target.id,
-                &target.id,
-                &[],
-                now,
-            )
-            .await?;
+                .insert_target_change(ChangeKind::TargetCreated, &target.id, &target.id, &[], now)
+                .await?;
             Ok(target)
         })
         .await
@@ -260,52 +236,18 @@ impl CollabCore {
                 created_by: actor.id.clone(),
                 created_at_ms: now,
             };
-            connection
-                .execute(
-                    "INSERT INTO targets
-                     (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
-                     VALUES (?1, ?2, ?3, NULL, NULL, ?4, ?5, NULL)",
-                    (
-                        target.id.as_str(),
-                        target.kind.as_str(),
-                        target.name.as_str(),
-                        target.created_by.as_str(),
-                        now,
-                    ),
-                )
-                .await?;
+            TargetStore::new(connection).insert(&target).await?;
             for (member_id, role) in [(&actor.id, "owner"), (&peer.id, "member")] {
-                connection
-                    .execute(
-                        "INSERT INTO memberships
-                         (target_id, actor_id, role, joined_at_ms, left_at_ms)
-                         VALUES (?1, ?2, ?3, ?4, NULL)",
-                        (target.id.as_str(), member_id.as_str(), role, now),
-                    )
+                MembershipStore::new(connection)
+                    .insert(&target.id, member_id, role, now)
                     .await?;
             }
-            connection
-                .execute(
-                    "INSERT INTO direct_pairs
-                     (target_id, actor_low_id, actor_high_id, created_at_ms)
-                     VALUES (?1, ?2, ?3, ?4)",
-                    (
-                        target.id.as_str(),
-                        low.id.as_str(),
-                        high.id.as_str(),
-                        now,
-                    ),
-                )
+            TargetStore::new(connection)
+                .insert_direct_pair(&target.id, low.id.as_str(), high.id.as_str(), now)
                 .await?;
             ChangeStore::new(connection)
-                .insert_target_change(
-                ChangeKind::TargetCreated,
-                &target.id,
-                &target.id,
-                &[],
-                now,
-            )
-            .await?;
+                .insert_target_change(ChangeKind::TargetCreated, &target.id, &target.id, &[], now)
+                .await?;
             Ok(target)
         })
         .await
@@ -383,6 +325,46 @@ impl FromRow for RouteRow {
 impl<'connection> TargetStore<'connection> {
     pub(crate) const fn new(connection: &'connection Connection) -> Self {
         Self { connection }
+    }
+
+    /// Insert one freshly built Target row.
+    pub(crate) async fn insert(&self, target: &Target) -> Result<()> {
+        self.connection
+            .execute_one(
+                "INSERT INTO targets
+                 (id, kind, name, parent_target_id, root_message_id, created_by, created_at_ms, archived_at_ms)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)",
+                (
+                    target.id.as_str(),
+                    target.kind.as_str(),
+                    target.name.as_str(),
+                    target.parent_target_id.as_deref(),
+                    target.root_message_id.as_deref(),
+                    target.created_by.as_str(),
+                    target.created_at_ms,
+                ),
+                "target insert",
+            )
+            .await
+    }
+
+    /// Record the unordered Actor pair that owns one Direct target.
+    pub(crate) async fn insert_direct_pair(
+        &self,
+        target_id: &str,
+        low_actor_id: &str,
+        high_actor_id: &str,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute_one(
+                "INSERT INTO direct_pairs
+                 (target_id, actor_low_id, actor_high_id, created_at_ms)
+                 VALUES (?1, ?2, ?3, ?4)",
+                (target_id, low_actor_id, high_actor_id, now),
+                "direct pair insert",
+            )
+            .await
     }
 
     pub(crate) async fn find(&self, target_id: &str) -> Result<Target> {

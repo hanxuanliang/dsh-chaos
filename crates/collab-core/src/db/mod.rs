@@ -12,7 +12,7 @@ use crate::{CollabError, Result};
 pub(crate) mod migrate;
 pub(crate) mod row;
 
-pub(crate) use row::{FromRow, QueryRows, assert_one_row, placeholders, require_scalar_row};
+pub(crate) use row::{ExecuteOne, FromRow, QueryRows, placeholders, require_scalar_row};
 
 use migrate::migrate;
 
