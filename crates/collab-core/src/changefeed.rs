@@ -178,12 +178,9 @@ impl CollabCore {
                     [before_ms],
                 )
                 .await?;
-            let Some(row) = rows.next().await? else {
-                return Err(CollabError::Database(
-                    "change retention query returned no row".into(),
-                ));
-            };
-            let first_retained_seq = row.get::<Option<i64>>(0)?;
+            let first_retained_seq =
+                require_scalar_row(rows.next().await?, "change retention query")?
+                    .get::<Option<i64>>(0)?;
             drop(rows);
             let prune_through = match first_retained_seq {
                 Some(first_retained_seq) => first_retained_seq - 1,

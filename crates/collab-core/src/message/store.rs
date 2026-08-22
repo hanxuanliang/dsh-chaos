@@ -235,7 +235,8 @@ impl<'connection> MessageStore<'connection> {
 
     /// Insert `message`, returning its global sequence.
     pub(crate) async fn insert(&self, message: &NewMessage) -> Result<i64> {
-        self.connection
+        let row = self
+            .connection
             .query_row::<SeqRow>(
                 "INSERT INTO messages
                  (id, target_id, author_id, client_request_id, body_json, created_at_ms)
@@ -250,8 +251,7 @@ impl<'connection> MessageStore<'connection> {
                     message.created_at_ms,
                 ),
             )
-            .await?
-            .map(|row| row.0)
-            .ok_or_else(|| CollabError::Database("message insert returned no sequence".into()))
+            .await?;
+        Ok(require_scalar_row(row, "message insert")?.0)
     }
 }
