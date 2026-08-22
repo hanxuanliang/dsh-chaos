@@ -23,14 +23,12 @@ impl CollabCore {
         request: SendMessageRequest,
         _failpoint: SendFailpoint,
     ) -> Result<SendMessageResult> {
-        for (name, value) in [
-            ("target_id", request.target_id.as_str()),
-            ("author_id", request.author_id.as_str()),
-            ("client_request_id", request.client_request_id.as_str()),
-            ("text", request.text.as_str()),
-        ] {
-            CollabError::require_non_blank(name, value)?;
-        }
+        require_non_blank!(
+            target_id = request.target_id,
+            author_id = request.author_id,
+            client_request_id = request.client_request_id,
+            text = request.text
+        );
 
         let now = now_ms()?;
         self.write(async |connection| {

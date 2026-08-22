@@ -9,8 +9,8 @@ use super::store::find_target;
 impl CollabCore {
     /// Create a Channel and make its creator the owner/member.
     pub async fn create_channel(&self, name: &str, creator_id: &str) -> Result<Target> {
-        CollabError::require_non_blank("channel name", name)?;
-        CollabError::require_non_blank("creator_id", creator_id)?;
+        require_non_blank!("channel name" = name);
+        require_non_blank!(creator_id);
         let creator_id = ActorId::parse(creator_id)?;
         let now = now_ms()?;
         let target = Target {
@@ -63,8 +63,7 @@ impl CollabCore {
     /// Return the one stable Direct target for an unordered pair of actors,
     /// creating it and its two memberships when absent.
     pub async fn create_direct(&self, actor_id: &str, peer_id: &str) -> Result<Target> {
-        CollabError::require_non_blank("actor_id", actor_id)?;
-        CollabError::require_non_blank("peer_id", peer_id)?;
+        require_non_blank!(actor_id, peer_id);
         if actor_id == peer_id {
             return Err(CollabError::InvalidArgument(
                 "a Direct target requires two distinct actors".into(),

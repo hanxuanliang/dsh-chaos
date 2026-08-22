@@ -1,13 +1,13 @@
 //! Runtime binding projections.
 
-use crate::{CollabCore, CollabError, Result, RuntimeBinding};
+use crate::{CollabCore, Result, RuntimeBinding};
 
 use super::store::{all_bindings, binding_for_agent, binding_for_session};
 
 impl CollabCore {
     /// Return the current runtime binding for one stable Agent.
     pub async fn runtime_binding(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
-        CollabError::require_non_blank("agent_id", agent_id)?;
+        require_non_blank!(agent_id);
         self.read(async |connection| binding_for_agent(connection, agent_id).await)
             .await
     }
@@ -17,7 +17,7 @@ impl CollabCore {
         &self,
         session_id: &str,
     ) -> Result<Option<RuntimeBinding>> {
-        CollabError::require_non_blank("session_id", session_id)?;
+        require_non_blank!(session_id);
         self.read(async |connection| binding_for_session(connection, session_id).await)
             .await
     }

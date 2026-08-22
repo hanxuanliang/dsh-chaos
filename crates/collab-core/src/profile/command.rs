@@ -58,7 +58,7 @@ impl CollabCore {
         workspace_path: &str,
         charter: &AgentCharter,
     ) -> Result<Actor> {
-        CollabError::require_non_blank("workspace_path", workspace_path)?;
+        require_non_blank!(workspace_path);
         let charter_json = encode_charter(charter)?;
         let now = now_ms()?;
         self.write(async |connection| {
@@ -81,8 +81,7 @@ impl CollabCore {
         charter: AgentCharter,
         expected_version: i64,
     ) -> Result<AgentProfile> {
-        CollabError::require_non_blank("agent_id", agent_id)?;
-        CollabError::require_non_blank("display_name", display_name)?;
+        require_non_blank!(agent_id, display_name);
         if expected_version <= 0 {
             return Err(CollabError::InvalidArgument(
                 "expected_version must be positive".into(),
@@ -125,7 +124,7 @@ impl CollabCore {
     /// Delete one Agent's operational state. The actor row and its messages
     /// stay so history never points at a missing author.
     pub async fn delete_agent(&self, actor_id: &str) -> Result<()> {
-        CollabError::require_non_blank("actor_id", actor_id)?;
+        require_non_blank!(actor_id);
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
@@ -156,8 +155,7 @@ impl CollabCore {
 
     /// Return the stable User for one handle, creating it when absent.
     pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
-        CollabError::require_non_blank("handle", handle)?;
-        CollabError::require_non_blank("display_name", display_name)?;
+        require_non_blank!(handle, display_name);
         let now = now_ms()?;
         self.write(async |connection| {
             if let Some(actor) = Actor::find_by_handle(connection, handle).await? {

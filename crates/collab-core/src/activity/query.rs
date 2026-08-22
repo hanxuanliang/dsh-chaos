@@ -13,7 +13,7 @@ impl CollabCore {
         limit: u32,
         cursor: Option<&str>,
     ) -> Result<ActivityInboxPage> {
-        CollabError::require_non_blank("actor_id", actor_id)?;
+        require_non_blank!(actor_id);
         if limit == 0 || limit > 50 {
             return Err(CollabError::InvalidArgument(
                 "limit must be between 1 and 50".into(),

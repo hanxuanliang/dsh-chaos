@@ -3,7 +3,7 @@
 use turso::Connection;
 
 use crate::changefeed::{all_actor_ids, insert_change};
-use crate::{Actor, ActorKind, ChangeKind, CollabError, Result, new_id};
+use crate::{Actor, ActorKind, ChangeKind, Result, new_id};
 
 /// Insert one Actor of `kind` and emit ActorCreated to every known actor.
 pub(crate) async fn insert_actor(
@@ -13,8 +13,7 @@ pub(crate) async fn insert_actor(
     display_name: &str,
     now: i64,
 ) -> Result<Actor> {
-    CollabError::require_non_blank("handle", handle)?;
-    CollabError::require_non_blank("display_name", display_name)?;
+    require_non_blank!(handle, display_name);
     let actor = Actor {
         id: new_id(),
         kind,

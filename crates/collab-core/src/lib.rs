@@ -22,6 +22,34 @@ macro_rules! string_id {
     };
 }
 
+/// Reject blank string arguments at an API boundary. The failure names each
+/// argument after its own expression; pass `name = value` only when the
+/// expression is not the parameter name itself, and `"label" = value` when
+/// neither is.
+macro_rules! require_non_blank {
+    ($($name:ident),+ $(,)?) => {$(
+        if $name.trim().is_empty() {
+            return Err(crate::CollabError::InvalidArgument(
+                concat!(stringify!($name), " must not be blank").into(),
+            ));
+        }
+    )+};
+    ($($name:ident = $value:expr),+ $(,)?) => {$(
+        if $value.trim().is_empty() {
+            return Err(crate::CollabError::InvalidArgument(
+                concat!(stringify!($name), " must not be blank").into(),
+            ));
+        }
+    )+};
+    ($label:literal = $value:expr $(,)?) => {
+        if $value.trim().is_empty() {
+            return Err(crate::CollabError::InvalidArgument(
+                concat!($label, " must not be blank").into(),
+            ));
+        }
+    };
+}
+
 mod activity;
 mod actor;
 mod changefeed;
