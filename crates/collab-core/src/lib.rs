@@ -52,10 +52,9 @@ pub use db::CollabCore;
 pub use error::{CollabError, Result};
 pub use membership::{AgentMembership, IdentityContext, MembershipRole, TargetMember};
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
-pub use model::{
-    ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, PendingWake, RuntimeBinding,
-};
+pub use model::{ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, PendingWake};
 pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
+pub use runtime::RuntimeBinding;
 pub use target::{Target, TargetKind};
 pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
@@ -69,7 +68,6 @@ use uuid::Uuid;
 
 use membership::*;
 use message::*;
-use runtime::*;
 use target::*;
 use thread::query::followed_thread_ids_for_actor;
 

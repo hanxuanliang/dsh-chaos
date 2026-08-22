@@ -1,6 +1,7 @@
 //! Level-triggered wake delivery, inbox batches, and model-seen fences.
 
 use super::*;
+use crate::runtime::require_current_binding;
 
 impl CollabCore {
     /// Scan the level-triggered wake ledger. Only authorized deliveries that

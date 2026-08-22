@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Actor, IdentityContext, Message, Target, Task};
+use crate::{Actor, IdentityContext, Message, RuntimeBinding, Target, Task};
 
 /// A durable UI invalidation kind. Change rows carry identifiers rather than
 /// mutable domain payloads; consumers re-read the authoritative projection.
@@ -57,18 +57,6 @@ pub struct ChangeEvent {
     pub target_id: Option<String>,
     pub entity_id: String,
     pub created_at_ms: i64,
-}
-
-/// The current DSH runtime generation bound to a stable Agent.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RuntimeBinding {
-    pub agent_id: String,
-    pub session_id: String,
-    pub generation: i64,
-    pub provider: String,
-    pub model: String,
-    pub preset: String,
-    pub bound_at_ms: i64,
 }
 
 /// One current runtime whose durable inbox still needs a level-triggered
