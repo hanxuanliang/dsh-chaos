@@ -1,5 +1,6 @@
 use turso::{Connection, Row};
 
+use crate::changefeed::{ChangeKind, ChangeStore};
 use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::message::stored_text;
 use crate::{CollabError, Result, Task, TaskStatus};
@@ -286,6 +287,28 @@ impl<'connection> TaskStore<'connection> {
 }
 
 impl TaskStore<'_> {
+    /// Persist one committed TaskTransition with its change notification:
+    /// the CAS row update, audit event, and published change in one call.
+    pub(crate) async fn apply_with_publish(
+        &self,
+        transition: &TaskTransition,
+        now: i64,
+    ) -> Result<()> {
+        self.apply(transition, now).await?;
+        if transition.publish {
+            ChangeStore::new(self.connection)
+                .insert_target_change(
+                    ChangeKind::TaskUpdated,
+                    &transition.target_id,
+                    &transition.message_id,
+                    &[],
+                    now,
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Persist one committed TaskTransition: the CAS row update and its audit
     /// event in one call. The change notification stays with the caller.
     pub(crate) async fn apply(&self, transition: &TaskTransition, now: i64) -> Result<()> {

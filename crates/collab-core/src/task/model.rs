@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::membership::MembershipRole;
 use crate::target::AccessGrant;
+use crate::task::store::TaskStore;
 use crate::{CollabError, Result};
 
 /// Task status remains independent from its optional assignee.
@@ -145,6 +146,21 @@ pub(crate) struct LoadedTask {
 }
 
 impl LoadedTask {
+    /// Assemble one Task's evidence: the loaded row plus the acting actor's
+    /// proven access.
+    pub(crate) async fn load(
+        connection: &turso::Connection,
+        message_id: &str,
+        actor_id: &str,
+    ) -> Result<Self> {
+        let task = TaskStore::new(connection)
+            .find_by_message(message_id)
+            .await?
+            .ok_or_else(|| Self::not_found(message_id))?;
+        let grant = AccessGrant::require(connection, &task.target_id, actor_id).await?;
+        Ok(Self { task, grant })
+    }
+
     pub(crate) fn not_found(message_id: &str) -> CollabError {
         CollabError::NotFound {
             entity: "task",

@@ -6,14 +6,12 @@ use turso::{Connection, Row};
 use std::collections::BTreeSet;
 
 use crate::actor::ActorId;
-use crate::actor::{Actor, parse_actor_kind};
+use crate::actor::{Actor, ActorKind};
 use crate::changefeed::ChangeStore;
 use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::delivery::store::DeliveryStore;
 use crate::profile::store::ProfileStore;
-use crate::target::{
-    TargetRoute, TargetStore, parse_target_kind, require_target, require_target_access,
-};
+use crate::target::{AccessGrant, TargetRoute, TargetStore};
 use crate::{
     AgentProfile, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, now_ms,
 };
@@ -34,6 +32,17 @@ impl MembershipRole {
         match self {
             Self::Owner => "owner",
             Self::Member => "member",
+        }
+    }
+
+    /// Decode one row's role text, rejecting unknown values.
+    pub(crate) fn parse(target_id: &str, actor_id: &str, value: &str) -> Result<Self> {
+        match value {
+            "owner" => Ok(Self::Owner),
+            "member" => Ok(Self::Member),
+            other => Err(CollabError::Database(format!(
+                "target '{target_id}' member '{actor_id}' has unknown role '{other}'"
+            ))),
         }
     }
 }
@@ -64,20 +73,6 @@ pub struct IdentityContext {
     pub target: Option<Target>,
     pub membership_target: Option<Target>,
     pub members: Vec<TargetMember>,
-}
-
-pub(crate) fn parse_membership_role(
-    target_id: &str,
-    actor_id: &str,
-    value: &str,
-) -> Result<MembershipRole> {
-    match value {
-        "owner" => Ok(MembershipRole::Owner),
-        "member" => Ok(MembershipRole::Member),
-        other => Err(CollabError::Database(format!(
-            "target '{target_id}' member '{actor_id}' has unknown role '{other}'"
-        ))),
-    }
 }
 
 // ── 证据 ─────────────────────────────────────────────────────────────────────
@@ -128,13 +123,13 @@ impl MemberRow {
         } = self;
         Ok(TargetMember {
             actor: Actor {
-                kind: parse_actor_kind(&id, &kind_text)?,
+                kind: ActorKind::parse(&id, &kind_text)?,
                 id: id.clone(),
                 handle,
                 display_name,
                 created_at_ms,
             },
-            role: parse_membership_role(target_id, &id, &role_text)?,
+            role: MembershipRole::parse(target_id, &id, &role_text)?,
             joined_at_ms,
         })
     }
@@ -186,14 +181,14 @@ impl AgentMembershipRow {
         Ok(AgentMembership {
             target: Target {
                 id: target_id.clone(),
-                kind: parse_target_kind(&target_id, &kind_text)?,
+                kind: TargetKind::parse(&target_id, &kind_text)?,
                 name,
                 parent_target_id,
                 root_message_id,
                 created_by,
                 created_at_ms,
             },
-            role: parse_membership_role(&target_id, agent_id, &role_text)?,
+            role: MembershipRole::parse(&target_id, agent_id, &role_text)?,
             joined_at_ms,
         })
     }
@@ -227,7 +222,7 @@ impl Membership {
                 target_id: target_id.to_owned(),
             })?;
         Ok(Self {
-            role: parse_membership_role(target_id, &actor.id, &role_text)?,
+            role: MembershipRole::parse(target_id, &actor.id, &role_text)?,
         })
     }
 
@@ -244,7 +239,7 @@ impl Membership {
                 (target_id, actor_id),
             )
             .await?
-            .map(|RoleRow(role_text)| parse_membership_role(target_id, actor_id, &role_text))
+            .map(|RoleRow(role_text)| MembershipRole::parse(target_id, actor_id, &role_text))
             .transpose()?;
         let Some(role) = role else {
             return Err(Self::manage_denied(target_id, actor_id));
@@ -276,7 +271,7 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            if require_target(connection, target_id).await? != TargetKind::Channel {
+            if TargetRoute::require(connection, target_id).await?.kind != TargetKind::Channel {
                 return Err(CollabError::InvalidArgument(
                     "add_member only supports Channel targets".into(),
                 ));
@@ -326,7 +321,9 @@ impl CollabCore {
     /// members pane must use; the actor directory is not a member list.
     pub async fn list_target_members(&self, actor_id: &str, target_id: &str) -> Result<Vec<Actor>> {
         self.read(async |connection| {
-            let route = require_target_access(connection, target_id, actor_id).await?;
+            let route = AccessGrant::require(connection, target_id, actor_id)
+                .await?
+                .route;
             if route.kind != TargetKind::Channel {
                 return Err(CollabError::InvalidArgument(
                     "list_target_members only supports Channel targets".into(),
@@ -355,7 +352,9 @@ impl CollabCore {
         target_id: &str,
     ) -> Result<Vec<TargetMember>> {
         self.read(async |connection| {
-            let route = require_target_access(connection, target_id, actor_id).await?;
+            let route = AccessGrant::require(connection, target_id, actor_id)
+                .await?
+                .route;
             MembershipStore::new(connection)
                 .target_memberships(route.permission_target_id(target_id))
                 .await
@@ -544,7 +543,9 @@ impl<'connection> MembershipStore<'connection> {
             });
         };
         NonBlank::parse("target_id", target_id)?;
-        let route = require_target_access(self.connection, target_id, agent_id).await?;
+        let route = AccessGrant::require(self.connection, target_id, agent_id)
+            .await?
+            .route;
         let target = TargetStore::new(self.connection).find(target_id).await?;
         let membership_target_id = route.permission_target_id(target_id);
         let membership_target = if membership_target_id == target_id {

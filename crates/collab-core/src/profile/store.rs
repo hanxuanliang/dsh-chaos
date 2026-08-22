@@ -1,10 +1,9 @@
 use turso::{Connection, Row};
 
-use crate::actor::parse_actor_kind;
 use crate::db::{FromRow, QueryRows};
-use crate::{Actor, ActorKind, AgentProfile, CollabError, Result};
+use crate::{Actor, ActorKind, AgentLifecycle, AgentProfile, CollabError, Result};
 
-use super::model::{decode_charter, parse_agent_lifecycle};
+use super::model::AgentCharter;
 
 /// Column order of the canonical Agent Profile projection: the Actor columns
 /// followed by the Agent columns of the JOIN.
@@ -47,15 +46,15 @@ impl FromRow for ProfileRow {
 
 impl ProfileRow {
     fn into_profile(self) -> Result<AgentProfile> {
-        let kind = parse_actor_kind(&self.id, &self.kind)?;
+        let kind = ActorKind::parse(&self.id, &self.kind)?;
         if kind != ActorKind::Agent {
             return Err(CollabError::Database(format!(
                 "Agent Profile '{}' belongs to a non-Agent actor",
                 self.id
             )));
         }
-        let lifecycle = parse_agent_lifecycle(&self.id, &self.lifecycle)?;
-        let charter = decode_charter(&self.id, &self.charter_json)?;
+        let lifecycle = AgentLifecycle::parse(&self.id, &self.lifecycle)?;
+        let charter = AgentCharter::decode(&self.id, &self.charter_json)?;
         Ok(AgentProfile {
             actor: Actor {
                 id: self.id,

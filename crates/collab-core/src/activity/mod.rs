@@ -10,7 +10,7 @@ pub use model::{
 
 use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
-use crate::target::require_target_access;
+use crate::target::AccessGrant;
 use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
 use crate::{Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, now_ms};
@@ -35,7 +35,9 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            let route = require_target_access(connection, target_id, actor_id).await?;
+            let route = AccessGrant::require(connection, target_id, actor_id)
+                .await?
+                .route;
             if route.kind == TargetKind::Thread
                 && !ThreadStore::new(connection)
                     .is_following(&ThreadId::parse(target_id)?, &ActorId::parse(actor_id)?)

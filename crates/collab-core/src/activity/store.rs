@@ -1,9 +1,8 @@
 use turso::{Connection, Row};
 
-use crate::actor::parse_actor_kind;
+use crate::actor::ActorKind;
 use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::message::stored_text;
-use crate::target::parse_target_kind;
 use crate::{
     ActivityInboxItem, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind, CollabError,
     Result, TargetKind, TaskStatus,
@@ -131,7 +130,7 @@ impl FromRow for ActivityInboxItem {
     fn from_row(row: &Row) -> Result<Self> {
         let conversation_id = row.get::<String>(0)?;
         let target_kind_text = row.get::<String>(1)?;
-        let target_kind = parse_target_kind(&conversation_id, &target_kind_text)?;
+        let target_kind = TargetKind::parse(&conversation_id, &target_kind_text)?;
         let parent_target_id = row.get::<Option<String>>(2)?;
         let root_message_id = row.get::<Option<String>>(3)?;
         match target_kind {
@@ -207,7 +206,7 @@ impl FromRow for ActivityInboxItem {
             )?,
             latest_reply: Some(ActivityInboxReply {
                 sender_name: row.get(8)?,
-                sender_kind: parse_actor_kind(&conversation_id, &latest_kind_text)?,
+                sender_kind: ActorKind::parse(&conversation_id, &latest_kind_text)?,
                 excerpt: stored_text(
                     &latest_body_json,
                     &format!("Activity preview for '{conversation_id}'"),

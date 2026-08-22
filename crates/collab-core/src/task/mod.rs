@@ -80,12 +80,14 @@ impl CollabCore {
     pub async fn claim_task(&self, message_id: &str, actor_id: &str) -> Result<Task> {
         let now = now_ms()?;
         self.write(async |connection| {
-            let loaded = load_task(connection, message_id, actor_id).await?;
+            let loaded = LoadedTask::load(connection, message_id, actor_id).await?;
             let task = loaded.task.clone();
             let task = match loaded.claim(now)? {
                 TaskDecision::Idempotent => task,
                 TaskDecision::Transition(transition) => {
-                    apply_task_transition(connection, &transition, now).await?;
+                    TaskStore::new(connection)
+                        .apply_with_publish(&transition, now)
+                        .await?;
                     transition.task_after
                 }
             };
@@ -109,12 +111,14 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            let loaded = load_task(connection, message_id, actor_id).await?;
+            let loaded = LoadedTask::load(connection, message_id, actor_id).await?;
             let task = loaded.task.clone();
             let task = match loaded.unclaim(expected_version, now)? {
                 TaskDecision::Idempotent => task,
                 TaskDecision::Transition(transition) => {
-                    apply_task_transition(connection, &transition, now).await?;
+                    TaskStore::new(connection)
+                        .apply_with_publish(&transition, now)
+                        .await?;
                     transition.task_after
                 }
             };
@@ -139,12 +143,14 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            let loaded = load_task(connection, message_id, actor_id).await?;
+            let loaded = LoadedTask::load(connection, message_id, actor_id).await?;
             let task = loaded.task.clone();
             let task = match loaded.change_status(status, expected_version, now)? {
                 TaskDecision::Idempotent => task,
                 TaskDecision::Transition(transition) => {
-                    apply_task_transition(connection, &transition, now).await?;
+                    TaskStore::new(connection)
+                        .apply_with_publish(&transition, now)
+                        .await?;
                     transition.task_after
                 }
             };
@@ -167,42 +173,4 @@ impl CollabCore {
         })
         .await
     }
-}
-
-/// Assemble one Task's evidence: the loaded row plus the acting actor's
-/// proven access.
-async fn load_task(
-    connection: &turso::Connection,
-    message_id: &str,
-    actor_id: &str,
-) -> Result<LoadedTask> {
-    let task = TaskStore::new(connection)
-        .find_by_message(message_id)
-        .await?
-        .ok_or_else(|| LoadedTask::not_found(message_id))?;
-    let grant = AccessGrant::require(connection, &task.target_id, actor_id).await?;
-    Ok(LoadedTask { task, grant })
-}
-
-/// Persist one committed decision: the fenced row update, its audit event,
-/// and the change notification, all in the caller's transaction.
-async fn apply_task_transition(
-    connection: &turso::Connection,
-    transition: &model::TaskTransition,
-    now: i64,
-) -> Result<()> {
-    let store = TaskStore::new(connection);
-    store.apply(transition, now).await?;
-    if transition.publish {
-        ChangeStore::new(connection)
-            .insert_target_change(
-                ChangeKind::TaskUpdated,
-                &transition.target_id,
-                &transition.message_id,
-                &[],
-                now,
-            )
-            .await?;
-    }
-    Ok(())
 }

@@ -40,6 +40,17 @@ impl ActorKind {
             Self::Agent => "agent",
         }
     }
+
+    /// Decode one row's kind text, rejecting unknown values.
+    pub(crate) fn parse(actor_id: &str, value: &str) -> Result<Self> {
+        match value {
+            "user" => Ok(Self::User),
+            "agent" => Ok(Self::Agent),
+            other => Err(CollabError::Database(format!(
+                "actor '{actor_id}' has unknown kind '{other}'"
+            ))),
+        }
+    }
 }
 
 /// A stable collab actor.
@@ -57,7 +68,7 @@ impl FromRow for Actor {
         let id = row.get::<String>(0)?;
         let kind_text = row.get::<String>(1)?;
         Ok(Self {
-            kind: parse_actor_kind(&id, &kind_text)?,
+            kind: ActorKind::parse(&id, &kind_text)?,
             id,
             handle: row.get(2)?,
             display_name: row.get(3)?,
@@ -104,41 +115,32 @@ impl Actor {
         }
         Ok(actor)
     }
-}
 
-pub(crate) fn parse_actor_kind(actor_id: &str, value: &str) -> Result<ActorKind> {
-    match value {
-        "user" => Ok(ActorKind::User),
-        "agent" => Ok(ActorKind::Agent),
-        other => Err(CollabError::Database(format!(
-            "actor '{actor_id}' has unknown kind '{other}'"
-        ))),
+    /// Insert one Actor of `kind` and emit ActorCreated to every known actor.
+    /// Creation evidence: guards, persistence, and broadcast in one step.
+    pub(crate) async fn insert(
+        connection: &Connection,
+        kind: ActorKind,
+        handle: &str,
+        display_name: &str,
+        now: i64,
+    ) -> Result<Self> {
+        let handle = NonBlank::parse("handle", handle)?;
+        let display_name = NonBlank::parse("display_name", display_name)?;
+        let actor = Self {
+            id: new_id(),
+            kind,
+            handle: handle.as_str().to_owned(),
+            display_name: display_name.as_str().to_owned(),
+            created_at_ms: now,
+        };
+        ActorStore::new(connection).insert(&actor).await?;
+        let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+        ChangeStore::new(connection)
+            .insert_change(ChangeKind::ActorCreated, None, &actor.id, &actor_ids, now)
+            .await?;
+        Ok(actor)
     }
-}
-
-/// Insert one Actor of `kind` and emit ActorCreated to every known actor.
-pub(crate) async fn insert_actor(
-    connection: &Connection,
-    kind: ActorKind,
-    handle: &str,
-    display_name: &str,
-    now: i64,
-) -> Result<Actor> {
-    let handle = NonBlank::parse("handle", handle)?;
-    let display_name = NonBlank::parse("display_name", display_name)?;
-    let actor = Actor {
-        id: new_id(),
-        kind,
-        handle: handle.as_str().to_owned(),
-        display_name: display_name.as_str().to_owned(),
-        created_at_ms: now,
-    };
-    ActorStore::new(connection).insert(&actor).await?;
-    let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
-    ChangeStore::new(connection)
-        .insert_change(ChangeKind::ActorCreated, None, &actor.id, &actor_ids, now)
-        .await?;
-    Ok(actor)
 }
 
 /// Persistence for the actors table; the only owner of its SQL.
