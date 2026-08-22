@@ -3,7 +3,7 @@ use turso::{Connection, Row};
 use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::{CollabError, Message, Result};
 
-use super::model::{NewMessage, StoredTextBody, stored_text};
+use super::model::{NewMessage, stored_text};
 
 /// Column order of the canonical Message projection, shared by every SELECT
 /// in this store.
@@ -215,15 +215,7 @@ impl<'connection> MessageStore<'connection> {
         self.connection
             .query_row::<BodyRow>("SELECT body_json FROM messages WHERE id = ?1", [message_id])
             .await?
-            .map(|row| {
-                serde_json::from_str::<StoredTextBody>(&row.0)
-                    .map_err(|error| {
-                        CollabError::Database(format!(
-                            "message '{message_id}' has invalid body: {error}"
-                        ))
-                    })
-                    .map(|body| body.text)
-            })
+            .map(|row| stored_text(&row.0, &format!("message '{message_id}' body")))
             .transpose()
     }
 

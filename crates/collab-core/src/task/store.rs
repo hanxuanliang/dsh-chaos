@@ -1,7 +1,7 @@
 use turso::{Connection, Row};
 
 use crate::db::{FromRow, QueryRows, assert_one_row};
-use crate::message::StoredTextBody;
+use crate::message::stored_text;
 use crate::{CollabError, Result, Task, TaskStatus};
 
 use super::model::{NewTask, TaskEvent, TaskTransition};
@@ -57,15 +57,7 @@ impl TaskRow {
             CollabError::Database(format!("task '{message_id}' has invalid status '{status}'"))
         })?;
         let anchor_text = body_json
-            .map(|body_json| {
-                serde_json::from_str::<StoredTextBody>(&body_json)
-                    .map(|body| body.text)
-                    .map_err(|error| {
-                        CollabError::Database(format!(
-                            "task '{message_id}' anchor has invalid body: {error}"
-                        ))
-                    })
-            })
+            .map(|body_json| stored_text(&body_json, &format!("task '{message_id}' anchor body")))
             .transpose()?;
         Ok(Task {
             message_id,
