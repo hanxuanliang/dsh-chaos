@@ -1,11 +1,13 @@
 //! Turso-backed persistence, connection lifecycle, and immutable schema migrations.
 
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::sync::Mutex;
+use turso::Connection;
+use turso::transaction::TransactionBehavior;
 
-use crate::{CollabCore, CollabError, Result};
+use crate::{CollabError, Result};
 
 pub(crate) mod migrate;
 pub(crate) mod row;
@@ -13,6 +15,12 @@ pub(crate) mod row;
 pub(crate) use row::{FromRow, QueryRows, placeholders};
 
 use migrate::migrate;
+
+/// One process-local handle over the authoritative local Turso database.
+pub struct CollabCore {
+    pub(crate) connection: Mutex<Connection>,
+    pub(crate) closed: AtomicBool,
+}
 
 impl CollabCore {
     /// Open a local Turso file and apply the current schema.
@@ -35,6 +43,50 @@ impl CollabCore {
     /// Open an in-memory Turso database for tests and ephemeral hosts.
     pub async fn open_memory() -> Result<Self> {
         Self::open(Path::new(":memory:")).await
+    }
+
+    /// Stop admitting new operations. In-flight operations hold the connection
+    /// mutex and finish before this future returns.
+    pub async fn close(&self) -> Result<()> {
+        self.closed.store(true, Ordering::SeqCst);
+        let _connection = self.connection.lock().await;
+        Ok(())
+    }
+
+    pub(crate) fn assert_open(&self) -> Result<()> {
+        if self.closed.load(Ordering::SeqCst) {
+            Err(CollabError::Closed)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) async fn read<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'connection> AsyncFnOnce(&'connection Connection) -> Result<T>,
+    {
+        self.assert_open()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .await?;
+        let value = f(&transaction).await?;
+        transaction.commit().await?;
+        Ok(value)
+    }
+
+    pub(crate) async fn write<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'connection> AsyncFnOnce(&'connection Connection) -> Result<T>,
+    {
+        self.assert_open()?;
+        let mut connection = self.connection.lock().await;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let value = f(&transaction).await?;
+        transaction.commit().await?;
+        Ok(value)
     }
 }
 

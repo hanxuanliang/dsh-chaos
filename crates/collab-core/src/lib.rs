@@ -25,7 +25,6 @@ macro_rules! string_id {
 mod activity;
 mod actor;
 mod changefeed;
-mod core;
 mod db;
 mod delivery;
 mod error;
@@ -49,7 +48,7 @@ pub use activity::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
 };
 pub use actor::{Actor, ActorKind};
-pub use core::CollabCore;
+pub use db::CollabCore;
 pub use error::{CollabError, Result};
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub use model::{
@@ -61,15 +60,28 @@ pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
 
 use std::collections::BTreeSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use turso::transaction::TransactionBehavior;
 use turso::{Connection, Row};
+use uuid::Uuid;
 
 use actor::*;
 use changefeed::*;
-use core::*;
 use membership::*;
 use message::*;
 use runtime::*;
 use target::*;
 use thread::query::followed_thread_ids_for_actor;
+
+pub(crate) fn new_id() -> String {
+    Uuid::now_v7().to_string()
+}
+
+pub(crate) fn now_ms() -> Result<i64> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| CollabError::Filesystem(error.to_string()))?;
+    i64::try_from(duration.as_millis())
+        .map_err(|_| CollabError::Filesystem("system clock is outside i64 milliseconds".into()))
+}
