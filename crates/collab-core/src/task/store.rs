@@ -1,6 +1,6 @@
 use turso::{Connection, Row};
 
-use crate::db::{FromRow, QueryRows, assert_one_row};
+use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::message::stored_text;
 use crate::{CollabError, Result, Task, TaskStatus};
 
@@ -204,16 +204,15 @@ impl<'connection> TaskStore<'connection> {
         expected_version: i64,
         now: i64,
     ) -> Result<()> {
-        let changed = self
-            .connection
-            .execute(
+        self.connection
+            .execute_one(
                 "UPDATE tasks
                  SET assignee_id = ?2, status = 'in_progress', version = ?3, updated_at_ms = ?4
                  WHERE message_id = ?1 AND assignee_id IS NULL AND version = ?5",
                 (message_id, actor_id, next_version, now, expected_version),
+                "task claim compare-and-set",
             )
-            .await?;
-        assert_one_row(changed, "task claim compare-and-set")
+            .await
     }
 
     /// Compare-and-set the release of a Task claimed by this actor.
@@ -225,16 +224,15 @@ impl<'connection> TaskStore<'connection> {
         expected_version: i64,
         now: i64,
     ) -> Result<()> {
-        let changed = self
-            .connection
-            .execute(
+        self.connection
+            .execute_one(
                 "UPDATE tasks
                  SET assignee_id = NULL, version = ?2, updated_at_ms = ?3
                  WHERE message_id = ?1 AND assignee_id = ?4 AND version = ?5",
                 (message_id, next_version, now, actor_id, expected_version),
+                "task unclaim compare-and-set",
             )
-            .await?;
-        assert_one_row(changed, "task unclaim compare-and-set")
+            .await
     }
 
     /// Compare-and-set one lifecycle status at the expected version.
@@ -246,9 +244,8 @@ impl<'connection> TaskStore<'connection> {
         expected_version: i64,
         now: i64,
     ) -> Result<()> {
-        let changed = self
-            .connection
-            .execute(
+        self.connection
+            .execute_one(
                 "UPDATE tasks
                  SET status = ?2, version = ?3, updated_at_ms = ?4
                  WHERE message_id = ?1 AND version = ?5",
@@ -259,9 +256,9 @@ impl<'connection> TaskStore<'connection> {
                     now,
                     expected_version,
                 ),
+                "task status compare-and-set",
             )
-            .await?;
-        assert_one_row(changed, "task status compare-and-set")
+            .await
     }
 
     pub(crate) async fn record_event(&self, event: &TaskEvent<'_>) -> Result<()> {

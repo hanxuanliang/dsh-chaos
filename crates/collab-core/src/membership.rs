@@ -8,7 +8,8 @@ use std::collections::BTreeSet;
 use crate::actor::ActorId;
 use crate::actor::{Actor, parse_actor_kind};
 use crate::changefeed::ChangeStore;
-use crate::db::{FromRow, QueryRows};
+use crate::db::{ExecuteOne, FromRow, QueryRows};
+use crate::delivery::store::DeliveryStore;
 use crate::profile::store::ProfileStore;
 use crate::target::{
     TargetRoute, TargetStore, parse_target_kind, require_target, require_target_access,
@@ -281,30 +282,11 @@ impl CollabCore {
                 ));
             }
             Membership::require_owner(connection, target_id, added_by).await?;
-            connection
-                .execute(
-                    "INSERT INTO memberships
-                     (target_id, actor_id, role, joined_at_ms, left_at_ms)
-                     VALUES (?1, ?2, 'member', ?3, NULL)
-                     ON CONFLICT(target_id, actor_id) DO UPDATE SET
-                       role = CASE
-                         WHEN memberships.role = 'owner' THEN 'owner'
-                         ELSE 'member'
-                       END,
-                       joined_at_ms = excluded.joined_at_ms,
-                       left_at_ms = NULL",
-                    (target_id, actor_id, now),
-                )
+            MembershipStore::new(connection)
+                .upsert_member(target_id, actor_id, now)
                 .await?;
             if actor.kind == crate::ActorKind::Agent {
-                connection
-                    .execute(
-                        "UPDATE agent_wake_state
-                         SET notified_generation = 0
-                         WHERE agent_id = ?1",
-                        [actor_id],
-                    )
-                    .await?;
+                DeliveryStore::new(connection).rearm(actor_id).await?;
             }
             ChangeStore::new(connection)
                 .insert_target_change(
@@ -430,6 +412,50 @@ impl<'connection> MembershipStore<'connection> {
         rows.into_iter()
             .map(|row| row.into_member(target_id))
             .collect()
+    }
+
+    /// Insert one freshly created membership row.
+    pub(crate) async fn insert(
+        &self,
+        target_id: &str,
+        actor_id: &str,
+        role: &str,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute_one(
+                "INSERT INTO memberships
+                 (target_id, actor_id, role, joined_at_ms, left_at_ms)
+                 VALUES (?1, ?2, ?3, ?4, NULL)",
+                (target_id, actor_id, role, now),
+                "membership insert",
+            )
+            .await
+    }
+
+    /// Add or reactivate one member, never demoting an existing owner.
+    pub(crate) async fn upsert_member(
+        &self,
+        target_id: &str,
+        actor_id: &str,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute_one(
+                "INSERT INTO memberships
+                 (target_id, actor_id, role, joined_at_ms, left_at_ms)
+                 VALUES (?1, ?2, 'member', ?3, NULL)
+                 ON CONFLICT(target_id, actor_id) DO UPDATE SET
+                   role = CASE
+                     WHEN memberships.role = 'owner' THEN 'owner'
+                     ELSE 'member'
+                   END,
+                   joined_at_ms = excluded.joined_at_ms,
+                   left_at_ms = NULL",
+                (target_id, actor_id, now),
+                "membership upsert",
+            )
+            .await
     }
 
     pub(crate) async fn active_member_ids(&self, target_id: &str) -> Result<Vec<String>> {

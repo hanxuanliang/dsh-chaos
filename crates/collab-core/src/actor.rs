@@ -3,7 +3,7 @@
 use turso::{Connection, Row};
 
 use crate::changefeed::ChangeStore;
-use crate::db::{FromRow, QueryRows};
+use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::{ChangeKind, CollabError, NonBlank, Result, new_id};
 
 /// Stable actor identifier, non-blank by construction.
@@ -182,7 +182,7 @@ impl<'connection> ActorStore<'connection> {
 
     pub(crate) async fn insert(&self, actor: &Actor) -> Result<()> {
         self.connection
-            .execute(
+            .execute_one(
                 "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 (
@@ -192,18 +192,18 @@ impl<'connection> ActorStore<'connection> {
                     actor.display_name.as_str(),
                     actor.created_at_ms,
                 ),
+                "actor insert",
             )
-            .await?;
-        Ok(())
+            .await
     }
 
     pub(crate) async fn rename(&self, id: &ActorId, display_name: &str) -> Result<()> {
         self.connection
-            .execute(
+            .execute_one(
                 "UPDATE actors SET display_name = ?2 WHERE id = ?1",
                 (id.as_str(), display_name),
+                "actor rename",
             )
-            .await?;
-        Ok(())
+            .await
     }
 }

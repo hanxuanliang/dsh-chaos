@@ -64,6 +64,29 @@ impl FromRow for String {
     }
 }
 
+/// Run a statement that must change exactly one row, naming the operation.
+/// Set-shaped statements (bulk stamps, prunes) keep the plain `execute`.
+pub(crate) trait ExecuteOne {
+    async fn execute_one(
+        &self,
+        sql: &str,
+        params: impl IntoParams,
+        operation: &str,
+    ) -> crate::Result<()>;
+}
+
+impl ExecuteOne for Connection {
+    async fn execute_one(
+        &self,
+        sql: &str,
+        params: impl IntoParams,
+        operation: &str,
+    ) -> crate::Result<()> {
+        let changed = self.execute(sql, params).await?;
+        assert_one_row(changed, operation)
+    }
+}
+
 pub(crate) fn placeholders(count: usize) -> String {
     (1..=count)
         .map(|index| format!("?{index}"))
