@@ -20,242 +20,17 @@
  *   SSE task_created/task_updated, so the board is a pure projection.
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { IconCheckOutline16, IconChevronDownOutline14, IconUserOutline16, Menu, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { NativeActor, NativeTask } from '../native.ts'
-import type { ChaosKey, ChaosTranslate } from './locales.ts'
+import type { NativeTask } from '../native.ts'
+import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import css from './blocks/TaskBoard.module.css'
-import { StatusChip } from './atoms/StatusChip.tsx'
 import { TaskCard } from './blocks/TaskCard.tsx'
 import { KanbanLane, KanbanLaneGrid } from './blocks/KanbanLane.tsx'
-import { AssigneePopover } from './blocks/AssigneePopover.tsx'
-import { ErrorBanner } from './atoms/ErrorBanner.tsx'
-
-type TaskStatus = NativeTask['status']
-
-/** Spec §3.1 lanes, order locked: 待办 → 进行 → 评审 → 完成. */
-const LANES: readonly TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done']
-
-const LANE_LABEL_KEY: Record<TaskStatus, ChaosKey> = {
-  todo: 'tasks.lane.todo',
-  in_progress: 'tasks.lane.inProgress',
-  in_review: 'tasks.lane.inReview',
-  done: 'tasks.lane.done',
-}
-
-/** crates/collab-core task_transition_allowed — keep in lockstep. */
-const ALLOWED: Record<TaskStatus, readonly TaskStatus[]> = {
-  todo: ['in_progress'],
-  in_progress: ['todo', 'in_review'],
-  in_review: ['in_progress', 'done'],
-  done: ['in_progress'],
-}
-
-/** Raft task panel idiom: small pencil = editable affordance cue. */
-
-/** Compact relative/absolute time label (dsh-task-board TaskCard.formatTime). */
-function formatTime(ms: number, t: ChaosTranslate): string {
-  const minutes = Math.floor((Date.now() - ms) / 60000)
-  if (minutes < 1) return t('tasks.time.justNow')
-  if (minutes < 60) return `${minutes}m`
-  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`
-  const date = new Date(ms)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-/** First line as card title; the rest (if any) as the excerpt. */
-function splitAnchor(text: string): { title: string; excerpt: string } {
-  const trimmed = text.trim()
-  const cut = trimmed.indexOf('\n')
-  if (cut < 0) return { title: trimmed, excerpt: '' }
-  return { title: trimmed.slice(0, cut), excerpt: trimmed.slice(cut + 1).trim() }
-}
-
-/**
- * plocal TaskStatusMenu: tinted chip → status menu. Non-reachable rows are
- * disabled, never fake-clickable. Anchors inline (parent is positioned) —
- * plocal portals only because its menus live inside virtualized rows.
- */
-function TaskStatusDropdown({ task, t, onMove }: {
-  task: NativeTask
-  t: ChaosTranslate
-  onMove: (target: TaskStatus) => void
-}): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (event: MouseEvent): void => {
-      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
-    }
-    const closeKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    document.addEventListener('keydown', closeKey)
-    return () => {
-      document.removeEventListener('mousedown', close)
-      document.removeEventListener('keydown', closeKey)
-    }
-  }, [open])
-
-  const reachable = ALLOWED[task.status]
-  return (
-    <span ref={rootRef} className={css.statusDropdown}>
-      <StatusChip
-        status={task.status}
-        label={t(LANE_LABEL_KEY[task.status])}
-        title={t('tasks.statusChange')}
-        onClick={() => { setOpen(v => !v) }}
-      />
-      {open && (
-        <span role="menu" className={css.statusMenu}>
-          {LANES.map((lane) => {
-            const legal = reachable.includes(lane)
-            return (
-              <button
-                key={lane}
-                type="button"
-                role="menuitem"
-                className={css.statusMenuItem}
-                disabled={!legal}
-                title={legal ? undefined : t('tasks.statusIllegal')}
-                onClick={() => { setOpen(false); onMove(lane) }}
-              >
-                <span className={css.statusDot} data-status={lane} aria-hidden="true" />
-                <span className={css.statusMenuLabel}>{t(LANE_LABEL_KEY[lane])}</span>
-                {lane === task.status && (
-                  <IconCheckOutline16 />
-                )}
-              </button>
-            )
-          })}
-        </span>
-      )}
-    </span>
-  )
-}
-
-/** plocal assignee pill → 宿主 Menu + Pill: 重写(P0-4.1); 原自手 dropdown
- * 被拍"非常丑"——直接借鉴 pilot 原语(anchor=trigger pill, portal 开局不被
- * overflow 裁, selectedId 自带对勾)。 */
-function AssigneeFilter({ t, members, value, onChange }: {
-  t: ChaosTranslate
-  members: NativeActor[]
-  value: string
-  onChange: (value: string) => void
-}): JSX.Element {
-  const [open, setOpen] = useState(false)
-
-  const label = value === ''
-    ? t('tasks.filterAssignee')
-    : value === 'unassigned'
-      ? t('tasks.unassigned')
-      : `@${members.find(m => m.id === value)?.handle ?? '?'}`
-  const selectedId = value === '' ? 'all' : value
-
-  return (
-    <Menu
-      open={open}
-      portal
-      compact
-      dense
-      onClose={() => { setOpen(false) }}
-      onSelect={(id) => { onChange(id === 'all' ? '' : id); setOpen(false) }}
-      selectedId={selectedId}
-      items={[
-        { id: 'all', label: t('tasks.filterAll') },
-        { id: 'unassigned', label: t('tasks.unassigned') },
-        { type: 'separator', id: 'sep' },
-        ...members.map(m => ({ id: m.id, label: `@${m.handle}` })),
-      ]}
-      anchor={
-        <button
-          type="button"
-          className={`${css.filterPill} ${value !== '' ? css.filterPillActive : ''}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          onClick={() => { setOpen(v => !v) }}
-        >
-          <IconUserOutline16 aria-hidden="true" />
-          {label}
-          <IconChevronDownOutline14 />
-        </button>
-      }
-    />
-  )
-}
-
-
-function TaskDetailModal({ task, title, assigneeLabel, createdByLabel, selfActor, agents, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
-  task: NativeTask
-  title: string
-  assigneeLabel: string | undefined
-  createdByLabel: string
-  selfActor: NativeActor | undefined
-  agents: NativeActor[]
-  t: ChaosTranslate
-  onMove: (target: TaskStatus) => void
-  onClaim: (actorId?: string) => void
-  onUnclaim: () => void
-  onOpenAnchor: () => void
-  onClose: () => void
-}): JSX.Element {
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={t('tasks.detailTitle', { number: task.number })}
-      closeLabel={t('members.close')}
-      contentClassName={css.dialogBody as string}
-    >
-      <div className={css.taskDetailTitleRow}>
-        {/* 用户拍板：不需要独立锚定区——title 本身就是跳转链。 */}
-        <button type="button" className={css.taskDetailTitleLink} title={t('tasks.anchorGo')} onClick={onOpenAnchor}>
-          <span className={css.taskDetailTitle}>{title}</span>
-        </button>
-      </div>
-      <dl className={css.taskDetailMeta}>
-        <div className={css.taskDetailRow}>
-          <dt>{t('tasks.status')}</dt>
-          <dd>
-            <TaskStatusDropdown task={task} t={t} onMove={onMove} />
-          </dd>
-        </div>
-        <div className={css.taskDetailRow}>
-          <dt>{t('tasks.assignee')}</dt>
-          <dd>
-            <AssigneePopover
-              task={task}
-              selfActor={selfActor}
-              agents={agents}
-              assigneeLabel={assigneeLabel}
-              t={t}
-              onClaim={onClaim}
-              onUnclaim={onUnclaim}
-            />
-          </dd>
-        </div>
-        <div className={css.taskDetailRow}>
-          {/* Native Task has no creator column (pool semantics); the honest
-              provenance is the anchor message's author. */}
-          <dt>{t('tasks.sourceAuthor')}</dt>
-          <dd>{createdByLabel}</dd>
-        </div>
-        <div className={css.taskDetailRow}>
-          <dt>{t('tasks.created')}</dt>
-          <dd>{new Date(task.createdAtMs).toLocaleString()}</dd>
-        </div>
-        <div className={css.taskDetailRow}>
-          <dt>{t('tasks.updated')}</dt>
-          <dd>{formatTime(task.updatedAtMs, t)}</dd>
-        </div>
-      </dl>
-
-    </Modal>
-  )
-}
+import { ErrorBanner } from './shared/ui/index.ts'
+import { Toolbar } from './shared/layout/index.ts'
+import { AssigneeFilter } from './features/tasks/AssigneeFilter.tsx'
+import { TaskDetailModal } from './features/tasks/TaskDetailModal.tsx'
+import { TASK_LANES, TASK_LANE_LABEL_KEY, TASK_TRANSITIONS, formatTaskTime, splitTaskAnchor, type TaskStatus } from './features/tasks/task-model.ts'
 
 export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, onFocusHandled, onOpenMessage }: {
   t: ChaosTranslate
@@ -369,23 +144,21 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
 
   return (
     <div className={css.taskBoard}>
-      <header className={css.taskBoardHeader}>
-        <AssigneeFilter t={t} members={members} value={assigneeFilter} onChange={setAssigneeFilter} />
-      </header>
+      <Toolbar className={css.taskBoardHeader} start={<AssigneeFilter t={t} members={members} value={assigneeFilter} onChange={setAssigneeFilter} />} />
       {moveError !== undefined && (
         <ErrorBanner>{moveError}</ErrorBanner>
       )}
       <KanbanLaneGrid>
-        {LANES.map((lane) => {
+        {TASK_LANES.map((lane) => {
           const laneTasks = tasks.filter(task => task.status === lane)
           const draggingTask = draggingTaskId === undefined ? undefined : tasks.find(t => t.messageId === draggingTaskId)
           const laneAcceptsDrag = draggingTask !== undefined && draggingTask.status !== lane
-            && ALLOWED[draggingTask.status].includes(lane)
+            && TASK_TRANSITIONS[draggingTask.status].includes(lane)
           return (
             <KanbanLane
               key={lane}
               status={lane}
-              label={t(LANE_LABEL_KEY[lane])}
+              label={t(TASK_LANE_LABEL_KEY[lane])}
               count={laneTasks.length}
               dragOver={dragOverLane === lane && laneAcceptsDrag}
               emptyLabel={t('tasks.laneEmpty')}
@@ -404,7 +177,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
               }}
             >
               {laneTasks.map((task) => {
-                const { title, excerpt } = splitAnchor(anchorOf(task))
+                const { title, excerpt } = splitTaskAnchor(anchorOf(task))
                 return (
                   <TaskCard
                     key={task.messageId}
@@ -417,7 +190,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
                     excerpt={excerpt}
                     assigneeLabel={assigneeLabelOf(task)}
                     unassignedLabel={t('tasks.unassigned')}
-                    timeLabel={formatTime(task.updatedAtMs, t)}
+                    timeLabel={formatTaskTime(task.updatedAtMs, t)}
                     dragging={draggingTaskId === task.messageId}
                     highlighted={highlightedMessageId === task.messageId}
                     onDragStart={() => { setDraggingTaskId(task.messageId) }}
@@ -433,7 +206,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
       {selected !== undefined && (
         <TaskDetailModal
           task={selected}
-          title={(() => { const s = splitAnchor(anchorOf(selected)); return s.title === '' ? `#${selected.number}` : s.title })()}
+          title={(() => { const s = splitTaskAnchor(anchorOf(selected)); return s.title === '' ? `#${selected.number}` : s.title })()}
           assigneeLabel={assigneeLabelOf(selected)}
           createdByLabel={createdByLabelOf(selected)}
           selfActor={state.actors.find(a => a.id === state.selfId)}
