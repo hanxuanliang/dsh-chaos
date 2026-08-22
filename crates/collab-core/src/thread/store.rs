@@ -226,19 +226,18 @@ impl<'connection> ThreadStore<'connection> {
         let counts_sql = format!(
             "SELECT thread.id, thread.root_message_id, COUNT(message.id),
                     MAX(message.created_at_ms)
-             FROM targets thread
-             JOIN targets parent
-               ON parent.id = thread.parent_target_id
-              AND parent.kind IN ('channel', 'direct')
-              AND parent.archived_at_ms IS NULL
-             JOIN memberships membership
-               ON membership.target_id = parent.id
-              AND membership.actor_id = ?{actor_parameter}
-              AND membership.left_at_ms IS NULL
+             FROM v_target_access access
+             JOIN targets thread
+               ON thread.id = access.target_id AND thread.kind = 'thread'
              LEFT JOIN messages message ON message.target_id = thread.id
-             WHERE thread.kind = 'thread'
-               AND thread.archived_at_ms IS NULL
+             WHERE access.actor_id = ?{actor_parameter}
                AND thread.root_message_id IN ({root_placeholders})
+               AND EXISTS (
+                 SELECT 1 FROM targets parent
+                 WHERE parent.id = thread.parent_target_id
+                   AND parent.kind IN ('channel', 'direct')
+                   AND parent.archived_at_ms IS NULL
+               )
              GROUP BY thread.id, thread.root_message_id
              ORDER BY thread.root_message_id, thread.id"
         );
@@ -299,19 +298,13 @@ impl<'connection> ThreadStore<'connection> {
             .query_rows(
                 "SELECT follow.thread_target_id
              FROM thread_follows follow
-             JOIN targets thread
-               ON thread.id = follow.thread_target_id AND thread.kind = 'thread'
-             JOIN targets parent
-               ON parent.id = thread.parent_target_id
-              AND parent.kind IN ('channel', 'direct')
-             JOIN memberships membership
-               ON membership.target_id = thread.parent_target_id
-              AND membership.actor_id = follow.actor_id
+             JOIN v_target_access access
+               ON access.target_id = follow.thread_target_id
+              AND access.actor_id = follow.actor_id
+             JOIN targets thread ON thread.id = follow.thread_target_id
              WHERE follow.actor_id = ?1
                AND follow.unfollowed_at_ms IS NULL
-               AND thread.archived_at_ms IS NULL
-               AND parent.archived_at_ms IS NULL
-               AND membership.left_at_ms IS NULL
+               AND thread.kind = 'thread'
              ORDER BY thread.created_at_ms DESC, follow.thread_target_id",
                 [actor_id.as_str()],
             )
