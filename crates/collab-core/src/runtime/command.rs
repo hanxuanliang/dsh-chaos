@@ -15,15 +15,7 @@ impl CollabCore {
         model: &str,
         preset: &str,
     ) -> Result<RuntimeBinding> {
-        for (name, value) in [
-            ("agent_id", agent_id),
-            ("session_id", session_id),
-            ("provider", provider),
-            ("model", model),
-            ("preset", preset),
-        ] {
-            CollabError::require_non_blank(name, value)?;
-        }
+        require_non_blank!(agent_id, session_id, provider, model, preset);
         let now = now_ms()?;
         self.write(async |connection| {
             Actor::require_agent(connection, &ActorId::parse(agent_id)?).await?;
@@ -55,9 +47,7 @@ impl CollabCore {
         session_id: &str,
         preset: &str,
     ) -> Result<RuntimeBinding> {
-        CollabError::require_non_blank("agent_id", agent_id)?;
-        CollabError::require_non_blank("session_id", session_id)?;
-        CollabError::require_non_blank("preset", preset)?;
+        require_non_blank!(agent_id, session_id, preset);
         self.write(async |connection| {
             let current = binding_for_agent(connection, agent_id)
                 .await?

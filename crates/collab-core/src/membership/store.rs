@@ -7,7 +7,7 @@ use turso::Connection;
 use crate::actor::parse_actor_kind;
 use crate::profile::store::ProfileStore;
 use crate::target::{TargetRoute, find_target, parse_target_kind, require_target_access};
-use crate::{Actor, AgentMembership, CollabError, IdentityContext, Result, Target, TargetMember};
+use crate::{Actor, AgentMembership, IdentityContext, Result, Target, TargetMember};
 
 use super::model::parse_membership_role;
 
@@ -157,7 +157,7 @@ pub(crate) async fn identity_context_for(
             members: Vec::new(),
         });
     };
-    CollabError::require_non_blank("target_id", target_id)?;
+    require_non_blank!(target_id);
     let route = require_target_access(connection, target_id, agent_id).await?;
     let target = find_target(connection, target_id).await?;
     let membership_target_id = route.permission_target_id(target_id);
