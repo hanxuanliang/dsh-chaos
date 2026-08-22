@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use turso::Row;
 
-use crate::{IdentityContext, Message, RuntimeBinding};
+use crate::db::FromRow;
+use crate::{IdentityContext, Message, Result, RuntimeBinding};
 
 /// One current runtime whose durable inbox still needs a level-triggered
 /// notification. The watermark is the newest authorized, not-yet-model-seen
@@ -9,6 +11,15 @@ use crate::{IdentityContext, Message, RuntimeBinding};
 pub struct PendingWake {
     pub binding: RuntimeBinding,
     pub pending_seq: i64,
+}
+
+impl FromRow for PendingWake {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            binding: RuntimeBinding::from_row(row)?,
+            pending_seq: row.get(7)?,
+        })
+    }
 }
 
 /// One message returned by an inbox check.
