@@ -2,7 +2,9 @@ use crate::test_support::*;
 
 #[tokio::test]
 async fn runtime_lookup_keeps_session_ownership_unique() -> Result<()> {
-    let (core, _user, alpha, beta, _channel) = fixture().await?;
+    let World {
+        core, alpha, beta, ..
+    } = World::create().await?;
     let binding = core
         .bind_runtime(&alpha.id, "session-owned", "openai", "codex", "default")
         .await?;
@@ -26,7 +28,7 @@ async fn runtime_lookup_keeps_session_ownership_unique() -> Result<()> {
 
 #[tokio::test]
 async fn runtime_preset_migration_preserves_session_generation() -> Result<()> {
-    let (core, _user, alpha, _beta, _channel) = fixture().await?;
+    let World { core, alpha, .. } = World::create().await?;
     let binding = core
         .bind_runtime(&alpha.id, "session-legacy", "default", "default", "default")
         .await?;

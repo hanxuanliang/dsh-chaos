@@ -6,7 +6,14 @@ use crate::{
 
 #[tokio::test]
 async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let task_channel = core.create_channel("tasks", &user.id).await?;
     core.add_member(&task_channel.id, &alpha.id, &user.id)
         .await?;
@@ -164,7 +171,13 @@ async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Resul
 
 #[tokio::test]
 async fn activity_inbox_enforces_membership_and_thread_follow_scope() -> Result<()> {
-    let (core, user, _alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let outsider = core.create_user("outsider", "Outsider").await?;
     let root = core
         .send_message(SendMessageRequest {

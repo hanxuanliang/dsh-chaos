@@ -2,7 +2,13 @@ use crate::test_support::*;
 
 #[tokio::test]
 async fn direct_target_is_unique_for_an_unordered_actor_pair() -> Result<()> {
-    let (core, user, alpha, beta, _channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        ..
+    } = World::create().await?;
     let direct = core.create_direct(&alpha.id, &beta.id).await?;
     let reversed = core.create_direct(&beta.id, &alpha.id).await?;
     assert_eq!(direct, reversed);

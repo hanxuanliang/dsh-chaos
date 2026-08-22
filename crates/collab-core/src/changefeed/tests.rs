@@ -56,7 +56,12 @@ async fn snapshot_and_change_cursor_are_authorization_filtered() -> Result<()> {
 
 #[tokio::test]
 async fn change_retention_requires_snapshot_resync_outside_retained_range() -> Result<()> {
-    let (core, user, _alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        channel,
+        ..
+    } = World::create().await?;
     let cursor = core.snapshot(&user.id).await?.cursor;
     assert!(cursor > 0);
 
