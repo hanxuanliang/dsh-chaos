@@ -40,15 +40,7 @@
 
 /* --- composer (pilot InputBar card, cut to channel needs: spec §5.5 v4) --- */
 
-/* Full-width composer seat — plocal truth (ChatComposer root w-full px-2):
- * the card spans the chat width instead of a centered 780 column. */
-.threadPanel .composerSeat {
-  flex: none;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 8px 8px;
-}
-/* composerSeat: 迁渡失踪补回 (panel 内宜 12px 侧) */
+/* Full-width composer seat; thread content keeps a 12px inset. */
 .threadPanel .composerSeat {
   flex: none;
   width: 100%;
