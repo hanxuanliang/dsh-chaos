@@ -1,6 +1,7 @@
 //! Stable Agent to DSH Session generation bindings.
 
 use super::*;
+use crate::actor::ActorId;
 
 impl CollabCore {
     /// Bind a new DSH Session generation to a stable Agent.
@@ -28,7 +29,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        require_agent(&transaction, agent_id).await?;
+        Actor::require_agent(&transaction, &ActorId::parse(agent_id)?).await?;
         let generation = current_generation(&transaction, agent_id).await? + 1;
         transaction
             .execute(

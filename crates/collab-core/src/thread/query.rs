@@ -1,4 +1,4 @@
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 use crate::{CollabCore, Result};
 
 use super::model::{RootMessageIds, ThreadSummary};

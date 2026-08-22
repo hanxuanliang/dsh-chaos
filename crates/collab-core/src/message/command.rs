@@ -1,6 +1,7 @@
+use crate::actor::ActorId;
 use crate::changefeed::insert_target_change;
-use crate::ids::{ActorId, ThreadId};
 use crate::target::require_target_access;
+use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
 use crate::{
     ChangeKind, CollabCore, CollabError, Message, Result, SendMessageRequest, SendMessageResult,

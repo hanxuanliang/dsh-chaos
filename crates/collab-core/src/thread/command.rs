@@ -1,5 +1,5 @@
+use crate::actor::ActorId;
 use crate::changefeed::insert_change;
-use crate::ids::{ActorId, ThreadId};
 use crate::membership::{Membership, active_member_ids};
 use crate::message::store::MessageStore;
 use crate::target::{is_active_member, require_target};
@@ -7,7 +7,7 @@ use crate::{
     Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
 };
 
-use super::model::{FollowOutcome, ThreadAccess, ThreadSubscription};
+use super::model::{FollowOutcome, ThreadAccess, ThreadId, ThreadSubscription};
 use super::store::ThreadStore;
 
 impl CollabCore {

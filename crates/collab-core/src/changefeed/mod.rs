@@ -1,7 +1,7 @@
 //! Durable, recipient-filtered change notifications for client synchronization.
 
 use super::*;
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 use crate::task::store::TaskStore;
 
 impl CollabCore {
@@ -10,7 +10,7 @@ impl CollabCore {
     pub async fn snapshot(&self, actor_id: &str) -> Result<CollabSnapshot> {
         self.assert_open()?;
         let connection = self.connection.lock().await;
-        let actor = find_actor(&connection, actor_id).await?;
+        let actor = Actor::require(&connection, &ActorId::parse(actor_id)?).await?;
         let cursor = latest_change_seq(&connection).await?;
         let targets = targets_for_actor(&connection, actor_id).await?;
         let followed_thread_ids = followed_thread_ids_for_actor(&connection, actor_id).await?;

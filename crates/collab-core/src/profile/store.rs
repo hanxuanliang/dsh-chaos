@@ -140,6 +140,26 @@ impl<'connection> ProfileStore<'connection> {
         Ok(())
     }
 
+    /// Insert the agents row of one freshly created Agent actor.
+    pub(crate) async fn insert_agent(
+        &self,
+        actor_id: &str,
+        workspace_path: &str,
+        charter_json: &str,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute(
+                "INSERT INTO agents
+                 (actor_id, workspace_path, lifecycle, created_at_ms, updated_at_ms,
+                  charter_json, profile_version)
+                 VALUES (?1, ?2, 'active', ?3, ?3, ?4, 1)",
+                (actor_id, workspace_path, now, charter_json),
+            )
+            .await?;
+        Ok(())
+    }
+
     /// Delete the Agent's operational state; its actors row and Messages stay
     /// so history never points at a missing author.
     pub(crate) async fn delete_operational_state(&self, agent_id: &str) -> Result<()> {
