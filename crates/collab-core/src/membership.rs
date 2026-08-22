@@ -16,8 +16,6 @@ use crate::{
     AgentProfile, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, now_ms,
 };
 
-// ── 类型 ─────────────────────────────────────────────────────────────────────
-
 /// Role of one active target member.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -74,8 +72,6 @@ pub struct IdentityContext {
     pub membership_target: Option<Target>,
     pub members: Vec<TargetMember>,
 }
-
-// ── 证据 ─────────────────────────────────────────────────────────────────────
 
 struct RoleRow(String);
 
@@ -263,8 +259,6 @@ impl Membership {
     }
 }
 
-// ── 能力 ─────────────────────────────────────────────────────────────────────
-
 impl CollabCore {
     /// Add or reactivate one Channel member.
     pub async fn add_member(&self, target_id: &str, actor_id: &str, added_by: &str) -> Result<()> {
@@ -382,8 +376,6 @@ impl CollabCore {
         .await
     }
 }
-
-// ── 存储 ─────────────────────────────────────────────────────────────────────
 
 /// Persistence for membership projections; the only owner of its SQL.
 pub(crate) struct MembershipStore<'connection> {

@@ -47,24 +47,3 @@
   align-items: center;
   gap: 8px;
 }
-
-.markAllButton {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--chaos-border, rgba(255, 255, 255, 0.14));
-  border-radius: 999px;
-  padding: 2px 10px;
-  cursor: pointer;
-  opacity: 0.85;
-}
-
-.markAllButton:hover:not(:disabled) {
-  opacity: 1;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.markAllButton:disabled {
-  opacity: 0.4;
-  cursor: default;
-}

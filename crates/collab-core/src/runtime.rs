@@ -7,8 +7,6 @@ use crate::actor::{Actor, ActorId};
 use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::{CollabCore, CollabError, NonBlank, Result, now_ms};
 
-// ── 类型 ─────────────────────────────────────────────────────────────────────
-
 /// The current DSH runtime generation bound to a stable Agent.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RuntimeBinding {
@@ -20,8 +18,6 @@ pub struct RuntimeBinding {
     pub preset: String,
     pub bound_at_ms: i64,
 }
-
-// ── 证据 ─────────────────────────────────────────────────────────────────────
 
 impl FromRow for RuntimeBinding {
     fn from_row(row: &Row) -> Result<Self> {
@@ -36,8 +32,6 @@ impl FromRow for RuntimeBinding {
         })
     }
 }
-
-// ── 能力 ─────────────────────────────────────────────────────────────────────
 
 impl CollabCore {
     /// Bind a new DSH Session generation to a stable Agent.
@@ -146,8 +140,6 @@ impl CollabCore {
             .await
     }
 }
-
-// ── 存储 ─────────────────────────────────────────────────────────────────────
 
 /// Column order of the canonical RuntimeBinding projection, shared by every
 /// SELECT in this vertical.
