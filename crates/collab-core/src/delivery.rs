@@ -1,6 +1,8 @@
 //! Level-triggered wake delivery, inbox batches, and model-seen fences.
 
 use super::*;
+use crate::membership::identity_context_for;
+use crate::message::StoredTextBody;
 use crate::runtime::require_current_binding;
 
 impl CollabCore {
