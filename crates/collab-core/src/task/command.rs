@@ -1,7 +1,8 @@
 use crate::actor::ActorId;
 use crate::changefeed::insert_target_change;
+use crate::membership::Membership;
 use crate::message::store::MessageStore;
-use crate::target::{is_owner, require_target_access};
+use crate::target::require_target_access;
 use crate::{
     Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, Task, TaskStatus, now_ms,
 };
@@ -276,13 +277,18 @@ impl CollabCore {
                 .assignee_id
                 .as_deref()
                 .is_some_and(|assignee_id| assignee_id != actor_id)
-                && !is_owner(connection, &current.target_id, actor_id).await?
             {
-                return Err(CollabError::PermissionDenied {
-                    actor_id: actor_id.to_owned(),
-                    action: "update another actor's task in",
-                    target_id: current.target_id,
-                });
+                let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
+                if !Membership::require(connection, &current.target_id, &actor)
+                    .await?
+                    .is_owner()
+                {
+                    return Err(CollabError::PermissionDenied {
+                        actor_id: actor_id.to_owned(),
+                        action: "update another actor's task in",
+                        target_id: current.target_id,
+                    });
+                }
             }
             if current.status == status {
                 return Ok(current);
