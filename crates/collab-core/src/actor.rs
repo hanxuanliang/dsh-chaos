@@ -1,13 +1,17 @@
-use serde::{Deserialize, Serialize};
+//! Stable actor identity and kind, with persistence anchored on the domain type.
+
 use turso::{Connection, Row};
 
+use crate::changefeed::{all_actor_ids, insert_change};
 use crate::db::{FromRow, QueryRows};
-use crate::{CollabError, Result};
+use crate::{ChangeKind, CollabError, Result, new_id};
+
+// ── 类型 ─────────────────────────────────────────────────────────────────────
 
 string_id!(ActorId, "actor_id");
 
 /// A stable collab actor kind.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize, Eq, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActorKind {
     User,
@@ -24,7 +28,7 @@ impl ActorKind {
 }
 
 /// A stable collab actor.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, Eq, PartialEq, serde::Serialize)]
 pub struct Actor {
     pub id: String,
     pub kind: ActorKind,
@@ -32,6 +36,8 @@ pub struct Actor {
     pub display_name: String,
     pub created_at_ms: i64,
 }
+
+// ── 证据 ─────────────────────────────────────────────────────────────────────
 
 impl FromRow for Actor {
     fn from_row(row: &Row) -> Result<Self> {
@@ -78,37 +84,6 @@ impl Actor {
             .await
     }
 
-    pub(crate) async fn insert(&self, connection: &Connection) -> Result<()> {
-        connection
-            .execute(
-                "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                (
-                    self.id.as_str(),
-                    self.kind.as_str(),
-                    self.handle.as_str(),
-                    self.display_name.as_str(),
-                    self.created_at_ms,
-                ),
-            )
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn rename(
-        connection: &Connection,
-        actor_id: &str,
-        display_name: &str,
-    ) -> Result<()> {
-        connection
-            .execute(
-                "UPDATE actors SET display_name = ?2 WHERE id = ?1",
-                (actor_id, display_name),
-            )
-            .await?;
-        Ok(())
-    }
-
     /// Load one Actor, failing unless it is an active Agent.
     pub(crate) async fn require_agent(connection: &Connection, id: &ActorId) -> Result<Self> {
         let actor = Self::require(connection, id).await?;
@@ -141,5 +116,72 @@ pub(crate) fn parse_actor_kind(actor_id: &str, value: &str) -> Result<ActorKind>
         other => Err(CollabError::Database(format!(
             "actor '{actor_id}' has unknown kind '{other}'"
         ))),
+    }
+}
+
+// ── 能力 ─────────────────────────────────────────────────────────────────────
+
+/// Insert one Actor of `kind` and emit ActorCreated to every known actor.
+pub(crate) async fn insert_actor(
+    connection: &Connection,
+    kind: ActorKind,
+    handle: &str,
+    display_name: &str,
+    now: i64,
+) -> Result<Actor> {
+    require_non_blank!(handle, display_name);
+    let actor = Actor {
+        id: new_id(),
+        kind,
+        handle: handle.to_owned(),
+        display_name: display_name.to_owned(),
+        created_at_ms: now,
+    };
+    actor.insert(connection).await?;
+    let actor_ids = all_actor_ids(connection).await?;
+    insert_change(
+        connection,
+        ChangeKind::ActorCreated,
+        None,
+        &actor.id,
+        &actor_ids,
+        now,
+    )
+    .await?;
+    Ok(actor)
+}
+
+// ── 存储 ─────────────────────────────────────────────────────────────────────
+
+impl Actor {
+    pub(crate) async fn insert(&self, connection: &Connection) -> Result<()> {
+        connection
+            .execute(
+                "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                (
+                    self.id.as_str(),
+                    self.kind.as_str(),
+                    self.handle.as_str(),
+                    self.display_name.as_str(),
+                    self.created_at_ms,
+                ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn rename(
+        connection: &Connection,
+        actor_id: &str,
+        display_name: &str,
+    ) -> Result<()> {
+        connection
+            .execute(
+                "UPDATE actors SET display_name = ?2 WHERE id = ?1",
+                (actor_id, display_name),
+            )
+            .await?;
+        Ok(())
     }
 }
