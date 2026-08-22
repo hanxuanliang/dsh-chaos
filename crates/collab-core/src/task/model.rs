@@ -15,6 +15,23 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    /// The explicit lifecycle: only these edges may be committed.
+    pub(crate) const fn can_transition_to(self, to: TaskStatus) -> bool {
+        matches!(
+            (self, to),
+            (TaskStatus::Todo, TaskStatus::InProgress)
+                | (
+                    TaskStatus::InProgress,
+                    TaskStatus::Todo | TaskStatus::InReview
+                )
+                | (
+                    TaskStatus::InReview,
+                    TaskStatus::InProgress | TaskStatus::Done
+                )
+                | (TaskStatus::Done, TaskStatus::InProgress)
+        )
+    }
+
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Todo => "todo",
@@ -236,7 +253,7 @@ impl LoadedTask {
         if self.task.status == status {
             return Ok(TaskDecision::Idempotent);
         }
-        if !task_transition_allowed(self.task.status, status) {
+        if !self.task.status.can_transition_to(status) {
             return Err(CollabError::TaskTransitionDenied {
                 message_id: self.task.message_id.clone(),
                 status: self.task.status.as_str().to_owned(),
@@ -253,23 +270,6 @@ impl LoadedTask {
         );
         Ok(TaskDecision::Transition(Box::new(transition)))
     }
-}
-
-/// The explicit Task lifecycle: only these edges may be committed.
-pub(crate) fn task_transition_allowed(from: TaskStatus, to: TaskStatus) -> bool {
-    matches!(
-        (from, to),
-        (TaskStatus::Todo, TaskStatus::InProgress)
-            | (
-                TaskStatus::InProgress,
-                TaskStatus::Todo | TaskStatus::InReview
-            )
-            | (
-                TaskStatus::InReview,
-                TaskStatus::InProgress | TaskStatus::Done
-            )
-            | (TaskStatus::Done, TaskStatus::InProgress)
-    )
 }
 
 pub(crate) struct NewTask<'message> {
