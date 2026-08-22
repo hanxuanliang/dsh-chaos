@@ -1,5 +1,5 @@
+use crate::actor::ActorId;
 use crate::changefeed::insert_target_change;
-use crate::ids::ActorId;
 use crate::message::store::MessageStore;
 use crate::target::{is_owner, require_target_access};
 use crate::{

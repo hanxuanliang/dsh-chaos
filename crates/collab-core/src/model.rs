@@ -1,33 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{AgentProfile, Message, Task};
-
-/// A stable collab actor kind.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ActorKind {
-    User,
-    Agent,
-}
-
-impl ActorKind {
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::User => "user",
-            Self::Agent => "agent",
-        }
-    }
-}
-
-/// A stable collab actor.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Actor {
-    pub id: String,
-    pub kind: ActorKind,
-    pub handle: String,
-    pub display_name: String,
-    pub created_at_ms: i64,
-}
+use crate::{Actor, AgentProfile, Message, Task};
 
 /// Role of one active target member.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

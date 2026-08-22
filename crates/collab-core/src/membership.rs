@@ -1,8 +1,8 @@
 //! Membership mutation and role-bearing member projections.
 
 use super::*;
+use crate::actor::ActorId;
 use crate::db::{FromRow, QueryRows};
-use crate::ids::ActorId;
 use crate::profile::store::ProfileStore;
 
 /// Presence proof that one Actor is an active member of one target. Obtained

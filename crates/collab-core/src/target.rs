@@ -1,7 +1,7 @@
 //! Channel and Direct operations plus shared target authorization routes.
 
 use super::*;
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 
 impl CollabCore {
     /// Create a Channel and make its creator the owner/member.

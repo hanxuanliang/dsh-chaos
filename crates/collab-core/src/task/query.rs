@@ -1,4 +1,4 @@
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 use crate::target::require_target_access;
 use crate::{Actor, CollabCore, Result, Task};
 

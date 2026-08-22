@@ -1,9 +1,12 @@
-use crate::ids::{ActorId, ThreadId};
+use serde::{Deserialize, Serialize};
+use turso::Connection;
+
+use crate::actor::ActorId;
 use crate::membership::Membership;
 use crate::target::TargetRoute;
 use crate::{Actor, CollabError, Result, TargetKind};
-use serde::{Deserialize, Serialize};
-use turso::Connection;
+
+string_id!(ThreadId, "thread_target_id");
 
 /// Batch Thread preview for one root Message: count plus recent distinct repliers.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

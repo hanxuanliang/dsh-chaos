@@ -2,12 +2,14 @@ use std::collections::HashMap;
 
 use turso::{Connection, Row};
 
+use crate::actor::ActorId;
 use crate::db::{FromRow, QueryRows, placeholders};
-use crate::ids::{ActorId, ThreadId};
 use crate::target::find_target;
 use crate::{Actor, CollabError, Result, Target};
 
-use super::model::{FollowOutcome, FollowState, RootMessageIds, ThreadSubscription, ThreadSummary};
+use super::model::{
+    FollowOutcome, FollowState, RootMessageIds, ThreadId, ThreadSubscription, ThreadSummary,
+};
 
 struct TargetIdRow(String);
 

@@ -1,4 +1,4 @@
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 use crate::{ActivityInboxPage, Actor, CollabCore, CollabError, Result};
 
 use super::model::ActivityCursor;

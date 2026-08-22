@@ -1,4 +1,4 @@
-use crate::ids::ActorId;
+use crate::actor::ActorId;
 use crate::membership::identity_context_for;
 use crate::{Actor, AgentProfile, CollabCore, CollabError, IdentityContext, Result};
 
