@@ -6,6 +6,3 @@ mod query;
 pub(crate) mod store;
 
 pub use model::{Task, TaskStatus};
-
-#[cfg(test)]
-mod tests;

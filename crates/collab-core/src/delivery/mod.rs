@@ -6,6 +6,3 @@ mod query;
 mod store;
 
 pub use model::{InboxBatch, InboxMessage, PendingWake};
-
-#[cfg(test)]
-mod tests;

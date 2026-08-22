@@ -18,7 +18,7 @@ impl CollabCore {
         self.send_message_inner(request, SendFailpoint::None).await
     }
 
-    pub(super) async fn send_message_inner(
+    pub(crate) async fn send_message_inner(
         &self,
         request: SendMessageRequest,
         _failpoint: SendFailpoint,
