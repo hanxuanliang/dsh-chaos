@@ -66,6 +66,8 @@ mod target;
 mod task;
 #[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod tests;
 mod thread;
 
 #[cfg(feature = "napi")]

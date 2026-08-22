@@ -7,6 +7,3 @@ mod store;
 
 pub use model::{ChangeEvent, ChangeKind, CollabSnapshot};
 pub(crate) use store::{all_actor_ids, insert_change, insert_target_change};
-
-#[cfg(test)]
-mod tests;

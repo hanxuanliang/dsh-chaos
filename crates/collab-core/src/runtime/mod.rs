@@ -7,6 +7,3 @@ mod store;
 
 pub use model::RuntimeBinding;
 pub(crate) use store::require_current_binding;
-
-#[cfg(test)]
-mod tests;
