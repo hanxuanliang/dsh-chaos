@@ -1,6 +1,7 @@
 //! Task projection, claim ownership, and lifecycle transitions.
 
 use super::*;
+use crate::message::store::MessageStore;
 
 impl CollabCore {
     /// List Task metadata visible to one actor, optionally narrowed to an
@@ -24,7 +25,9 @@ impl CollabCore {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
         require_actor(&transaction, actor_id).await?;
-        let target_id = message_target(&transaction, message_id).await?;
+        let target_id = MessageStore::new(&transaction)
+            .target_of(message_id)
+            .await?;
         let route = require_target_access(&transaction, &target_id, actor_id).await?;
         if route.kind == TargetKind::Thread {
             return Err(CollabError::InvalidArgument(
@@ -94,7 +97,9 @@ impl CollabCore {
             now,
         )
         .await?;
-        let anchor_text = message_body_text(&transaction, message_id).await?;
+        let anchor_text = MessageStore::new(&transaction)
+            .body_text(message_id)
+            .await?;
         transaction.commit().await?;
 
         Ok(Task {
