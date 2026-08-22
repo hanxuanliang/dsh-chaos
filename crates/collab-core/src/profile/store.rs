@@ -2,7 +2,7 @@ use turso::{Connection, Row};
 
 use crate::actor::parse_actor_kind;
 use crate::db::{FromRow, QueryRows};
-use crate::{Actor, ActorKind, AgentProfile, CollabError, Result, not_found};
+use crate::{Actor, ActorKind, AgentProfile, CollabError, Result};
 
 use super::model::{decode_charter, parse_agent_lifecycle};
 
@@ -98,7 +98,10 @@ impl<'connection> ProfileStore<'connection> {
             .await?
             .map(ProfileRow::into_profile)
             .transpose()?
-            .ok_or_else(|| not_found("agent profile", agent_id))
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "agent profile",
+                id: agent_id.to_owned(),
+            })
     }
 
     /// List every live Agent Profile, handle-ordered.

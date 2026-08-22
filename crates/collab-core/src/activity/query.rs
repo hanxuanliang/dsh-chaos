@@ -1,5 +1,5 @@
 use crate::ids::ActorId;
-use crate::{ActivityInboxPage, Actor, CollabCore, CollabError, Result, require_non_empty};
+use crate::{ActivityInboxPage, Actor, CollabCore, CollabError, Result};
 
 use super::model::ActivityCursor;
 use super::store::ActivityStore;
@@ -13,7 +13,7 @@ impl CollabCore {
         limit: u32,
         cursor: Option<&str>,
     ) -> Result<ActivityInboxPage> {
-        require_non_empty("actor_id", actor_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
         if limit == 0 || limit > 50 {
             return Err(CollabError::InvalidArgument(
                 "limit must be between 1 and 50".into(),

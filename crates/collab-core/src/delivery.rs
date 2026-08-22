@@ -104,7 +104,10 @@ impl CollabCore {
             )
             .await?;
         let Some(row) = rows.next().await? else {
-            return Err(not_found("wake state", agent_id));
+            return Err(CollabError::NotFound {
+                entity: "wake state",
+                id: agent_id.to_owned(),
+            });
         };
         let durable_pending = row.get::<i64>(0)?;
         drop(rows);
@@ -328,7 +331,10 @@ impl CollabCore {
             )
             .await?;
         let Some(row) = rows.next().await? else {
-            return Err(not_found("inbox batch", batch_id));
+            return Err(CollabError::NotFound {
+                entity: "inbox batch",
+                id: batch_id.to_owned(),
+            });
         };
         let batch_agent = row.get::<String>(0)?;
         let batch_session = row.get::<String>(1)?;

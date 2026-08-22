@@ -29,7 +29,10 @@ impl Actor {
                 [id.as_str()],
             )
             .await?
-            .ok_or_else(|| not_found("actor", id.as_str()))
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "actor",
+                id: id.as_str().to_owned(),
+            })
     }
 
     pub(crate) async fn insert(&self, connection: &Connection) -> Result<()> {
@@ -74,8 +77,8 @@ impl CollabCore {
         charter: Option<&AgentCharter>,
     ) -> Result<Actor> {
         self.assert_open()?;
-        require_non_empty("handle", handle)?;
-        require_non_empty("display_name", display_name)?;
+        CollabError::require_non_blank("handle", handle)?;
+        CollabError::require_non_blank("display_name", display_name)?;
         let now = now_ms()?;
         let actor = Actor {
             id: new_id(),
@@ -162,7 +165,10 @@ pub(crate) async fn require_agent(connection: &Connection, agent_id: &str) -> Re
         .kind
         != ActorKind::Agent
     {
-        return Err(not_found("agent", agent_id));
+        return Err(CollabError::NotFound {
+            entity: "agent",
+            id: agent_id.to_owned(),
+        });
     }
     let mut rows = connection
         .query(
@@ -171,7 +177,10 @@ pub(crate) async fn require_agent(connection: &Connection, agent_id: &str) -> Re
         )
         .await?;
     if rows.next().await?.is_none() {
-        return Err(not_found("active agent", agent_id));
+        return Err(CollabError::NotFound {
+            entity: "active agent",
+            id: agent_id.to_owned(),
+        });
     }
     Ok(())
 }

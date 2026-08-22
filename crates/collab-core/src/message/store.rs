@@ -1,7 +1,7 @@
 use turso::{Connection, Row};
 
 use crate::db::{FromRow, QueryRows};
-use crate::{ActorKind, CollabError, Message, Result, not_found};
+use crate::{ActorKind, CollabError, Message, Result};
 
 use super::model::{NewMessage, StoredTextBody, stored_text};
 
@@ -134,7 +134,10 @@ impl<'connection> MessageStore<'connection> {
             .await?
             .map(MessageRow::into_message)
             .transpose()?
-            .ok_or_else(|| not_found("message in exact target", message_id))
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "message in exact target",
+                id: message_id.to_owned(),
+            })
     }
 
     /// Read an ascending page from one exact target after a global sequence.
@@ -245,7 +248,10 @@ impl<'connection> MessageStore<'connection> {
             .query_row::<TargetOfRow>("SELECT target_id FROM messages WHERE id = ?1", [message_id])
             .await?
             .map(|row| row.0)
-            .ok_or_else(|| not_found("message", message_id))
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "message",
+                id: message_id.to_owned(),
+            })
     }
 
     pub(crate) async fn body_text(&self, message_id: &str) -> Result<Option<String>> {
@@ -272,7 +278,10 @@ impl<'connection> MessageStore<'connection> {
             )
             .await?
             .map(|row| (row.target_id, row.author_id))
-            .ok_or_else(|| not_found("message", message_id))
+            .ok_or_else(|| CollabError::NotFound {
+                entity: "message",
+                id: message_id.to_owned(),
+            })
     }
 
     /// Insert `message`, returning its global sequence.

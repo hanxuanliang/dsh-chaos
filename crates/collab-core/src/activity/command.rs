@@ -2,10 +2,7 @@ use crate::changefeed::insert_change;
 use crate::ids::{ActorId, ThreadId};
 use crate::target::require_target_access;
 use crate::thread::store::ThreadStore;
-use crate::{
-    Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, not_found, now_ms,
-    require_non_empty,
-};
+use crate::{Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, now_ms};
 
 use super::store::ActivityStore;
 
@@ -18,8 +15,8 @@ impl CollabCore {
         target_id: &str,
         through_seq: i64,
     ) -> Result<()> {
-        require_non_empty("actor_id", actor_id)?;
-        require_non_empty("target_id", target_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
+        CollabError::require_non_blank("target_id", target_id)?;
         if through_seq <= 0 {
             return Err(CollabError::InvalidArgument(
                 "through_seq must be a positive integer".into(),
@@ -34,14 +31,21 @@ impl CollabCore {
                     .is_following(&ThreadId::parse(target_id)?, &ActorId::parse(actor_id)?)
                     .await?
             {
-                return Err(not_found("active Thread follow", target_id));
+                return Err(CollabError::NotFound {
+                    entity: "active Thread follow",
+                    id: target_id.to_owned(),
+                });
             }
 
             let store = ActivityStore::new(connection);
-            let latest_seq = store
-                .latest_seq(target_id)
-                .await?
-                .ok_or_else(|| not_found("target activity", target_id))?;
+            let latest_seq =
+                store
+                    .latest_seq(target_id)
+                    .await?
+                    .ok_or_else(|| CollabError::NotFound {
+                        entity: "target activity",
+                        id: target_id.to_owned(),
+                    })?;
             if through_seq > latest_seq {
                 return Err(CollabError::InvalidArgument(format!(
                     "through_seq {through_seq} is newer than target activity {latest_seq}"

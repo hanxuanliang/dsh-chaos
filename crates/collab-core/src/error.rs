@@ -60,6 +60,15 @@ pub enum CollabError {
 }
 
 impl CollabError {
+    /// Reject a blank API argument, naming it in the failure.
+    pub(crate) fn require_non_blank(name: &str, value: &str) -> Result<()> {
+        if value.trim().is_empty() {
+            Err(Self::InvalidArgument(format!("{name} must not be blank")))
+        } else {
+            Ok(())
+        }
+    }
+
     /// Machine-oriented code that remains stable across wording changes.
     pub const fn code(&self) -> &'static str {
         match self {

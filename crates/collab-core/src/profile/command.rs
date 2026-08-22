@@ -1,7 +1,7 @@
 use crate::changefeed::{all_actor_ids, insert_change};
 use crate::{
     Actor, ActorKind, AgentCharter, AgentProfile, ChangeKind, CollabCore, CollabError, Result,
-    new_id, not_found, now_ms, require_non_empty,
+    new_id, now_ms,
 };
 
 use super::model::{encode_charter, normalize_charter};
@@ -22,7 +22,7 @@ impl CollabCore {
         workspace_path: &str,
     ) -> Result<Actor> {
         let charter = AgentCharter::default();
-        require_non_empty("workspace_path", workspace_path)?;
+        CollabError::require_non_blank("workspace_path", workspace_path)?;
         self.create_actor(
             ActorKind::Agent,
             handle,
@@ -41,7 +41,7 @@ impl CollabCore {
         workspace_path: &str,
         charter: AgentCharter,
     ) -> Result<AgentProfile> {
-        require_non_empty("workspace_path", workspace_path)?;
+        CollabError::require_non_blank("workspace_path", workspace_path)?;
         let charter = normalize_charter(charter)?;
         let actor = self
             .create_actor(
@@ -63,8 +63,8 @@ impl CollabCore {
         charter: AgentCharter,
         expected_version: i64,
     ) -> Result<AgentProfile> {
-        require_non_empty("agent_id", agent_id)?;
-        require_non_empty("display_name", display_name)?;
+        CollabError::require_non_blank("agent_id", agent_id)?;
+        CollabError::require_non_blank("display_name", display_name)?;
         if expected_version <= 0 {
             return Err(CollabError::InvalidArgument(
                 "expected_version must be positive".into(),
@@ -107,12 +107,15 @@ impl CollabCore {
     /// Delete one Agent's operational state. The actor row and its messages
     /// stay so history never points at a missing author.
     pub async fn delete_agent(&self, actor_id: &str) -> Result<()> {
-        require_non_empty("actor_id", actor_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = crate::actor::find_actor(connection, actor_id).await?;
             if actor.kind != ActorKind::Agent {
-                return Err(not_found("agent", actor_id));
+                return Err(CollabError::NotFound {
+                    entity: "agent",
+                    id: actor_id.to_owned(),
+                });
             }
             ProfileStore::new(connection)
                 .delete_operational_state(actor_id)
@@ -135,8 +138,8 @@ impl CollabCore {
 
     /// Return the stable User for one handle, creating it when absent.
     pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
-        require_non_empty("handle", handle)?;
-        require_non_empty("display_name", display_name)?;
+        CollabError::require_non_blank("handle", handle)?;
+        CollabError::require_non_blank("display_name", display_name)?;
         let now = now_ms()?;
         self.write(async |connection| {
             if let Some(actor) = crate::actor::find_actor_by_handle(connection, handle).await? {

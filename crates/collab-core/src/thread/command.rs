@@ -14,7 +14,7 @@ impl CollabCore {
     /// Return the one Thread target rooted at a top-level Message. The creator
     /// and root author follow it immediately when they retain parent access.
     pub async fn create_thread(&self, root_message_id: &str, actor_id: &str) -> Result<Target> {
-        crate::require_non_empty("root_message_id", root_message_id)?;
+        CollabError::require_non_blank("root_message_id", root_message_id)?;
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
         self.write(async |connection| {
