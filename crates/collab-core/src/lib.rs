@@ -48,11 +48,12 @@ pub use activity::{
     ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
 };
 pub use actor::{Actor, ActorKind};
+pub use changefeed::{ChangeEvent, ChangeKind, CollabSnapshot};
 pub use db::CollabCore;
 pub use error::{CollabError, Result};
 pub use membership::{AgentMembership, IdentityContext, MembershipRole, TargetMember};
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
-pub use model::{ChangeEvent, ChangeKind, CollabSnapshot, InboxBatch, InboxMessage, PendingWake};
+pub use model::{InboxBatch, InboxMessage, PendingWake};
 pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
 pub use runtime::RuntimeBinding;
 pub use target::{Target, TargetKind};
@@ -63,13 +64,7 @@ use std::collections::BTreeSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use turso::transaction::TransactionBehavior;
-use turso::{Connection, Row};
 use uuid::Uuid;
-
-use membership::*;
-use message::*;
-use target::*;
-use thread::query::followed_thread_ids_for_actor;
 
 pub(crate) fn new_id() -> String {
     Uuid::now_v7().to_string()
