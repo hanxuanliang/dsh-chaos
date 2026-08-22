@@ -9,7 +9,10 @@
 //   sleep <ms>
 //   html <file>           — dump document.body.innerHTML
 //   console               — print collected console entries
+//   setfile <selector> <file> — choose one local file on an input element
+//   viewport <width> <height> — override the page viewport
 import { writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const DEBUG = process.env.CDP_DEBUG ?? 'http://127.0.0.1:9222'
 
@@ -115,6 +118,22 @@ try {
     case 'console':
       console.log(consoleEntries.join('\n') || '(no console entries)')
       break
+    case 'setfile': {
+      const [selector, file] = rest
+      if (selector === undefined || file === undefined) throw new Error('setfile requires a selector and file')
+      await send('DOM.enable')
+      const { root } = await send('DOM.getDocument', { depth: -1, pierce: true })
+      const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector })
+      if (nodeId === 0) throw new Error(`file input not found: ${selector}`)
+      await send('DOM.setFileInputFiles', { nodeId, files: [resolve(file)] })
+      break
+    }
+    case 'viewport': {
+      const [width, height] = rest.map(Number)
+      if (!Number.isFinite(width) || !Number.isFinite(height)) throw new Error('viewport requires width and height')
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
+      break
+    }
     case 'dragseq': {
       const [x1,y1,x2,y2] = rest.map(Number)
       const points = [[x1,y1],[x1+8,y1+2],[x1+20,y1+6],[x1+42,y1+12],[(x1+x2)/2,(y1+y2)/2],[x2-30,y2-10],[x2-8,y2-2],[x2,y2]]

@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { CollabRuntimeApi } from './contracts.ts'
 import type { RuntimeManager } from './runtime.ts'
+import type { NativeActor, NativeIdentityContext } from './native.ts'
 
 const ACTOR_SCHEMA = {
   type: 'object',
@@ -15,6 +16,24 @@ const ACTOR_SCHEMA = {
     createdAtMs: { type: 'number', required: true },
   },
 } as const
+
+function actorForModel(actor: NativeActor): Omit<NativeActor, 'avatarDataUrl'> {
+  return {
+    id: actor.id,
+    kind: actor.kind,
+    handle: actor.handle,
+    displayName: actor.displayName,
+    createdAtMs: actor.createdAtMs,
+  }
+}
+
+function identityContextForModel(context: NativeIdentityContext) {
+  return {
+    ...context,
+    agent: { ...context.agent, actor: actorForModel(context.agent.actor) },
+    members: context.members.map(member => ({ ...member, actor: actorForModel(member.actor) })),
+  }
+}
 
 const TARGET_SCHEMA = {
   type: 'object',
@@ -221,13 +240,13 @@ export function installCollabTools(
       exec.signal.throwIfAborted()
       const binding = await runtimes.bindingForExecution(requireAgent(exec.agent))
       if (args.targetId === undefined && args.target === undefined) {
-        return collab.identityContext(binding.agentId)
+        return identityContextForModel(await collab.identityContext(binding.agentId))
       }
       const addressed = await resolveAgentTarget(collab, binding.agentId, {
         targetId: args.targetId,
         target: args.target,
       })
-      return collab.identityContext(binding.agentId, addressed.targetId)
+      return identityContextForModel(await collab.identityContext(binding.agentId, addressed.targetId))
     },
   }))
 
@@ -282,7 +301,10 @@ export function installCollabTools(
         limit,
       )
       if (batch.id !== undefined) runtimes.recordInboxBatch(binding, batch.id)
-      return batch
+      return {
+        ...batch,
+        contexts: batch.contexts.map(identityContextForModel),
+      }
     },
   }))
 

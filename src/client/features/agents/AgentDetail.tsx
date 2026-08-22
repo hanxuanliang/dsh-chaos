@@ -13,6 +13,7 @@ import { ChaosClient, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import { PanelHeader, Toolbar } from '../../shared/layout/index.ts'
 import { ErrorBanner, Field, IconButton, StatusChip, Tabs } from '../../shared/ui/index.ts'
+import { AgentAvatarEditor } from './AgentAvatarEditor.tsx'
 import css from './AgentDetail.module.css'
 
 type Tab = 'identity' | 'runtime' | 'collaboration'
@@ -50,19 +51,27 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
   const [membershipsError, setMembershipsError] = useState<string | null>(null)
   const catalogRequest = useRef(0)
   const membershipsRequest = useRef(0)
+  const previousProfile = useRef(profile)
 
   useEffect(() => {
-    setName(profile.actor.displayName)
-    setDescription(profile.charter.summary)
-    setProvider(profile.binding?.provider ?? '')
-    setModel(profile.binding?.model ?? '')
-    setPresetId(profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? '')
-    setIdentityError(null)
-    setRuntimeError(null)
-    membershipsRequest.current += 1
-    setMemberships(null)
-    setMembershipsLoading(false)
-    setMembershipsError(null)
+    const previous = previousProfile.current
+    const changedAgent = previous.actor.id !== profile.actor.id
+    setName(current => changedAgent || current === previous.actor.displayName ? profile.actor.displayName : current)
+    setDescription(current => changedAgent || current === previous.charter.summary ? profile.charter.summary : current)
+    setProvider(current => changedAgent || current === (previous.binding?.provider ?? '') ? (profile.binding?.provider ?? '') : current)
+    setModel(current => changedAgent || current === (previous.binding?.model ?? '') ? (profile.binding?.model ?? '') : current)
+    setPresetId(current => changedAgent || current === (previous.binding?.preset ?? '')
+      ? (profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? '')
+      : current)
+    if (changedAgent) {
+      setIdentityError(null)
+      setRuntimeError(null)
+      membershipsRequest.current += 1
+      setMemberships(null)
+      setMembershipsLoading(false)
+      setMembershipsError(null)
+    }
+    previousProfile.current = profile
   }, [profile, presets])
 
   const loadCatalog = useCallback((): void => {
@@ -157,6 +166,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
             <p>{t('agents.identityHint')}</p>
           </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
+          <AgentAvatarEditor client={client} profile={profile} onUpdated={onUpdated} t={t} />
           <Field label={t('agents.name')} required><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></Field>
           <Field label={t('agents.charter')} required><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
           <footer className={css.footer}>

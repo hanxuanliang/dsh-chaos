@@ -3,7 +3,7 @@ use turso::transaction::TransactionBehavior;
 
 use crate::{CollabError, Result};
 
-pub(crate) const SCHEMA_VERSION: u32 = 7;
+pub(crate) const SCHEMA_VERSION: u32 = 8;
 
 pub(crate) const META_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS collab_meta (
@@ -46,6 +46,10 @@ const MIGRATIONS: [Migration; SCHEMA_VERSION as usize] = [
     Migration {
         version: 7,
         sql: include_str!("migrations/007_target_access_view.sql"),
+    },
+    Migration {
+        version: 8,
+        sql: include_str!("migrations/008_agent_avatar.sql"),
     },
 ];
 

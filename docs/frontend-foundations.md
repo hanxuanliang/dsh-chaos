@@ -33,10 +33,10 @@ We adopt these patterns:
 | Pattern | Chaos use |
 | --- | --- |
 | Compact header and list rows | Activity, Channel, Agent, and Task indexes |
-| List/detail split view | Activity and Task detail workflows |
+| List/detail split view | Activity detail workflows |
 | Resizable desktop panels | Activity list/detail and optional Thread context |
-| List-to-detail drill-in on narrow screens | Activity, Agents, and Tasks below 700px |
-| Main content plus properties rail | Task detail and future run/session detail |
+| List-to-detail drill-in on narrow screens | Activity and Agents below 700px |
+| Compact centered detail dialog | Task information and live Task actions |
 | Centered settings sections with grouped rows | Agent Identity and Runtime settings |
 | Icon-only secondary actions with menus | Dense toolbars and row actions |
 
@@ -203,6 +203,7 @@ These are the minimal shared components Chaos should own:
 | `Tabs` | Real tab/panel semantics, arrow-key navigation, active indicator |
 | `SegmentedControl` | Filters or view modes, button-group semantics and pressed state |
 | `StatusChip` | Real domain status only, never decorative tagging |
+| `AvatarChip` | One custom local image or a stable, differentiable two-glyph fallback |
 | `EntityRow` | Selection, primary/secondary/meta slots, row action slot |
 | `PanelHeader` | Title, optional back action, compact action group |
 | `Toolbar` | Filters, view controls, and overflow behavior |
@@ -224,7 +225,7 @@ Product behavior remains inside feature folders:
 - Activity: filters, `ActivityList`, `ActivityRow`, `ActivityDetail`.
 - Messages: `MessageStream`, `MessageRow`, `MessageBody`, reply preview.
 - Threads: `ThreadPanel`, root card, thread composer integration.
-- Tasks: filters, board/list, lane, row/card, detail.
+- Tasks: filters, horizontally scrollable board, lane, card, detail dialog.
 - Agents: list, detail, create flow, Identity, Runtime, Collaboration.
 - Approvals: request card and resolution state when that vertical is built.
 

@@ -13,6 +13,7 @@ pub struct JsActor {
     pub handle: String,
     pub display_name: String,
     pub created_at_ms: f64,
+    pub avatar_data_url: Option<String>,
 }
 
 impl From<Actor> for JsActor {
@@ -23,6 +24,7 @@ impl From<Actor> for JsActor {
             handle: actor.handle,
             display_name: actor.display_name,
             created_at_ms: actor.created_at_ms as f64,
+            avatar_data_url: actor.avatar_data_url,
         }
     }
 }

@@ -105,10 +105,9 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
     return () => { window.cancelAnimationFrame(frame) }
   }, [focusMessageId, state.tasksByMessage, channelId, assigneeFilter, onFocusHandled])
 
-  const assigneeLabelOf = (task: NativeTask): string | undefined => {
+  const assigneeOf = (task: NativeTask) => {
     if (task.assigneeId === undefined) return undefined
-    const actor = state.actors.find(a => a.id === task.assigneeId)
-    return actor === undefined ? undefined : `@${actor.handle}`
+    return state.actors.find(a => a.id === task.assigneeId)
   }
 
   const anchorOf = (task: NativeTask): string => {
@@ -196,9 +195,10 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
                     task={task}
                     title={title === '' ? `#${task.number}` : title}
                     excerpt={excerpt}
-                    assigneeLabel={assigneeLabelOf(task)}
+                    assignee={assigneeOf(task)}
                     unassignedLabel={t('tasks.unassigned')}
                     timeLabel={formatTaskTime(task.updatedAtMs, t)}
+                    sourceLabel={t('tasks.anchorGo')}
                     dragging={draggingTaskId === task.messageId}
                     highlighted={highlightedMessageId === task.messageId}
                     onDragStart={() => { setDraggingTaskId(task.messageId) }}
@@ -218,7 +218,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
             task={selected}
             title={anchor.title === '' ? `#${selected.number}` : anchor.title}
             description={anchor.excerpt}
-            assigneeLabel={assigneeLabelOf(selected)}
+            assigneeLabel={assigneeOf(selected) === undefined ? undefined : `@${assigneeOf(selected)?.handle ?? ''}`}
             createdByLabel={createdByLabelOf(selected)}
             selfActor={state.actors.find(a => a.id === state.selfId)}
             agents={members}

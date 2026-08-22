@@ -9,6 +9,7 @@ use super::model::AgentCharter;
 /// followed by the Agent columns of the JOIN.
 const PROFILE_COLUMNS: &str =
     "actor.id, actor.kind, actor.handle, actor.display_name, actor.created_at_ms,
+     actor.avatar_data_url,
      agent.workspace_path, agent.lifecycle, agent.charter_json,
      agent.profile_version, agent.created_at_ms, agent.updated_at_ms";
 
@@ -18,6 +19,7 @@ struct ProfileRow {
     handle: String,
     display_name: String,
     actor_created_at_ms: i64,
+    avatar_data_url: Option<String>,
     workspace_path: String,
     lifecycle: String,
     charter_json: String,
@@ -34,12 +36,13 @@ impl FromRow for ProfileRow {
             handle: row.get(2)?,
             display_name: row.get(3)?,
             actor_created_at_ms: row.get(4)?,
-            workspace_path: row.get(5)?,
-            lifecycle: row.get(6)?,
-            charter_json: row.get(7)?,
-            version: row.get(8)?,
-            created_at_ms: row.get(9)?,
-            updated_at_ms: row.get(10)?,
+            avatar_data_url: row.get(5)?,
+            workspace_path: row.get(6)?,
+            lifecycle: row.get(7)?,
+            charter_json: row.get(8)?,
+            version: row.get(9)?,
+            created_at_ms: row.get(10)?,
+            updated_at_ms: row.get(11)?,
         })
     }
 }
@@ -62,6 +65,7 @@ impl ProfileRow {
                 handle: self.handle,
                 display_name: self.display_name,
                 created_at_ms: self.actor_created_at_ms,
+                avatar_data_url: self.avatar_data_url,
             },
             workspace_path: self.workspace_path,
             lifecycle,
@@ -134,6 +138,23 @@ impl<'connection> ProfileStore<'connection> {
                  SET charter_json = ?2, profile_version = ?3, updated_at_ms = ?4
                  WHERE actor_id = ?1",
                 (agent_id, charter_json, next_version, now),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn advance_version(
+        &self,
+        agent_id: &str,
+        next_version: i64,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute(
+                "UPDATE agents
+                 SET profile_version = ?2, updated_at_ms = ?3
+                 WHERE actor_id = ?1",
+                (agent_id, next_version, now),
             )
             .await?;
         Ok(())

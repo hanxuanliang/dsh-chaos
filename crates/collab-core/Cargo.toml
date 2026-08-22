@@ -13,6 +13,7 @@ default = []
 napi = ["dep:napi", "dep:napi-derive"]
 
 [dependencies]
+base64.workspace = true
 napi = { workspace = true, optional = true }
 napi-derive = { workspace = true, optional = true }
 serde.workspace = true

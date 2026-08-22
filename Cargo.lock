@@ -445,6 +445,7 @@ dependencies = [
 name = "dsh-chaos-core"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "napi",
  "napi-build",
  "napi-derive",

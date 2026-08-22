@@ -48,6 +48,12 @@ export interface CollabRemoteApi {
     description: string,
     expectedProfileVersion: string,
   ): Promise<AgentProfile>
+  updateAgentAvatar(
+    viewerId: string,
+    agentId: string,
+    avatarDataUrl: string | undefined,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile>
   replaceAgentRuntime(
     viewerId: string,
     agentId: string,
@@ -280,6 +286,13 @@ async function dispatchRemote(
         requiredString(input, 'agentId'),
         requiredString(input, 'displayName'),
         requiredString(input, 'description'),
+        decimalString(input, 'expectedProfileVersion'),
+      )
+    case 'agent.avatar.update':
+      return await api.updateAgentAvatar(
+        actorId,
+        requiredString(input, 'agentId'),
+        optionalString(input, 'avatarDataUrl'),
         decimalString(input, 'expectedProfileVersion'),
       )
     case 'agent.runtime.replace':

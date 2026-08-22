@@ -11,18 +11,21 @@ import type { JSX } from 'react'
 import { avatarSeed, type AvatarSeed } from '../avatar.ts'
 import css from './AvatarChip.module.css'
 
-export function AvatarChip({ handle, displayName, seed, size = 'xs', title }: {
+export function AvatarChip({ handle, displayName, avatarUrl, seed, size = 'xs', title }: {
   handle?: string
   displayName?: string
+  avatarUrl?: string | undefined
   /** 调用方已有 seed(avatarSeed 已算了) 就传它; 否则由 handle/displayName 现场算。 */
   seed?: AvatarSeed
-  size?: 'xs' | 'md' | 'lg' | 'xxsmall'
+  size?: 'xs' | 'md' | 'lg' | 'xl' | 'xxsmall'
   title?: string | undefined
 }): JSX.Element {
   const s: AvatarSeed = seed ?? avatarSeed(handle ?? '', displayName ?? handle ?? '')
   return (
-    <span className={`${css.avatar} ${size === 'xs' ? css.xs : size === 'md' ? css.md : size === 'lg' ? css.lg : css.xxsmall}`} style={{ background: s.background }} title={title} data-avatar-chip aria-hidden="true">
-      {s.initial}
+    <span className={`${css.avatar} ${size === 'xs' ? css.xs : size === 'md' ? css.md : size === 'lg' ? css.lg : size === 'xl' ? css.xl : css.xxsmall}`} style={{ background: s.background }} title={title} data-avatar-chip aria-hidden="true">
+      {avatarUrl === undefined
+        ? s.initial
+        : <img className={css.image} src={avatarUrl} alt="" draggable={false} />}
     </span>
   )
 }

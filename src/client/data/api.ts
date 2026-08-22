@@ -188,6 +188,18 @@ export class ChaosClient {
     })
   }
 
+  updateAgentAvatar(
+    agentId: string,
+    avatarDataUrl: string | undefined,
+    expectedProfileVersion: string,
+  ): Promise<AgentProfile> {
+    return this.call('agent.avatar.update', {
+      agentId,
+      ...(avatarDataUrl === undefined ? {} : { avatarDataUrl }),
+      expectedProfileVersion,
+    })
+  }
+
   replaceAgentRuntime(
     agentId: string,
     provider: string,
