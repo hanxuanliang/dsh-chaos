@@ -1,0 +1,3 @@
+.banner { display: flex; flex: none; align-items: center; justify-content: space-between; gap: var(--chaos-space-3); border: 1px solid var(--dsw-alias-state-error-secondary); border-radius: var(--chaos-radius-field); padding: 6px 10px; color: var(--dsw-alias-state-error-primary); background: var(--dsw-alias-state-error-tertiary, transparent); font-size: 12px; line-height: 18px; }
+.message { min-width: 0; }
+.action { display: inline-flex; flex: none; align-items: center; }

@@ -1,0 +1,25 @@
+.scope {
+  --chaos-space-1: 4px;
+  --chaos-space-2: 8px;
+  --chaos-space-3: 12px;
+  --chaos-space-4: 16px;
+  --chaos-space-6: 24px;
+  --chaos-space-8: 32px;
+  --chaos-control-compact: 28px;
+  --chaos-control-standard: 34px;
+  --chaos-row-compact: 34px;
+  --chaos-row-dense: 44px;
+  --chaos-radius-control: 6px;
+  --chaos-radius-field: 8px;
+  --chaos-radius-surface: 10px;
+  --chaos-radius-modal: 12px;
+  --chaos-motion-fast: 120ms;
+  --chaos-motion-panel: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scope {
+    --chaos-motion-fast: 0ms;
+    --chaos-motion-panel: 0ms;
+  }
+}

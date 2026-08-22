@@ -1,0 +1,10 @@
+.list { display: flex; flex-direction: column; padding: 4px 8px; }
+.row { display: grid; min-height: 56px; grid-template-columns: 28px minmax(0, 1fr) 42px; align-items: center; gap: 10px; padding: 6px 10px; }
+.leading, .copy span, .meta { display: block; border-radius: 5px; background: var(--dsw-alias-bg-layer-2); animation: pulse 1.4s ease-in-out infinite; }
+.leading { width: 28px; height: 28px; border-radius: 50%; }
+.copy { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
+.copy span:first-child { width: min(55%, 180px); height: 10px; }
+.copy span:last-child { width: min(82%, 300px); height: 8px; }
+.meta { width: 42px; height: 8px; }
+@keyframes pulse { 0%, 100% { opacity: .45; } 50% { opacity: .8; } }
+@media (prefers-reduced-motion: reduce) { .leading, .copy span, .meta { animation: none; } }
