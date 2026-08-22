@@ -5,13 +5,12 @@
  * - 点击 = 列表收窄 + 右栏 dock,channel/thread 同一套 dock 机制, 不再整页跳:
  *   channel → DockedChannelPane(header-lite + MessageStream + ChannelComposer);
  *   thread → ThreadPanel 本体(与频道内同一件)。
- * - 组件复用: Button pill 与频道 tab 同一 css.tab 族; 状态色块 = StatusChip
- *   (与看板 toggle 同源); composer = ChannelComposer; 流 = MessageStream。
- * - 筛选 pill: All 生效; Unread/Mentions disabled(plocal 此刻同样 disabled —
- *   read vertical 未落地), Mark-all-read 同因 disabled。不做假交互。
+ * - 组件复用: filter 使用 pressed-button SegmentedControl，详情用共享 SplitPane；
+ *   composer = ChannelComposer，消息流 = MessageStream。
+ * - Unread / All 与 Mark-all-read 都接真实 read vertical，不做假交互。
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
-import { useMemo, useState, type JSX } from 'react'
+import { useMemo, useRef, useState, type JSX } from 'react'
 import { Button, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './blocks/ActivityView.module.css'
@@ -19,10 +18,10 @@ import type { ChaosTranslate } from './locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from './collab-store.ts'
 import { ChannelView } from './ChannelView.tsx'
 import { ThreadPanel } from './ThreadPanel.tsx'
-import { PillTabs } from './atoms/PillTabs.tsx'
 import { ActivityCard } from './blocks/ActivityCard.tsx'
 import cardCss from './blocks/ActivityCard.module.css'
-import { ErrorBanner } from './atoms/ErrorBanner.tsx'
+import { EmptyState, ErrorBanner, IconButton, SegmentedControl } from './shared/ui/index.ts'
+import { PanelHeader, ResponsiveDrilldown, SplitPane, Toolbar } from './shared/layout/index.ts'
 interface ActivityViewProps {
   t: ChaosTranslate
   store: CollabStore
@@ -48,6 +47,7 @@ function relativeTime(atMs: number): string {
 export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
+  const lastTriggerId = useRef<string | null>(null)
   const actorNamesById = new Map<string, string>()
   for (const a of state.actors) actorNamesById.set(a.id, a.displayName)
 
@@ -60,7 +60,16 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     ? state.threads.find((x) => x.rootMessageId === dock.threadRootId)
     : undefined
   const dockKey = dock === undefined ? undefined : `${dock.channelId}:${dock.threadRootId ?? ''}`
-  const open = (item: NativeActivityInboxItem): void => {
+  const closeDock = (): void => {
+    setDock(undefined)
+    window.requestAnimationFrame(() => {
+      const trigger = [...document.querySelectorAll<HTMLButtonElement>('[data-activity-id]')]
+        .find(button => button.dataset.activityId === lastTriggerId.current)
+      trigger?.focus()
+    })
+  }
+  const open = (item: NativeActivityInboxItem, trigger?: HTMLButtonElement): void => {
+    if (trigger !== undefined) lastTriggerId.current = item.conversationId
     if (item.targetKind === 'channel') {
       void store.hydrateTarget(item.conversationId)
       setDock((cur) =>
@@ -109,12 +118,13 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
   const unreadCount = state.activityCount
   const filterTabs = (
     <div className={css.activityFilterRow}>
-      <PillTabs
-        align="lead"
-        ariaLabel={t('activity.filtersAria')}
+      <SegmentedControl
+        label={t('activity.filtersAria')}
+        value={filter}
+        onValueChange={value => { void store.setActivityFilter(value) }}
         items={[
-          { id: 'unread', label: unreadCount > 0 ? `${t('activity.filterUnread')} (${unreadCount})` : t('activity.filterUnread'), active: filter === 'unread', onClick: () => { void store.setActivityFilter('unread') } },
-          { id: 'all', label: t('activity.filterAll'), active: filter === 'all', onClick: () => { void store.setActivityFilter('all') } },
+          { id: 'unread', label: unreadCount > 0 ? `${t('activity.filterUnread')} (${unreadCount})` : t('activity.filterUnread') },
+          { id: 'all', label: t('activity.filterAll') },
         ]}
       />
       {unreadCount > 0 && (
@@ -143,65 +153,74 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
           thread={item.rootMessageId === undefined ? undefined : state.threads.find(th => th.rootMessageId === item.rootMessageId)}
           summary={item.rootMessageId === undefined ? undefined : state.threadSummariesByRoot[item.rootMessageId]}
           actorNamesById={actorNamesById}
-          onOpen={() => { open(item) }}
+          onOpen={trigger => { open(item, trigger) }}
           onDone={() => { markDone(item) }}
         />
       ))}
     </div>
  )
-  const headerRow = (
-    <header className={css.activityHeader}>
-      <h2 className={css.activityTitle}>{t('activity.title')}</h2>
-      <div className={css.activityHeadTabs}>{filterTabs}</div>
-    </header>
+  const listPane = (
+    <section className={css.activityListCol} aria-label={t('activity.title')}>
+      <PanelHeader title={t('activity.title')} />
+      <Toolbar start={filterTabs} />
+      {error !== undefined && <ErrorBanner className={css.activityError}>{error}</ErrorBanner>}
+      {items.length === 0 ? <EmptyState title={t('activity.empty')} /> : rows}
+    </section>
   )
-  if (dock !== undefined) {
-    // dock 态 = 两列: 左列 [Activity 头 + 筛行 + 列表全栈]; 右列 [dock 头 + ChannelChatPane body]
-    const dockChannel = state.channels.find((c) => c.id === dock.channelId)
-    return (
-      <div className={css.activityView} data-docked="true">
-        <div className={css.activityListCol}>
-          {headerRow}
-          {error !== undefined && <ErrorBanner>{error}</ErrorBanner>}
-          {rows}
-        </div>
-        <div className={css.activityDetailCol}>
-          <div className={css.activityDetailPane} key={dockKey}>
-            {/* ① channel 行: 右区 = ChannelView 自体(完全铺开, thread 只在里面点了才开)。
-                ② thread 行: 右区 = ThreadPanel 自体平铺(thread 页面一份, 不要 channel 夹带)。 */}
-            {dock.threadRootId !== undefined && dockThread !== undefined ? (
-              <ThreadPanel
-                t={t}
-                store={store}
-                state={state}
-                thread={dockThread}
-                parentChannelId={dock.channelId}
-                activeLocale={activeLocale}
-                onRootJump={() => { setDock({ channelId: dock.channelId }) }}
-                onClose={() => { setDock({ channelId: dock.channelId }) }}
-              />
-            ) : (
-              <ChannelView
-                t={t}
-                store={store}
-                state={state}
-                channel={dockChannel as NativeTarget}
-                activeLocale={activeLocale}
-              />
-            )}
-            <button type="button" className={css.activityDockClose} aria-label={t('activity.closeDock')} title={t('activity.closeDock')} onClick={() => { setDock(undefined) }}>
-              <IconCloseOutline16 />
-            </button>
-          </div>
-        </div>
+  const dockChannel = dock === undefined ? undefined : state.channels.find((c) => c.id === dock.channelId)
+  const detailPane = dock === undefined ? null : (
+    <section className={css.activityDetailCol} aria-label={dockChannel?.name ?? t('activity.title')}>
+      <div className={css.mobileDetailHeader}>
+        <PanelHeader title={t('activity.title')} backLabel={t('activity.back')} onBack={closeDock} />
       </div>
-    )
-  }
+      <div className={css.activityDetailPane} key={dockKey}>
+        {dock.threadRootId !== undefined && dockThread !== undefined ? (
+          <ThreadPanel
+            t={t}
+            store={store}
+            state={state}
+            thread={dockThread}
+            parentChannelId={dock.channelId}
+            activeLocale={activeLocale}
+            onRootJump={() => { setDock({ channelId: dock.channelId }) }}
+            onClose={() => { setDock({ channelId: dock.channelId }) }}
+          />
+        ) : dockChannel !== undefined ? (
+          <ChannelView
+            t={t}
+            store={store}
+            state={state}
+            channel={dockChannel as NativeTarget}
+            activeLocale={activeLocale}
+          />
+        ) : (
+          <EmptyState title={t('activity.empty')} />
+        )}
+        <IconButton
+          className={css.activityDockClose}
+          label={t('activity.closeDock')}
+          icon={<IconCloseOutline16 size={16} />}
+          onClick={closeDock}
+        />
+      </div>
+    </section>
+  )
+  const desktop = dock === undefined ? listPane : (
+    <SplitPane
+      id="activity-detail"
+      leading={listPane}
+      trailing={detailPane}
+      separatorLabel={t('activity.resize')}
+    />
+  )
   return (
-    <div className={css.activityView}>
-      {headerRow}
-      {error !== undefined && <ErrorBanner>{error}</ErrorBanner>}
-      {items.length === 0 ? <div className={css.activityEmpty}>{t('activity.empty')}</div> : rows}
+    <div className={css.activityView} data-docked={dock === undefined ? undefined : 'true'}>
+      <ResponsiveDrilldown
+        desktop={desktop}
+        list={listPane}
+        detail={detailPane}
+        detailOpen={dock !== undefined}
+      />
     </div>
   )
 }

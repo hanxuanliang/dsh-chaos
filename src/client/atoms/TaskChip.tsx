@@ -18,13 +18,21 @@ function StatusIcon({ status }: { status: NativeTask['status'] }): JSX.Element {
 export function TaskChip({ task, assignee, onClick }: {
   task: Pick<NativeTask, 'number' | 'status'>
   assignee: string | undefined
-  onClick(): void
+  onClick?: (() => void) | undefined
 }): JSX.Element {
-  return (
-    <button type="button" className={css.chip} data-plugin="dsh-chaos" data-status={task.status} onClick={onClick}>
+  const content = (
+    <>
       <StatusIcon status={task.status} />
       <span className={css.chipId}>#{task.number}</span>
       {assignee !== undefined && <span className={css.chipAssignee}>@{assignee}</span>}
+    </>
+  )
+  if (onClick === undefined) {
+    return <span className={css.chip} data-plugin="dsh-chaos" data-status={task.status}>{content}</span>
+  }
+  return (
+    <button type="button" className={css.chip} data-plugin="dsh-chaos" data-status={task.status} onClick={onClick}>
+      {content}
     </button>
   )
 }
