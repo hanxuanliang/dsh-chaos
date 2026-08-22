@@ -23,8 +23,8 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, vari
   variant?: 'avatar' | 'plain' | undefined
 }): JSX.Element | undefined {
   if (thread === undefined || summary === undefined || summary.replyCount === 0) return undefined
-  return (
-    <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant} onClick={onOpen} disabled={onOpen === undefined}>
+  const content = (
+    <>
       <IconReply size={12} />
       {variant === 'avatar' && (
         <span className={css.previewAvatars} aria-hidden="true">
@@ -34,6 +34,14 @@ export function ThreadPreview({ t, thread, summary, actorNamesById, onOpen, vari
         </span>
       )}
       {t('thread.replies', { count: summary.replyCount })}
+    </>
+  )
+  if (onOpen === undefined) {
+    return <span className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant}>{content}</span>
+  }
+  return (
+    <button type="button" className={css.threadPreview} data-plugin="dsh-chaos" data-variant={variant} onClick={onOpen}>
+      {content}
     </button>
   )
 }

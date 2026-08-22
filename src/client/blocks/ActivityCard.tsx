@@ -21,12 +21,12 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
   thread: NativeTarget | undefined
   summary: NativeThreadSummary | undefined
   actorNamesById: Map<string, string>
-  onOpen: () => void
+  onOpen: (trigger?: HTMLButtonElement) => void
   onDone: () => void
 }) {
   return (
     <div className={css.row} role="listitem" data-selected={selected ? 'true' : undefined} data-done={item.done === true ? 'true' : undefined}>
-      <button type="button" className={css.rowMain} onClick={onOpen}>
+      <button type="button" className={css.rowMain} data-activity-id={item.conversationId} onClick={event => { onOpen(event.currentTarget) }}>
         <span className={css.body}>
           <span className={css.line1}>
             <span className={css.time}>{timeLabel}</span>
@@ -41,7 +41,6 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
                 <TaskChip
                   task={item.task}
                   assignee={item.task.assigneeName}
-                  onClick={onOpen}
                 />
               )}
               {item.targetKind === 'thread' && (
@@ -50,7 +49,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
                   thread={thread}
                   summary={summary}
                   actorNamesById={actorNamesById}
-                  onOpen={onOpen}
+                  onOpen={undefined}
                   variant="plain"
                 />
               )}
