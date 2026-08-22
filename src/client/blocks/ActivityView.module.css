@@ -19,7 +19,6 @@
   background: var(--dsw-alias-bg-base);
 }
 
-.activityFilterRow { display: flex; min-width: 0; align-items: center; gap: var(--chaos-space-2); }
 .activityError { margin: 0 10px 6px; }
 
 .markAllButton {
@@ -57,18 +56,10 @@
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: 0 !important; }
 .activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }
 
-.activityDockClose {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 4;
-  background: var(--dsw-alias-bg-base);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
-}
-
+.desktopClose { display: inline-flex; flex: none; }
 .mobileDetailHeader { display: none; }
 
 @media (max-width: 700px) {
   .mobileDetailHeader { display: block; }
-  .activityDockClose { display: none; }
+  .desktopClose { display: none; }
 }

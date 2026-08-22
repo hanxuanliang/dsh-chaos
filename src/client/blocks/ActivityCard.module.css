@@ -52,20 +52,24 @@
   gap: 2px;
 }
 
-.line1 {
+.titleLine,
+.summaryLine {
   display: flex;
+  min-width: 0;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
 }
 
 .time {
   flex: none;
   margin-left: auto;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 11.5px;
+  font-size: 11px;
+  line-height: 17px;
 }
 
 .titleText {
+  min-width: 0;
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
@@ -76,6 +80,16 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+.unreadDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.summaryLine > :first-child { min-width: 0; flex: 1; }
 
 .bottomLine {
   display: flex;
@@ -107,11 +121,13 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
-  opacity: 0;
+  opacity: .55;
+  transition: color var(--chaos-motion-fast) ease, background-color var(--chaos-motion-fast) ease, opacity var(--chaos-motion-fast) ease;
 }
 
-.row:hover .done { opacity: 1; }
-.row:focus-within .done { opacity: 1; }
+.row:hover .done, .row:focus-within .done { opacity: 1; }
+.done:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; opacity: 1; }
+.done:disabled { cursor: not-allowed; opacity: .35; }
 
 .done:hover {
   background: var(--dsw-alias-bg-layer-2);

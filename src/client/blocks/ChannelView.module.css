@@ -24,6 +24,8 @@
 
 
 .channel .channelTitle {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   overflow: hidden;
   font-size: 15px;

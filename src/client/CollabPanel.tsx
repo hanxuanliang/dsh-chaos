@@ -10,6 +10,7 @@ import css from './CollabPanel.module.css'
 import { PillTabs } from './atoms/PillTabs.tsx'
 import { IconJoin } from './atoms/DomainIcons.tsx'
 import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './collab-navigation.ts'
+import { IconButton } from './shared/ui/index.ts'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -52,15 +53,12 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
             { id: 'activity', label: t('activity.title') + ` (${String(state.activityCount)})`, active: panelView === 'activity', onClick: () => { setPanelView('activity') } },
           ]}
         />
-        <button
-          type="button"
+        <IconButton
           className={css.closeButton}
-          aria-label={t('panel.close')}
-          title={t('panel.close')}
+          label={t('panel.close')}
+          icon={<IconCloseOutline16 size={16} />}
           onClick={onClose}
-        >
-          <IconCloseOutline16 />
-        </button>
+        />
       </header>
       {panelView === 'activity' ? (
         <div className={css.body}>

@@ -28,13 +28,16 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
     <div className={css.row} role="listitem" data-selected={selected ? 'true' : undefined} data-done={item.done === true ? 'true' : undefined}>
       <button type="button" className={css.rowMain} data-activity-id={item.conversationId} onClick={event => { onOpen(event.currentTarget) }}>
         <span className={css.body}>
-          <span className={css.line1}>
+          <span className={css.titleLine}>
+            {item.done !== true && <span className={css.unreadDot} aria-hidden="true" />}
+            <span className={css.titleText}>{item.title}</span>
+          </span>
+          <span className={css.summaryLine}>
+            {item.latestReply !== undefined
+              ? <ReplyExcerpt senderName={item.latestReply.senderName} excerpt={item.latestReply.excerpt} />
+              : <span />}
             <span className={css.time}>{timeLabel}</span>
           </span>
-          <span className={css.titleText}>{item.title}</span>
-          {item.latestReply !== undefined && (
-            <ReplyExcerpt senderName={item.latestReply.senderName} excerpt={item.latestReply.excerpt} />
-          )}
           {(item.task !== undefined || item.targetKind === 'thread') && (
             <span className={css.bottomLine}>
               {item.task !== undefined && (

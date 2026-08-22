@@ -31,9 +31,11 @@ export interface ChannelViewProps {
   pendingThreadRoot?: string | undefined
   /** 跨层消耗回调: Parent(mount 消费者) 需要烤定 pending state; Activity dock 无此链路。 */
   onPendingThreadConsumed?(): void
+  /** Optional host-surface actions rendered in the Channel header action row. */
+  headerActions?: ReactNode
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed }: ChannelViewProps): JSX.Element {
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks' | 'activity'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
@@ -97,6 +99,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
           <span className={css.memberCount}>{members.length}</span>
         </button>
       )}
+      {headerActions}
     </header>
   )
 
