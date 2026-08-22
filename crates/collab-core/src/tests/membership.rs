@@ -1,4 +1,4 @@
-use crate::test_support::*;
+use super::test_support::*;
 
 #[tokio::test]
 async fn agent_membership_directory_is_top_level_and_viewer_filtered() -> Result<()> {

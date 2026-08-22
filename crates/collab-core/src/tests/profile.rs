@@ -1,4 +1,4 @@
-use crate::test_support::*;
+use super::test_support::*;
 use crate::{
     AgentCharter, AgentLifecycle, ChangeKind, CollabCore, CollabError, Result, SendMessageRequest,
 };
