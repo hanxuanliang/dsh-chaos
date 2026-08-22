@@ -34,8 +34,9 @@ export interface CollabRemoteApi {
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
   readMessagesTail(actorId: string, targetId: string, limit: number): Promise<NativeMessageTail>
-  inboxList(actorId: string, limit: number, cursor?: string): Promise<NativeActivityInboxPage>
+  inboxList(actorId: string, limit: number, cursor?: string, filter?: 'all' | 'unread'): Promise<NativeActivityInboxPage>
   inboxDone(actorId: string, targetId: string, throughSeq: string): Promise<void>
+  inboxDoneAll(actorId: string): Promise<number>
   listTasks(actorId: string, targetId?: string): Promise<NativeTask[]>
   listAgentPresets(): Promise<AgentPresetSummary[]>
   agentProfile(viewerId: string, agentId: string): Promise<AgentProfile>
@@ -244,12 +245,20 @@ async function dispatchRemote(
         requiredString(input, 'targetId'),
         integer(input, 'limit', 10, 100),
       )
-    case 'inbox.list':
+    case 'inbox.list': {
+      const filter = optionalString(input, 'filter')
+      if (filter !== undefined && filter !== 'all' && filter !== 'unread') {
+        throw new Error(`[invalid_argument] filter must be 'unread' or 'all', got '${filter}'`)
+      }
       return await api.inboxList(
         actorId,
         integer(input, 'limit', 20, 50),
         optionalString(input, 'cursor'),
+        filter as 'all' | 'unread' | undefined,
       )
+    }
+    case 'inbox.doneAll':
+      return await api.inboxDoneAll(actorId)
     case 'inbox.done':
       await api.inboxDone(
         actorId,

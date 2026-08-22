@@ -25,7 +25,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
   onDone: () => void
 }) {
   return (
-    <div className={css.row} role="listitem" data-selected={selected ? 'true' : undefined}>
+    <div className={css.row} role="listitem" data-selected={selected ? 'true' : undefined} data-done={item.done === true ? 'true' : undefined}>
       <button type="button" className={css.rowMain} onClick={onOpen}>
         <span className={css.body}>
           <span className={css.line1}>

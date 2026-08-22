@@ -56,6 +56,7 @@ pub struct JsActivityInboxItem {
     pub last_activity_seq: String,
     pub reply_count: Option<String>,
     pub task: Option<JsActivityInboxTask>,
+    pub done: bool,
 }
 
 impl From<ActivityInboxItem> for JsActivityInboxItem {
@@ -73,6 +74,7 @@ impl From<ActivityInboxItem> for JsActivityInboxItem {
             last_activity_seq: item.last_activity_seq.to_string(),
             reply_count: item.reply_count.map(|count| count.to_string()),
             task: item.task.map(JsActivityInboxTask::from),
+            done: item.done,
         }
     }
 }
@@ -106,11 +108,21 @@ impl CollabHandle {
         actor_id: String,
         limit: u32,
         cursor: Option<String>,
+        filter: Option<String>,
     ) -> Result<JsActivityInboxPage> {
         self.core
-            .inbox_list(&actor_id, limit, cursor.as_deref())
+            .inbox_list(&actor_id, limit, cursor.as_deref(), filter.as_deref())
             .await
             .map(JsActivityInboxPage::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub async fn inbox_done_all(&self, actor_id: String) -> Result<f64> {
+        self.core
+            .inbox_done_all(&actor_id)
+            .await
+            .map(f64::from)
             .map_err(to_napi_error)
     }
 

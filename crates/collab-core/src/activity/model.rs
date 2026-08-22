@@ -3,6 +3,28 @@ use uuid::Uuid;
 
 use crate::{ActorKind, CollabError, Result, TargetKind, TaskStatus};
 
+/// Which conversations the Activity inbox lists: those with unseen activity,
+/// or every conversation including done ones.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityFilter {
+    #[default]
+    Unread,
+    All,
+}
+
+impl ActivityFilter {
+    pub(crate) fn parse(value: Option<&str>) -> Result<Self> {
+        match value {
+            None | Some("unread") => Ok(Self::Unread),
+            Some("all") => Ok(Self::All),
+            Some(other) => Err(CollabError::InvalidArgument(format!(
+                "filter must be 'unread' or 'all', got '{other}'"
+            ))),
+        }
+    }
+}
+
 /// The title source used by one Activity inbox row.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -53,6 +75,9 @@ pub struct ActivityInboxItem {
     pub last_activity_seq: i64,
     pub reply_count: Option<i64>,
     pub task: Option<ActivityInboxTask>,
+    /// Whether the actor's Done fence already covers the latest activity.
+    /// Always false under the Unread filter.
+    pub done: bool,
 }
 
 /// One newest-first Activity page plus the total active conversation count.

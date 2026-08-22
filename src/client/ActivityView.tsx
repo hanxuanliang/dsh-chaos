@@ -82,6 +82,15 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
       )
     }
   }
+  const markAllDone = (): void => {
+    setBusy('all')
+    setError(undefined)
+    store.markAllActivityDone()
+      .catch((e: unknown) => {
+        setError(t('activity.markAllFailed', { error: e instanceof Error ? e.message : String(e) }))
+      })
+      .finally(() => { setBusy(undefined) })
+  }
   const markDone = (item: NativeActivityInboxItem): void => {
     setBusy(item.conversationId)
     setError(undefined)
@@ -96,16 +105,29 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     if (item.targetKind === 'channel') return dock.channelId === item.conversationId && dock.threadRootId === undefined
     return item.rootMessageId !== undefined && dock.threadRootId === item.rootMessageId
   }
+  const filter = state.activityFilter
+  const unreadCount = state.activityCount
   const filterTabs = (
-    <PillTabs
-      align="lead"
-      ariaLabel={t('activity.filtersAria')}
-      items={[
-        { id: 'all', label: t('activity.filterAll'), active: true },
-        { id: 'unread', label: t('activity.filterUnread'), disabled: true, title: t('activity.filterPending') },
-        { id: 'mentions', label: t('activity.filterMentions'), disabled: true, title: t('activity.filterPending') },
-      ]}
-    />
+    <div className={css.activityFilterRow}>
+      <PillTabs
+        align="lead"
+        ariaLabel={t('activity.filtersAria')}
+        items={[
+          { id: 'unread', label: unreadCount > 0 ? `${t('activity.filterUnread')} (${unreadCount})` : t('activity.filterUnread'), active: filter === 'unread', onClick: () => { void store.setActivityFilter('unread') } },
+          { id: 'all', label: t('activity.filterAll'), active: filter === 'all', onClick: () => { void store.setActivityFilter('all') } },
+        ]}
+      />
+      {unreadCount > 0 && (
+        <button
+          type="button"
+          className={css.markAllButton}
+          disabled={busy !== undefined}
+          onClick={() => { markAllDone() }}
+        >
+          {t('activity.markAllRead')}
+        </button>
+      )}
+    </div>
   )
   const rows = (
     <div className={cardCss.list} role="list">

@@ -41,6 +41,9 @@ export interface CollabStoreSnapshot {
   /** crates activity inbox(会话粒度,新活动自动复活) */
   activityItems: NativeActivityInboxItem[]
   activityCount: number
+  /** 当前 Activity 过滤器:'unread' 只显示未 done,'all' 显示全部(带 done 标)。 */
+  activityFilter: 'all' | 'unread'
+
   actors: NativeActor[]
   activeChannelId: string | undefined
   /** Spec §1.3: the active channel vanished (membership loss) — linger, then empty. */
@@ -144,6 +147,7 @@ export class CollabStore {
     threadSummariesByRoot: {},
     activityItems: [],
     activityCount: 0,
+    activityFilter: 'unread',
     actors: [],
     activeChannelId: undefined,
     removedNotice: false,
@@ -640,8 +644,9 @@ export class CollabStore {
 
   async refreshActivity(): Promise<void> {
     const generation = this.loadGeneration
+    const filter = this.snapshot.activityFilter
     try {
-      const page = await this.client.inboxList(30)
+      const page = await this.client.inboxList(30, undefined, filter)
       if (this.loadGeneration !== generation) return
       this.set({
         activityItems: page.items,
@@ -650,8 +655,19 @@ export class CollabStore {
     } catch { /* 下一次 SSE 会回来摘; activity 失败不炸页 */ }
   }
 
+  async setActivityFilter(filter: 'all' | 'unread'): Promise<void> {
+    if (this.snapshot.activityFilter === filter) return
+    this.set({ activityFilter: filter })
+    await this.refreshActivity()
+  }
+
   async markActivityDone(conversationId: string, throughSeq: string): Promise<void> {
     await this.client.inboxDone(conversationId, throughSeq)
+    await this.refreshActivity()
+  }
+
+  async markAllActivityDone(): Promise<void> {
+    await this.client.inboxDoneAll()
     await this.refreshActivity()
   }
 

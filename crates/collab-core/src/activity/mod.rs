@@ -4,7 +4,8 @@ mod model;
 pub(crate) mod store;
 
 pub use model::{
-    ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask, ActivityTitleKind,
+    ActivityFilter, ActivityInboxItem, ActivityInboxPage, ActivityInboxReply, ActivityInboxTask,
+    ActivityTitleKind,
 };
 
 use crate::actor::ActorId;
@@ -82,25 +83,32 @@ impl CollabCore {
 }
 
 impl CollabCore {
-    /// List active Activity conversations newest-first. Eligibility and Done
-    /// are actor-specific; count and page are read from one database snapshot.
+    /// List Activity conversations newest-first under one filter. Unread
+    /// returns only conversations with activity past the actor's Done fence;
+    /// All returns every conversation with its done flag. `active_count` is
+    /// always the unread count, so it can badge the Unread pill.
     pub async fn inbox_list(
         &self,
         actor_id: &str,
         limit: u32,
         cursor: Option<&str>,
+        filter: Option<&str>,
     ) -> Result<ActivityInboxPage> {
         if limit == 0 || limit > 50 {
             return Err(CollabError::InvalidArgument(
                 "limit must be between 1 and 50".into(),
             ));
         }
+        let filter = ActivityFilter::parse(filter)?;
+        let unread = filter == ActivityFilter::Unread;
         let cursor = cursor.map(ActivityCursor::parse).transpose()?;
         self.read(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             let store = ActivityStore::new(connection);
             let active_count = store.active_count(actor_id).await?;
-            let mut items = store.inbox_page(actor_id, cursor.as_ref(), limit).await?;
+            let mut items = store
+                .inbox_page(actor_id, cursor.as_ref(), limit, unread)
+                .await?;
 
             let has_more = items.len() > limit as usize;
             if has_more {
@@ -114,6 +122,41 @@ impl CollabCore {
                 next_cursor,
                 active_count,
             })
+        })
+        .await
+    }
+
+    /// Advance the actor's Done fence to the latest activity of every active
+    /// unread conversation, returning how many fences moved. One change
+    /// notification covers the whole batch; the fence's forward-only rule
+    /// keeps a repeat call a no-op returning zero.
+    pub async fn inbox_done_all(&self, actor_id: &str) -> Result<u32> {
+        let now = now_ms()?;
+        self.write(async |connection| {
+            Actor::require(connection, &ActorId::parse(actor_id)?).await?;
+            let store = ActivityStore::new(connection);
+            let conversations = store.active_conversations(actor_id).await?;
+            let mut advanced = 0u32;
+            for (target_id, last_seq) in &conversations {
+                if store
+                    .set_done_fence(actor_id, target_id, *last_seq, now)
+                    .await?
+                {
+                    advanced += 1;
+                }
+            }
+            if advanced > 0 {
+                ChangeStore::new(connection)
+                    .insert_change(
+                        ChangeKind::ActivityDoneChanged,
+                        None,
+                        actor_id,
+                        &[actor_id.to_owned()],
+                        now,
+                    )
+                    .await?;
+            }
+            Ok(advanced)
         })
         .await
     }
