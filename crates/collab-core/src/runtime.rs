@@ -54,7 +54,10 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             Actor::require_agent(connection, &ActorId::parse(agent_id)?).await?;
-            let generation = current_generation(connection, agent_id).await? + 1;
+            let generation = RuntimeStore::new(connection)
+                .current_generation(agent_id)
+                .await?
+                + 1;
             let binding = RuntimeBinding {
                 agent_id: agent_id.to_owned(),
                 session_id: session_id.to_owned(),
@@ -64,7 +67,7 @@ impl CollabCore {
                 preset: preset.to_owned(),
                 bound_at_ms: now,
             };
-            binding.upsert(connection).await?;
+            RuntimeStore::new(connection).upsert(&binding).await?;
             Ok(binding)
         })
         .await
@@ -85,7 +88,8 @@ impl CollabCore {
         let _ = ActorId::parse(agent_id)?;
         require_non_blank!(session_id, preset);
         self.write(async |connection| {
-            let current = binding_for_agent(connection, agent_id)
+            let current = RuntimeStore::new(connection)
+                .binding_for_agent(agent_id)
                 .await?
                 .ok_or_else(|| CollabError::NotFound {
                     entity: "runtime binding",
@@ -96,7 +100,9 @@ impl CollabCore {
                     agent_id: agent_id.to_owned(),
                 });
             }
-            current.update_preset(connection, preset).await?;
+            RuntimeStore::new(connection)
+                .update_preset(&current, preset)
+                .await?;
             Ok(RuntimeBinding {
                 preset: preset.to_owned(),
                 ..current
@@ -108,8 +114,12 @@ impl CollabCore {
     /// Return the current runtime binding for one stable Agent.
     pub async fn runtime_binding(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
         let _ = ActorId::parse(agent_id)?;
-        self.read(async |connection| binding_for_agent(connection, agent_id).await)
-            .await
+        self.read(async |connection| {
+            RuntimeStore::new(connection)
+                .binding_for_agent(agent_id)
+                .await
+        })
+        .await
     }
 
     /// Resolve the stable Agent identity that owns one live DSH Session id.
@@ -118,13 +128,17 @@ impl CollabCore {
         session_id: &str,
     ) -> Result<Option<RuntimeBinding>> {
         let _ = ActorId::parse(session_id)?;
-        self.read(async |connection| binding_for_session(connection, session_id).await)
-            .await
+        self.read(async |connection| {
+            RuntimeStore::new(connection)
+                .binding_for_session(session_id)
+                .await
+        })
+        .await
     }
 
     /// List every durable current runtime binding for process recovery.
     pub async fn list_runtime_bindings(&self) -> Result<Vec<RuntimeBinding>> {
-        self.read(async |connection| all_bindings(connection).await)
+        self.read(async |connection| RuntimeStore::new(connection).all_bindings().await)
             .await
     }
 }
@@ -136,10 +150,98 @@ impl CollabCore {
 const BINDING_COLUMNS: &str =
     "agent_id, session_id, generation, provider, model, preset, bound_at_ms";
 
-impl RuntimeBinding {
+/// Persistence for the runtime_bindings table; the only owner of its SQL.
+pub(crate) struct RuntimeStore<'connection> {
+    connection: &'connection Connection,
+}
+
+impl<'connection> RuntimeStore<'connection> {
+    pub(crate) const fn new(connection: &'connection Connection) -> Self {
+        Self { connection }
+    }
+
+    /// Load the current binding for one stable Agent.
+    pub(crate) async fn binding_for_agent(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
+        self.connection
+            .query_row::<RuntimeBinding>(
+                &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings WHERE agent_id = ?1"),
+                [agent_id],
+            )
+            .await
+    }
+
+    /// Resolve the stable Agent identity that owns one live DSH Session id.
+    pub(crate) async fn binding_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<RuntimeBinding>> {
+        self.connection
+            .query_row::<RuntimeBinding>(
+                &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings WHERE session_id = ?1"),
+                [session_id],
+            )
+            .await
+    }
+
+    /// List every durable current runtime binding for process recovery.
+    pub(crate) async fn all_bindings(&self) -> Result<Vec<RuntimeBinding>> {
+        self.connection
+            .query_rows::<RuntimeBinding>(
+                &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings ORDER BY agent_id"),
+                (),
+            )
+            .await
+    }
+
+    /// The generation counter for one Agent; zero before the first bind.
+    pub(crate) async fn current_generation(&self, agent_id: &str) -> Result<i64> {
+        let mut rows = self
+            .connection
+            .query(
+                "SELECT generation FROM runtime_bindings WHERE agent_id = ?1",
+                [agent_id],
+            )
+            .await?;
+        match rows.next().await? {
+            Some(row) => Ok(row.get(0)?),
+            None => Ok(0),
+        }
+    }
+
+    /// Fail unless the durable binding for `agent_id` is exactly the fenced
+    /// Session and generation pair.
+    pub(crate) async fn require_current_binding(
+        &self,
+        agent_id: &str,
+        generation: i64,
+        session_id: &str,
+    ) -> Result<()> {
+        let mut rows = self
+            .connection
+            .query(
+                "SELECT session_id, generation FROM runtime_bindings WHERE agent_id = ?1",
+                [agent_id],
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(CollabError::NotFound {
+                entity: "runtime binding",
+                id: agent_id.to_owned(),
+            });
+        };
+        let current_session = row.get::<String>(0)?;
+        let current_generation = row.get::<i64>(1)?;
+        if current_session != session_id || current_generation != generation {
+            return Err(CollabError::RuntimeGenerationMismatch {
+                agent_id: agent_id.to_owned(),
+            });
+        }
+        Ok(())
+    }
+
     /// Insert or replace the durable current binding for this Agent.
-    pub(crate) async fn upsert(&self, connection: &Connection) -> Result<()> {
-        connection
+    pub(crate) async fn upsert(&self, binding: &RuntimeBinding) -> Result<()> {
+        self.connection
             .execute(
                 "INSERT INTO runtime_bindings
                  (agent_id, session_id, generation, provider, model, preset, bound_at_ms)
@@ -152,13 +254,13 @@ impl RuntimeBinding {
                    preset = excluded.preset,
                    bound_at_ms = excluded.bound_at_ms",
                 (
-                    self.agent_id.as_str(),
-                    self.session_id.as_str(),
-                    self.generation,
-                    self.provider.as_str(),
-                    self.model.as_str(),
-                    self.preset.as_str(),
-                    self.bound_at_ms,
+                    binding.agent_id.as_str(),
+                    binding.session_id.as_str(),
+                    binding.generation,
+                    binding.provider.as_str(),
+                    binding.model.as_str(),
+                    binding.preset.as_str(),
+                    binding.bound_at_ms,
                 ),
             )
             .await?;
@@ -167,99 +269,19 @@ impl RuntimeBinding {
 
     /// Rewrite the preset label for exactly this Agent, Session, and
     /// generation.
-    pub(crate) async fn update_preset(&self, connection: &Connection, preset: &str) -> Result<()> {
-        connection
+    pub(crate) async fn update_preset(&self, binding: &RuntimeBinding, preset: &str) -> Result<()> {
+        self.connection
             .execute(
                 "UPDATE runtime_bindings SET preset = ?1
                  WHERE agent_id = ?2 AND generation = ?3 AND session_id = ?4",
                 (
                     preset,
-                    self.agent_id.as_str(),
-                    self.generation,
-                    self.session_id.as_str(),
+                    binding.agent_id.as_str(),
+                    binding.generation,
+                    binding.session_id.as_str(),
                 ),
             )
             .await?;
         Ok(())
     }
-}
-
-/// Load the current binding for one stable Agent.
-pub(crate) async fn binding_for_agent(
-    connection: &Connection,
-    agent_id: &str,
-) -> Result<Option<RuntimeBinding>> {
-    connection
-        .query_row::<RuntimeBinding>(
-            &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings WHERE agent_id = ?1"),
-            [agent_id],
-        )
-        .await
-}
-
-/// Resolve the stable Agent identity that owns one live DSH Session id.
-pub(crate) async fn binding_for_session(
-    connection: &Connection,
-    session_id: &str,
-) -> Result<Option<RuntimeBinding>> {
-    connection
-        .query_row::<RuntimeBinding>(
-            &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings WHERE session_id = ?1"),
-            [session_id],
-        )
-        .await
-}
-
-/// List every durable current runtime binding for process recovery.
-pub(crate) async fn all_bindings(connection: &Connection) -> Result<Vec<RuntimeBinding>> {
-    connection
-        .query_rows::<RuntimeBinding>(
-            &format!("SELECT {BINDING_COLUMNS} FROM runtime_bindings ORDER BY agent_id"),
-            (),
-        )
-        .await
-}
-
-/// The generation counter for one Agent; zero before the first bind.
-pub(crate) async fn current_generation(connection: &Connection, agent_id: &str) -> Result<i64> {
-    let mut rows = connection
-        .query(
-            "SELECT generation FROM runtime_bindings WHERE agent_id = ?1",
-            [agent_id],
-        )
-        .await?;
-    match rows.next().await? {
-        Some(row) => Ok(row.get(0)?),
-        None => Ok(0),
-    }
-}
-
-/// Fail unless the durable binding for `agent_id` is exactly the fenced
-/// Session and generation pair.
-pub(crate) async fn require_current_binding(
-    connection: &Connection,
-    agent_id: &str,
-    generation: i64,
-    session_id: &str,
-) -> Result<()> {
-    let mut rows = connection
-        .query(
-            "SELECT session_id, generation FROM runtime_bindings WHERE agent_id = ?1",
-            [agent_id],
-        )
-        .await?;
-    let Some(row) = rows.next().await? else {
-        return Err(CollabError::NotFound {
-            entity: "runtime binding",
-            id: agent_id.to_owned(),
-        });
-    };
-    let current_session = row.get::<String>(0)?;
-    let current_generation = row.get::<i64>(1)?;
-    if current_session != session_id || current_generation != generation {
-        return Err(CollabError::RuntimeGenerationMismatch {
-            agent_id: agent_id.to_owned(),
-        });
-    }
-    Ok(())
 }

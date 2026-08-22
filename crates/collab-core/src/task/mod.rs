@@ -6,7 +6,7 @@ pub(crate) mod store;
 pub use model::{Task, TaskStatus};
 
 use crate::actor::ActorId;
-use crate::changefeed::insert_target_change;
+use crate::changefeed::ChangeStore;
 use crate::message::store::MessageStore;
 use crate::target::AccessGrant;
 use crate::{Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, now_ms};
@@ -55,15 +55,9 @@ impl CollabCore {
                     created_at_ms: now,
                 })
                 .await?;
-            insert_target_change(
-                connection,
-                ChangeKind::TaskCreated,
-                &target_id,
-                message_id,
-                &[],
-                now,
-            )
-            .await?;
+            ChangeStore::new(connection)
+                .insert_target_change(ChangeKind::TaskCreated, &target_id, message_id, &[], now)
+                .await?;
             let anchor_text = MessageStore::new(connection).body_text(message_id).await?;
 
             Ok(Task {
@@ -200,15 +194,15 @@ async fn apply_task_transition(
     let store = TaskStore::new(connection);
     store.apply(transition, now).await?;
     if transition.publish {
-        insert_target_change(
-            connection,
-            ChangeKind::TaskUpdated,
-            &transition.target_id,
-            &transition.message_id,
-            &[],
-            now,
-        )
-        .await?;
+        ChangeStore::new(connection)
+            .insert_target_change(
+                ChangeKind::TaskUpdated,
+                &transition.target_id,
+                &transition.message_id,
+                &[],
+                now,
+            )
+            .await?;
     }
     Ok(())
 }

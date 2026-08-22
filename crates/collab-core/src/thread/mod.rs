@@ -7,8 +7,8 @@ pub(crate) use model::ThreadId;
 pub use model::ThreadSummary;
 
 use crate::actor::ActorId;
-use crate::changefeed::insert_change;
-use crate::membership::{Membership, active_member_ids, is_active_member};
+use crate::changefeed::ChangeStore;
+use crate::membership::{Membership, MembershipStore};
 use crate::message::store::MessageStore;
 use crate::target::require_target;
 use crate::{
@@ -70,20 +70,23 @@ impl CollabCore {
             store.ensure_following(&thread_id, &actor_id, now).await?;
             let root_author_id = ActorId::parse(&root_author_id)?;
             if root_author_id != actor_id
-                && is_active_member(connection, &parent_target_id, root_author_id.as_str()).await?
+                && MembershipStore::new(connection)
+                    .is_active_member(&parent_target_id, root_author_id.as_str())
+                    .await?
             {
                 store.ensure_following(&thread_id, &root_author_id, now).await?;
             }
-            let parent_actor_ids = active_member_ids(connection, &parent_target_id).await?;
-            insert_change(
-                connection,
-                ChangeKind::TargetCreated,
-                Some(thread_id.as_str()),
-                thread_id.as_str(),
-                &parent_actor_ids,
-                now,
-            )
-            .await?;
+            let parent_actor_ids =
+                MembershipStore::new(connection).active_member_ids(&parent_target_id).await?;
+            ChangeStore::new(connection)
+                .insert_change(
+                    ChangeKind::TargetCreated,
+                    Some(thread_id.as_str()),
+                    thread_id.as_str(),
+                    &parent_actor_ids,
+                    now,
+                )
+                .await?;
             Ok(target)
         })
         .await
@@ -120,16 +123,18 @@ impl CollabCore {
             let outcome = transition(&mut subscription);
             store.save_subscription(&subscription, outcome, now).await?;
             if outcome.changed() {
-                let recipients = active_member_ids(connection, &scope.permission_target_id).await?;
-                insert_change(
-                    connection,
-                    ChangeKind::ThreadFollowChanged,
-                    Some(scope.thread_id.as_str()),
-                    actor_id.as_str(),
-                    &recipients,
-                    now,
-                )
-                .await?;
+                let recipients = MembershipStore::new(connection)
+                    .active_member_ids(&scope.permission_target_id)
+                    .await?;
+                ChangeStore::new(connection)
+                    .insert_change(
+                        ChangeKind::ThreadFollowChanged,
+                        Some(scope.thread_id.as_str()),
+                        actor_id.as_str(),
+                        &recipients,
+                        now,
+                    )
+                    .await?;
             }
             Ok(())
         })

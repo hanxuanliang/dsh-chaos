@@ -7,8 +7,8 @@ pub use model::{InboxBatch, InboxMessage, PendingWake};
 
 use std::collections::BTreeSet;
 
-use crate::membership::identity_context_for;
-use crate::runtime::require_current_binding;
+use crate::membership::MembershipStore;
+use crate::runtime::RuntimeStore;
 use crate::{CollabCore, CollabError, Result, new_id, now_ms};
 
 use store::DeliveryStore;
@@ -31,7 +31,9 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            require_current_binding(connection, agent_id, generation, session_id).await?;
+            RuntimeStore::new(connection)
+                .require_current_binding(agent_id, generation, session_id)
+                .await?;
             let store = DeliveryStore::new(connection);
             let durable_pending = store.durable_pending_seq(agent_id).await?;
             if pending_seq > durable_pending {
@@ -56,7 +58,9 @@ impl CollabCore {
         session_id: &str,
     ) -> Result<()> {
         self.write(async |connection| {
-            require_current_binding(connection, agent_id, generation, session_id).await?;
+            RuntimeStore::new(connection)
+                .require_current_binding(agent_id, generation, session_id)
+                .await?;
             DeliveryStore::new(connection).rearm(agent_id).await
         })
         .await
@@ -78,7 +82,9 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            require_current_binding(connection, agent_id, generation, session_id).await?;
+            RuntimeStore::new(connection)
+                .require_current_binding(agent_id, generation, session_id)
+                .await?;
             let store = DeliveryStore::new(connection);
             let messages = store.unseen_deliveries(agent_id, limit).await?;
 
@@ -87,8 +93,11 @@ impl CollabCore {
             for item in &messages {
                 let target_id = item.message.target_id.as_str();
                 if seen_target_ids.insert(target_id.to_owned()) {
-                    contexts
-                        .push(identity_context_for(connection, agent_id, Some(target_id)).await?);
+                    contexts.push(
+                        MembershipStore::new(connection)
+                            .identity_context_for(agent_id, Some(target_id))
+                            .await?,
+                    );
                 }
             }
 
@@ -137,7 +146,9 @@ impl CollabCore {
     ) -> Result<()> {
         let now = now_ms()?;
         self.write(async |connection| {
-            require_current_binding(connection, agent_id, generation, session_id).await?;
+            RuntimeStore::new(connection)
+                .require_current_binding(agent_id, generation, session_id)
+                .await?;
             let store = DeliveryStore::new(connection);
             store
                 .require_batch(batch_id, agent_id, session_id, generation)
