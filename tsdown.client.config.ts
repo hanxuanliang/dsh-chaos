@@ -9,7 +9,7 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 export default {
   name: `${id}/client`,
-  entry: { client: 'src/client/index.tsx' },
+  entry: { client: 'src/client/entry/index.tsx' },
   outDir: 'lib',
   format: 'cjs',
   platform: 'browser',
