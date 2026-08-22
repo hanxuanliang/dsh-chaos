@@ -42,30 +42,6 @@
 .dialogBody > *:first-child { padding-bottom: 0; }
 .dialogBody *, .dialogBody *::before, .dialogBody *::after { box-sizing: border-box; }
 
-.panel .statusMenuItem,
-.dialogBody .statusMenuItem {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  border: none;
-  padding: 7px 10px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--dsw-alias-label-primary);
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-.panel .statusMenuItem:hover:not(:disabled),
-.dialogBody .statusMenuItem:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.panel .statusMenuItem:disabled,
-.dialogBody .statusMenuItem:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 /* dialogs 接触清两君 avatar 旁 member 名/handle (原 0-2-0 scope 原位重修) */
 .dialogBody .memberName {
   flex: none;

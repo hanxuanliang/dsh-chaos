@@ -1,8 +1,6 @@
 /**
- * Active-channel container (spec §1.2): 44px header (# name + member count
- * meta + 「消息 | 任务 (N)」tab switch, N = non-done tasks), message stream,
- * and the in-panel composer. The tasks tab is a P0-2 placeholder only — the
- * real board lands with P0-4.
+ * Active-channel container: compact header (# name + member count + message /
+ * task tabs), message stream, task board, and the official-style composer.
  */
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState, type JSX } from 'react'
@@ -39,7 +37,7 @@ export interface ChannelViewProps {
 }
 
 export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading }: ChannelViewProps): JSX.Element {
-  const [tab, setTab] = useState<'messages' | 'tasks' | 'activity'>('messages')
+  const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
   const [jumpMessageId, setJumpMessageId] = useState<string | undefined>(undefined)
@@ -86,7 +84,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         <span className={css.channelHash} aria-hidden="true">#</span>
         {channel.name}
       </h3>
-      <Tabs<'messages' | 'tasks' | 'activity'>
+      <Tabs<'messages' | 'tasks'>
         value={tab}
         onValueChange={setTab}
         label={t('panel.title')}
