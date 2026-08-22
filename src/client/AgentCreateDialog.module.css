@@ -24,8 +24,6 @@
 
 .body *, .body *::before, .body *::after { box-sizing: border-box; }
 
-.field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
-
 .section {
   display: flex;
   min-width: 0;
@@ -41,57 +39,14 @@
 .sectionHeading strong { font-size: 13px; font-weight: 600; line-height: 20px; }
 .sectionHeading span { color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; }
 
-.labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
-.req { margin-left: 2px; color: var(--dsw-alias-state-error-primary); font-style: normal; }
 .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
-.error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 
 .input { display: block; }
 .input input { width: 100%; }
 
-.textarea {
-  width: 100%;
-  min-height: 92px;
-  resize: vertical;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  outline: none;
-  padding: 9px 10px;
-  color: inherit;
-  background: var(--dsw-alias-bg-layer-2);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-}
-.textarea:focus-visible { box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
+.textarea { min-height: 92px; }
 
 .routeGrid { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
-
-/* Select chrome borrowed from the host ModelsSettings "API 协议" select
- * (ui-settings-models ModelsSection.module.css .selectInput): OS arrow
- * replaced by an inset 12px chevron (#81858C caption gray, both themes). */
-.select {
-  appearance: none;
-  width: 100%;
-  min-width: 0;
-  height: 38px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
-  outline: none;
-  padding: 0 32px 0 10px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-2);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 12px 12px;
-  font: inherit;
-  font-size: 12px;
-}
-
-.select:disabled { cursor: default; opacity: .46; }
-.select:focus-visible { box-shadow: 0 0 0 2px var(--dsw-alias-border-l3); }
-.select option:disabled { color: var(--dsw-alias-label-tertiary); }
 
 @media (max-width: 700px) {
   .body { max-height: calc(100vh - 180px); }

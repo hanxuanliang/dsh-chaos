@@ -4,6 +4,7 @@ import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary, CreatedAgent } from '../agent-settings-types.ts'
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from './api.ts'
 import type { ChaosTranslate } from './locales.ts'
+import { ErrorBanner, Field } from './shared/ui/index.ts'
 import css from './AgentCreateDialog.module.css'
 
 export interface AgentCreateDialogProps {
@@ -116,19 +117,16 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
           <strong id="chaos-create-identity">{t('create.identity')}</strong>
           <span>{t('create.identityHint')}</span>
         </div>
-        <label className={css.field} htmlFor="chaos-agent-create-name">
-          <span className={css.labelText}>{t('create.name')}<em className={css.req}>*</em></span>
+        <Field label={t('create.name')} required>
           <Input id="chaos-agent-create-name" className={css.input as string} value={displayName}
             onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
             placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
-        </label>
-        <label className={css.field} htmlFor="chaos-agent-create-charter">
-          <span className={css.labelText}>{t('create.charter')}<em className={css.req}>*</em></span>
+        </Field>
+        <Field label={t('create.charter')} required hint={t('create.charterHint')}>
           <textarea id="chaos-agent-create-charter" className={css.textarea} value={description}
             onChange={event => { setDescription(event.target.value); setFailure(null) }} maxLength={800}
             placeholder={t('create.charterPlaceholder')} disabled={submitting} />
-          <small className={css.hint}>{t('create.charterHint')}</small>
-        </label>
+        </Field>
       </section>
 
       <section className={css.section} aria-labelledby="chaos-create-runtime">
@@ -137,39 +135,36 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
           <span>{t('create.runtimeHint')}</span>
         </div>
         {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
-        {catalogError !== null && <p className={css.error} role="alert">{t('create.routeFailed', { error: catalogError })}{' '}<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button></p>}
+        {catalogError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>}>{t('create.routeFailed', { error: catalogError })}</ErrorBanner>}
         <div className={css.routeGrid}>
-          <label className={css.field}>
-            <span className={css.labelText}>{t('create.provider')}<em className={css.req}>*</em></span>
-            <select className={css.select} value={provider} disabled={submitting || catalogLoading}
+          <Field label={t('create.provider')} required>
+            <select value={provider} disabled={submitting || catalogLoading}
               onChange={event => { setProvider(event.target.value); setModel(''); setFailure(null) }}>
               <option value="" disabled>{t('create.providerPlaceholder')}</option>
               {catalog?.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
-          </label>
-          <label className={css.field}>
-            <span className={css.labelText}>{t('create.model')}<em className={css.req}>*</em></span>
-            <select className={css.select} value={model} disabled={submitting || provider === '' || models.length === 0}
+          </Field>
+          <Field label={t('create.model')} required>
+            <select value={model} disabled={submitting || provider === '' || models.length === 0}
               onChange={event => { setModel(event.target.value); setFailure(null) }}>
               <option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>
               {models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
-          </label>
+          </Field>
         </div>
-        <label className={css.field}>
-          <span className={css.labelText}>{t('create.preset')}<em className={css.req}>*</em></span>
-          {presetsLoading && <p className={css.hint} role="status">{t('create.presetLoading')}</p>}
-          {presetsError !== null && <p className={css.error} role="alert">{t('create.presetFailed', { error: presetsError })}{' '}<Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button></p>}
-          <select className={css.select} value={presetId} disabled={submitting || presetsLoading}
+        {presetsLoading && <p className={css.hint} role="status">{t('create.presetLoading')}</p>}
+        {presetsError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button>}>{t('create.presetFailed', { error: presetsError })}</ErrorBanner>}
+        <Field label={t('create.preset')} required>
+          <select value={presetId} disabled={submitting || presetsLoading}
             onChange={event => { setPresetId(event.target.value); setFailure(null) }}>
             <option value="" disabled>{t('create.presetPlaceholder')}</option>
             {presets?.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>
               {item.name?.trim() || item.id}{item.broken === undefined ? '' : ` — ${item.broken}`}
             </option>)}
           </select>
-        </label>
+        </Field>
       </section>
-      {failure !== null && <p className={css.error} role="alert">{t('create.failed', { error: failure })}</p>}
+      {failure !== null && <ErrorBanner>{t('create.failed', { error: failure })}</ErrorBanner>}
     </Modal>
   )
 }
