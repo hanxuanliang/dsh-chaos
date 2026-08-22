@@ -12,14 +12,17 @@ const safeStorage = {
   },
 }
 
-export function SplitPane({ id, leading, trailing, leadingDefault = 320, leadingMin = 280, leadingMax = 480, trailingMin = 420, separatorLabel, className }: {
+export function SplitPane({ id, leading, trailing, fixedSide = 'leading', leadingDefault = 320, leadingMin = 280, leadingMax = 480, trailingDefault = 360, trailingMin = 420, trailingMax, separatorLabel, className }: {
   id: string
   leading: ReactNode
   trailing: ReactNode
   leadingDefault?: number | undefined
   leadingMin?: number | undefined
   leadingMax?: number | undefined
+  trailingDefault?: number | undefined
   trailingMin?: number | undefined
+  trailingMax?: number | undefined
+  fixedSide?: 'leading' | 'trailing' | undefined
   separatorLabel: string
   className?: string | undefined
 }): JSX.Element {
@@ -44,17 +47,24 @@ export function SplitPane({ id, leading, trailing, leadingDefault = 320, leading
       <Panel
         id={leadingId}
         className={css.panel}
-        defaultSize={leadingDefault}
         minSize={leadingMin}
-        maxSize={leadingMax}
-        groupResizeBehavior="preserve-pixel-size"
+        {...(fixedSide === 'leading'
+          ? { defaultSize: leadingDefault, maxSize: leadingMax, groupResizeBehavior: 'preserve-pixel-size' as const }
+          : {})}
       >
         {leading}
       </Panel>
       <Separator id={`${id}-separator`} className={css.separator} aria-label={separatorLabel}>
         <span className={css.rule} />
       </Separator>
-      <Panel id={trailingId} className={css.panel} minSize={trailingMin}>
+      <Panel
+        id={trailingId}
+        className={css.panel}
+        minSize={trailingMin}
+        {...(fixedSide === 'trailing'
+          ? { defaultSize: trailingDefault, maxSize: trailingMax ?? 520, groupResizeBehavior: 'preserve-pixel-size' as const }
+          : {})}
+      >
         {trailing}
       </Panel>
     </Group>

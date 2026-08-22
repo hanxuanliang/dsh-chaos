@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type JSX } from 'react'
-import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronLeftOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStore } from './collab-store.ts'
 import { ChannelRail } from './ChannelRail.tsx'
 import { ActivityView } from './ActivityView.tsx'
@@ -11,6 +11,7 @@ import { PillTabs } from './atoms/PillTabs.tsx'
 import { IconJoin } from './atoms/DomainIcons.tsx'
 import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './collab-navigation.ts'
 import { IconButton } from './shared/ui/index.ts'
+import { ResponsiveDrilldown } from './shared/layout/index.ts'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -31,6 +32,7 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
   const [createOpen, setCreateOpen] = useState(false)
   /** 面板顶栏切视图(plocal Activity 为独立 shell section → 我们对应面板级)。 */
   const [panelView, setPanelView] = useState<'collab' | 'activity'>('collab')
+  const [mobileChannelsOpen, setMobileChannelsOpen] = useState(false)
   /** Activity 行点击 → 新 ChannelView mount 初始值一次性消费 (key 换血保证 remount)。 */
   const [pendingThreadRoot, setPendingThreadRoot] = useState<string | undefined>(undefined)
   const active = state.channels.find(channel => channel.id === state.activeChannelId)
@@ -38,11 +40,63 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
   useEffect(() => {
     const showCollab = (): void => {
       setPanelView('collab')
+      setMobileChannelsOpen(false)
       setPendingThreadRoot(undefined)
     }
     document.addEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, showCollab)
     return () => { document.removeEventListener(CHAOS_NAVIGATE_CHANNEL_EVENT, showCollab) }
   }, [])
+
+  const channelRail = <ChannelRail
+    t={t}
+    state={state}
+    onSelect={(targetId) => { setPendingThreadRoot(undefined); setMobileChannelsOpen(false); store.setActiveChannel(targetId) }}
+    onCreate={() => { setCreateOpen(true) }}
+  />
+  const mainView = <main className={css.main}>
+    {state.removedNotice && (
+      <div className={css.mainEmpty} role="status">
+        <p className={css.empty}>{t('channel.removed')}</p>
+      </div>
+    )}
+    {!state.removedNotice && state.bootstrapError !== undefined && (
+      <div className={css.mainEmpty} role="alert">
+        <p className={css.empty}>{t('panel.loadFailed', { error: state.bootstrapError })}</p>
+        <button type="button" className={css.retryButton} onClick={() => { store.start() }}>
+          {t('panel.retry')}
+        </button>
+      </div>
+    )}
+    {!state.removedNotice && state.bootstrapError === undefined && !state.bootstrapped && (
+      <div className={css.mainEmpty} role="status" aria-label={t('channel.loading')}>
+        <div className={css.skeletonRow} />
+        <div className={css.skeletonRow} />
+        <div className={css.skeletonRow} />
+      </div>
+    )}
+    {!state.removedNotice && state.bootstrapError === undefined && state.bootstrapped && active === undefined && (
+      <div className={css.mainEmpty}>
+        <IconJoin />
+        <p className={css.empty}>{t('panel.selectChannel')}</p>
+      </div>
+    )}
+    {!state.removedNotice && active !== undefined && (
+      <ChannelView
+        key={active.id}
+        t={t}
+        store={store}
+        state={state}
+        channel={active}
+        activeLocale={activeLocale}
+        pendingThreadRoot={pendingThreadRoot}
+        onPendingThreadConsumed={() => { setPendingThreadRoot(undefined) }}
+        headerLeading={<span className={css.mobileChannelsButton}><IconButton label={t('panel.channels')} icon={<IconChevronLeftOutline14 size={14} />} onClick={() => { setMobileChannelsOpen(true) }} /></span>}
+      />
+    )}
+  </main>
+  const showMobileChannel = !mobileChannelsOpen && (
+    active !== undefined || !state.bootstrapped || state.bootstrapError !== undefined || state.removedNotice
+  )
 
   return (
     <>
@@ -71,52 +125,12 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
         </div>
       ) : (
       <div className={css.body}>
-        <ChannelRail
-          t={t}
-          state={state}
-          onSelect={(targetId) => { setPendingThreadRoot(undefined); store.setActiveChannel(targetId) }}
-          onCreate={() => { setCreateOpen(true) }}
+        <ResponsiveDrilldown
+          desktop={<>{channelRail}{mainView}</>}
+          list={channelRail}
+          detail={mainView}
+          detailOpen={showMobileChannel}
         />
-        <main className={css.main}>
-          {state.removedNotice && (
-            <div className={css.mainEmpty} role="status">
-              <p className={css.empty}>{t('channel.removed')}</p>
-            </div>
-          )}
-          {!state.removedNotice && state.bootstrapError !== undefined && (
-            <div className={css.mainEmpty} role="alert">
-              <p className={css.empty}>{t('panel.loadFailed', { error: state.bootstrapError })}</p>
-              <button type="button" className={css.retryButton} onClick={() => { store.start() }}>
-                {t('panel.retry')}
-              </button>
-            </div>
-          )}
-          {!state.removedNotice && state.bootstrapError === undefined && !state.bootstrapped && (
-            <div className={css.mainEmpty} role="status" aria-label={t('channel.loading')}>
-              <div className={css.skeletonRow} />
-              <div className={css.skeletonRow} />
-              <div className={css.skeletonRow} />
-            </div>
-          )}
-          {!state.removedNotice && state.bootstrapError === undefined && state.bootstrapped && active === undefined && (
-            <div className={css.mainEmpty}>
-              <IconJoin />
-              <p className={css.empty}>{t('panel.selectChannel')}</p>
-            </div>
-          )}
-          {!state.removedNotice && active !== undefined && (
-            <ChannelView
-              key={active.id}
-              t={t}
-              store={store}
-              state={state}
-              channel={active}
-              activeLocale={activeLocale}
-              pendingThreadRoot={pendingThreadRoot}
-              onPendingThreadConsumed={() => { setPendingThreadRoot(undefined) }}
-            />
-          )}
-        </main>
       </div>
       )}
       {createOpen && (
