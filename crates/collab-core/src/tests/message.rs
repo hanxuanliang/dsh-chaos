@@ -1,5 +1,5 @@
+use super::test_support::*;
 use crate::message::SendFailpoint;
-use crate::test_support::*;
 use crate::{CollabCore, CollabError, Result, SendMessageRequest};
 
 #[tokio::test]

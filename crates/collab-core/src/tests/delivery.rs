@@ -1,4 +1,4 @@
-use crate::test_support::*;
+use super::test_support::*;
 
 #[tokio::test]
 async fn runtime_generation_fences_model_seen_receipts() -> Result<()> {

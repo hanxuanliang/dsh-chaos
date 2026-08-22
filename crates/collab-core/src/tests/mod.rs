@@ -10,4 +10,5 @@ mod profile;
 mod runtime;
 mod target;
 mod task;
+mod test_support;
 mod thread;

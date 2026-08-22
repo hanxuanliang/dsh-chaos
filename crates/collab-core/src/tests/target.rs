@@ -1,4 +1,4 @@
-use crate::test_support::*;
+use super::test_support::*;
 
 #[tokio::test]
 async fn direct_target_is_unique_for_an_unordered_actor_pair() -> Result<()> {

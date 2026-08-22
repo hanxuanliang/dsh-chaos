@@ -1,4 +1,4 @@
-use crate::test_support::*;
+use super::test_support::*;
 
 #[tokio::test]
 async fn snapshot_and_change_cursor_are_authorization_filtered() -> Result<()> {
