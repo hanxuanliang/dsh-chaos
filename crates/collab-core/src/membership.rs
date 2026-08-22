@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::db::{FromRow, QueryRows};
+use crate::profile::store::ProfileStore;
 
 /// Presence proof that one Actor is an active member of one target. Obtained
 /// exclusively through [`Membership::require`]; role-bearing checks will grow
@@ -162,7 +163,9 @@ impl CollabCore {
         require_non_empty("agent_id", agent_id)?;
         let connection = self.connection.lock().await;
         require_actor(&connection, actor_id).await?;
-        find_agent_profile(&connection, agent_id).await?;
+        ProfileStore::new(&connection)
+            .require_profile(agent_id)
+            .await?;
         agent_memberships_for(&connection, actor_id, agent_id).await
     }
 }
@@ -316,7 +319,9 @@ pub(crate) async fn identity_context_for(
     agent_id: &str,
     target_id: Option<&str>,
 ) -> Result<IdentityContext> {
-    let agent = find_agent_profile(connection, agent_id).await?;
+    let agent = ProfileStore::new(connection)
+        .require_profile(agent_id)
+        .await?;
     let Some(target_id) = target_id else {
         return Ok(IdentityContext {
             agent,

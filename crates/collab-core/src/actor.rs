@@ -31,6 +31,37 @@ impl Actor {
             .await?
             .ok_or_else(|| not_found("actor", id.as_str()))
     }
+
+    pub(crate) async fn insert(&self, connection: &Connection) -> Result<()> {
+        connection
+            .execute(
+                "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                (
+                    self.id.as_str(),
+                    self.kind.as_str(),
+                    self.handle.as_str(),
+                    self.display_name.as_str(),
+                    self.created_at_ms,
+                ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn rename(
+        connection: &Connection,
+        actor_id: &str,
+        display_name: &str,
+    ) -> Result<()> {
+        connection
+            .execute(
+                "UPDATE actors SET display_name = ?2 WHERE id = ?1",
+                (actor_id, display_name),
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 impl CollabCore {
@@ -57,19 +88,7 @@ impl CollabCore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await?;
-        transaction
-            .execute(
-                "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                (
-                    actor.id.as_str(),
-                    actor.kind.as_str(),
-                    actor.handle.as_str(),
-                    actor.display_name.as_str(),
-                    actor.created_at_ms,
-                ),
-            )
-            .await?;
+        actor.insert(&transaction).await?;
         if let Some(workspace_path) = workspace_path {
             let resolved_path = workspace_path.replace("{id}", actor.id.as_str());
             let charter = charter.ok_or_else(|| {
