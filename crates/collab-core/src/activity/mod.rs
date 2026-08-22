@@ -8,7 +8,7 @@ pub use model::{
 };
 
 use crate::actor::ActorId;
-use crate::changefeed::insert_change;
+use crate::changefeed::ChangeStore;
 use crate::target::require_target_access;
 use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
@@ -65,15 +65,15 @@ impl CollabCore {
                 .set_done_fence(actor_id, target_id, through_seq, now)
                 .await?
             {
-                insert_change(
-                    connection,
-                    ChangeKind::ActivityDoneChanged,
-                    Some(target_id),
-                    target_id,
-                    &[actor_id.to_owned()],
-                    now,
-                )
-                .await?;
+                ChangeStore::new(connection)
+                    .insert_change(
+                        ChangeKind::ActivityDoneChanged,
+                        Some(target_id),
+                        target_id,
+                        &[actor_id.to_owned()],
+                        now,
+                    )
+                    .await?;
             }
             Ok(())
         })

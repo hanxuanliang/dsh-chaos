@@ -4,11 +4,9 @@ use serde::{Deserialize, Serialize};
 use turso::Connection;
 
 use crate::actor::{Actor, ActorId};
-use crate::changefeed::insert_target_change;
+use crate::changefeed::ChangeStore;
 use crate::membership::{Membership, MembershipRole};
 use crate::{ChangeKind, CollabCore, CollabError, Result, new_id, now_ms};
-
-// ── 类型 ─────────────────────────────────────────────────────────────────────
 
 /// A collab target kind.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -40,8 +38,6 @@ pub struct Target {
     pub created_by: String,
     pub created_at_ms: i64,
 }
-
-// ── 证据 ─────────────────────────────────────────────────────────────────────
 
 /// One active target's authorization route: kind proof plus the Thread
 /// inheritance parent when present.
@@ -173,8 +169,6 @@ impl AccessGrant {
     }
 }
 
-// ── 能力 ─────────────────────────────────────────────────────────────────────
-
 impl CollabCore {
     /// Create a Channel and make its creator the owner/member.
     pub async fn create_channel(&self, name: &str, creator_id: &str) -> Result<Target> {
@@ -215,8 +209,8 @@ impl CollabCore {
                     (target.id.as_str(), target.created_by.as_str(), now),
                 )
                 .await?;
-            insert_target_change(
-                connection,
+            ChangeStore::new(connection)
+                .insert_target_change(
                 ChangeKind::TargetCreated,
                 &target.id,
                 &target.id,
@@ -258,7 +252,7 @@ impl CollabCore {
             if let Some(row) = rows.next().await? {
                 let target_id = row.get::<String>(0)?;
                 drop(rows);
-                return find_target(connection, &target_id).await;
+                return TargetStore::new(connection).find(&target_id).await;
             }
             drop(rows);
 
@@ -308,8 +302,8 @@ impl CollabCore {
                     ),
                 )
                 .await?;
-            insert_target_change(
-                connection,
+            ChangeStore::new(connection)
+                .insert_target_change(
                 ChangeKind::TargetCreated,
                 &target.id,
                 &target.id,
@@ -323,73 +317,81 @@ impl CollabCore {
     }
 }
 
-// ── 存储 ─────────────────────────────────────────────────────────────────────
-
-pub(crate) async fn find_target(connection: &Connection, target_id: &str) -> Result<Target> {
-    let mut rows = connection
-        .query(
-            "SELECT id, kind, name, parent_target_id, root_message_id,
-                    created_by, created_at_ms
-             FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
-            [target_id],
-        )
-        .await?;
-    let Some(row) = rows.next().await? else {
-        return Err(CollabError::NotFound {
-            entity: "active target",
-            id: target_id.to_owned(),
-        });
-    };
-    let kind_text = row.get::<String>(1)?;
-    Ok(Target {
-        id: row.get(0)?,
-        kind: parse_target_kind(target_id, &kind_text)?,
-        name: row.get(2)?,
-        parent_target_id: row.get(3)?,
-        root_message_id: row.get(4)?,
-        created_by: row.get(5)?,
-        created_at_ms: row.get(6)?,
-    })
+/// Persistence for the targets table; the only owner of its SQL.
+pub(crate) struct TargetStore<'connection> {
+    connection: &'connection Connection,
 }
 
-pub(crate) async fn targets_for_actor(
-    connection: &Connection,
-    actor_id: &str,
-) -> Result<Vec<Target>> {
-    let mut rows = connection
-        .query(
-            "SELECT DISTINCT target.id, target.kind, target.name,
-                    target.parent_target_id, target.root_message_id,
-                    target.created_by, target.created_at_ms
-             FROM v_target_access access
-             JOIN targets target ON target.id = access.target_id
-             WHERE access.actor_id = ?1
-               AND (
-                 target.kind <> 'thread'
-                 OR EXISTS (
-                   SELECT 1 FROM targets parent
-                   WHERE parent.id = target.parent_target_id
-                     AND parent.kind IN ('channel', 'direct')
-                     AND parent.archived_at_ms IS NULL
-                 )
-               )
-             ORDER BY target.created_at_ms, target.id",
-            [actor_id],
-        )
-        .await?;
-    let mut targets = Vec::new();
-    while let Some(row) = rows.next().await? {
-        let id = row.get::<String>(0)?;
+impl<'connection> TargetStore<'connection> {
+    pub(crate) const fn new(connection: &'connection Connection) -> Self {
+        Self { connection }
+    }
+
+    pub(crate) async fn find(&self, target_id: &str) -> Result<Target> {
+        let mut rows = self
+            .connection
+            .query(
+                "SELECT id, kind, name, parent_target_id, root_message_id,
+                        created_by, created_at_ms
+                 FROM targets WHERE id = ?1 AND archived_at_ms IS NULL",
+                [target_id],
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Err(CollabError::NotFound {
+                entity: "active target",
+                id: target_id.to_owned(),
+            });
+        };
         let kind_text = row.get::<String>(1)?;
-        targets.push(Target {
-            kind: parse_target_kind(&id, &kind_text)?,
-            id,
+        Ok(Target {
+            id: row.get(0)?,
+            kind: parse_target_kind(target_id, &kind_text)?,
             name: row.get(2)?,
             parent_target_id: row.get(3)?,
             root_message_id: row.get(4)?,
             created_by: row.get(5)?,
             created_at_ms: row.get(6)?,
-        });
+        })
     }
-    Ok(targets)
+
+    pub(crate) async fn for_actor(&self, actor_id: &str) -> Result<Vec<Target>> {
+        let mut rows = self
+            .connection
+            .query(
+                "SELECT DISTINCT target.id, target.kind, target.name,
+                        target.parent_target_id, target.root_message_id,
+                        target.created_by, target.created_at_ms
+                 FROM v_target_access access
+                 JOIN targets target ON target.id = access.target_id
+                 WHERE access.actor_id = ?1
+                   AND (
+                     target.kind <> 'thread'
+                     OR EXISTS (
+                       SELECT 1 FROM targets parent
+                       WHERE parent.id = target.parent_target_id
+                         AND parent.kind IN ('channel', 'direct')
+                         AND parent.archived_at_ms IS NULL
+                     )
+                   )
+                 ORDER BY target.created_at_ms, target.id",
+                [actor_id],
+            )
+            .await?;
+        let mut targets = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let id = row.get::<String>(0)?;
+            let kind_text = row.get::<String>(1)?;
+            targets.push(Target {
+                kind: parse_target_kind(&id, &kind_text)?,
+                id,
+                name: row.get(2)?,
+                parent_target_id: row.get(3)?,
+                root_message_id: row.get(4)?,
+                created_by: row.get(5)?,
+                created_at_ms: row.get(6)?,
+            });
+        }
+        Ok(targets)
+    }
 }

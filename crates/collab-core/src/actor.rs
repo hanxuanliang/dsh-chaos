@@ -2,11 +2,9 @@
 
 use turso::{Connection, Row};
 
-use crate::changefeed::{all_actor_ids, insert_change};
+use crate::changefeed::ChangeStore;
 use crate::db::{FromRow, QueryRows};
 use crate::{ChangeKind, CollabError, Result, new_id};
-
-// ── 类型 ─────────────────────────────────────────────────────────────────────
 
 /// Stable actor identifier, non-blank by construction.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -54,8 +52,6 @@ pub struct Actor {
     pub created_at_ms: i64,
 }
 
-// ── 证据 ─────────────────────────────────────────────────────────────────────
-
 impl FromRow for Actor {
     fn from_row(row: &Row) -> Result<Self> {
         let id = row.get::<String>(0)?;
@@ -74,12 +70,8 @@ impl Actor {
     /// Load one Actor by id, failing when absent. Presence proof for
     /// authorization chains.
     pub(crate) async fn require(connection: &Connection, id: &ActorId) -> Result<Self> {
-        connection
-            .query_row::<Self>(
-                "SELECT id, kind, handle, display_name, created_at_ms
-                 FROM actors WHERE id = ?1",
-                [id.as_str()],
-            )
+        ActorStore::new(connection)
+            .find_by_id(id)
             .await?
             .ok_or_else(|| CollabError::NotFound {
                 entity: "actor",
@@ -92,13 +84,7 @@ impl Actor {
         connection: &Connection,
         handle: &str,
     ) -> Result<Option<Self>> {
-        connection
-            .query_row::<Self>(
-                "SELECT id, kind, handle, display_name, created_at_ms
-                 FROM actors WHERE handle = ?1",
-                [handle],
-            )
-            .await
+        ActorStore::new(connection).find_by_handle(handle).await
     }
 
     /// Load one Actor, failing unless it is an active Agent.
@@ -110,13 +96,7 @@ impl Actor {
                 id: id.as_str().to_owned(),
             });
         }
-        let mut rows = connection
-            .query(
-                "SELECT 1 FROM agents WHERE actor_id = ?1 AND lifecycle = 'active'",
-                [id.as_str()],
-            )
-            .await?;
-        if rows.next().await?.is_none() {
+        if !ActorStore::new(connection).has_active_agent_row(id).await? {
             return Err(CollabError::NotFound {
                 entity: "active agent",
                 id: id.as_str().to_owned(),
@@ -136,8 +116,6 @@ pub(crate) fn parse_actor_kind(actor_id: &str, value: &str) -> Result<ActorKind>
     }
 }
 
-// ── 能力 ─────────────────────────────────────────────────────────────────────
-
 /// Insert one Actor of `kind` and emit ActorCreated to every known actor.
 pub(crate) async fn insert_actor(
     connection: &Connection,
@@ -154,49 +132,77 @@ pub(crate) async fn insert_actor(
         display_name: display_name.to_owned(),
         created_at_ms: now,
     };
-    actor.insert(connection).await?;
-    let actor_ids = all_actor_ids(connection).await?;
-    insert_change(
-        connection,
-        ChangeKind::ActorCreated,
-        None,
-        &actor.id,
-        &actor_ids,
-        now,
-    )
-    .await?;
+    ActorStore::new(connection).insert(&actor).await?;
+    let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+    ChangeStore::new(connection)
+        .insert_change(ChangeKind::ActorCreated, None, &actor.id, &actor_ids, now)
+        .await?;
     Ok(actor)
 }
 
-// ── 存储 ─────────────────────────────────────────────────────────────────────
+/// Persistence for the actors table; the only owner of its SQL.
+pub(crate) struct ActorStore<'connection> {
+    connection: &'connection Connection,
+}
 
-impl Actor {
-    pub(crate) async fn insert(&self, connection: &Connection) -> Result<()> {
-        connection
+impl<'connection> ActorStore<'connection> {
+    pub(crate) const fn new(connection: &'connection Connection) -> Self {
+        Self { connection }
+    }
+
+    pub(crate) async fn find_by_id(&self, id: &ActorId) -> Result<Option<Actor>> {
+        self.connection
+            .query_row::<Actor>(
+                "SELECT id, kind, handle, display_name, created_at_ms
+                 FROM actors WHERE id = ?1",
+                [id.as_str()],
+            )
+            .await
+    }
+
+    pub(crate) async fn find_by_handle(&self, handle: &str) -> Result<Option<Actor>> {
+        self.connection
+            .query_row::<Actor>(
+                "SELECT id, kind, handle, display_name, created_at_ms
+                 FROM actors WHERE handle = ?1",
+                [handle],
+            )
+            .await
+    }
+
+    pub(crate) async fn has_active_agent_row(&self, id: &ActorId) -> Result<bool> {
+        let mut rows = self
+            .connection
+            .query(
+                "SELECT 1 FROM agents WHERE actor_id = ?1 AND lifecycle = 'active'",
+                [id.as_str()],
+            )
+            .await?;
+        Ok(rows.next().await?.is_some())
+    }
+
+    pub(crate) async fn insert(&self, actor: &Actor) -> Result<()> {
+        self.connection
             .execute(
                 "INSERT INTO actors (id, kind, handle, display_name, created_at_ms)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 (
-                    self.id.as_str(),
-                    self.kind.as_str(),
-                    self.handle.as_str(),
-                    self.display_name.as_str(),
-                    self.created_at_ms,
+                    actor.id.as_str(),
+                    actor.kind.as_str(),
+                    actor.handle.as_str(),
+                    actor.display_name.as_str(),
+                    actor.created_at_ms,
                 ),
             )
             .await?;
         Ok(())
     }
 
-    pub(crate) async fn rename(
-        connection: &Connection,
-        actor_id: &str,
-        display_name: &str,
-    ) -> Result<()> {
-        connection
+    pub(crate) async fn rename(&self, id: &ActorId, display_name: &str) -> Result<()> {
+        self.connection
             .execute(
                 "UPDATE actors SET display_name = ?2 WHERE id = ?1",
-                (actor_id, display_name),
+                (id.as_str(), display_name),
             )
             .await?;
         Ok(())

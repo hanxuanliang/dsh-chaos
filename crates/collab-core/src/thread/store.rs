@@ -4,7 +4,7 @@ use turso::{Connection, Row};
 
 use crate::actor::ActorId;
 use crate::db::{FromRow, QueryRows, placeholders};
-use crate::target::find_target;
+use crate::target::TargetStore;
 use crate::{Actor, CollabError, Result, Target};
 
 use super::model::{
@@ -187,7 +187,10 @@ impl<'connection> ThreadStore<'connection> {
         else {
             return Ok(None);
         };
-        find_target(self.connection, &target_id).await.map(Some)
+        TargetStore::new(self.connection)
+            .find(&target_id)
+            .await
+            .map(Some)
     }
 
     pub(crate) async fn ensure_following(

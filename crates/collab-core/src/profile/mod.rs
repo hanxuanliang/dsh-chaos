@@ -6,8 +6,8 @@ pub(crate) mod store;
 pub use model::{AgentCharter, AgentLifecycle, AgentProfile};
 
 use crate::actor::{ActorId, insert_actor};
-use crate::changefeed::{all_actor_ids, insert_change};
-use crate::membership::identity_context_for;
+use crate::changefeed::ChangeStore;
+use crate::membership::MembershipStore;
 use crate::{
     Actor, ActorKind, ChangeKind, CollabCore, CollabError, IdentityContext, Result, now_ms,
 };
@@ -108,20 +108,22 @@ impl CollabCore {
                 });
             }
             let next_version = current.version + 1;
-            Actor::rename(connection, agent_id, display_name).await?;
+            crate::actor::ActorStore::new(connection)
+                .rename(&ActorId::parse(agent_id)?, display_name)
+                .await?;
             store
                 .update_charter(agent_id, &charter_json, next_version, now)
                 .await?;
-            let actor_ids = all_actor_ids(connection).await?;
-            insert_change(
-                connection,
-                ChangeKind::AgentProfileChanged,
-                None,
-                agent_id,
-                &actor_ids,
-                now,
-            )
-            .await?;
+            let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+            ChangeStore::new(connection)
+                .insert_change(
+                    ChangeKind::AgentProfileChanged,
+                    None,
+                    agent_id,
+                    &actor_ids,
+                    now,
+                )
+                .await?;
             store.require_profile(agent_id).await
         })
         .await
@@ -144,16 +146,10 @@ impl CollabCore {
                 .delete_operational_state(actor_id)
                 .await?;
             // The actor set changed; reuse actor_created so clients re-pull actors.
-            let actor_ids = all_actor_ids(connection).await?;
-            insert_change(
-                connection,
-                ChangeKind::ActorCreated,
-                None,
-                &actor.id,
-                &actor_ids,
-                now,
-            )
-            .await?;
+            let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+            ChangeStore::new(connection)
+                .insert_change(ChangeKind::ActorCreated, None, &actor.id, &actor_ids, now)
+                .await?;
             Ok(())
         })
         .await
@@ -178,17 +174,13 @@ impl CollabCore {
                     }
                     // Explicit display-name migration on the stable handle: the
                     // actor id, Memberships and Tasks are untouched.
-                    Actor::rename(connection, &actor.id, display_name).await?;
-                    let actor_ids = all_actor_ids(connection).await?;
-                    insert_change(
-                        connection,
-                        ChangeKind::ActorCreated,
-                        None,
-                        &actor.id,
-                        &actor_ids,
-                        now,
-                    )
-                    .await?;
+                    crate::actor::ActorStore::new(connection)
+                        .rename(&ActorId::parse(&actor.id)?, display_name)
+                        .await?;
+                    let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+                    ChangeStore::new(connection)
+                        .insert_change(ChangeKind::ActorCreated, None, &actor.id, &actor_ids, now)
+                        .await?;
                     return Ok(Actor {
                         display_name: display_name.to_owned(),
                         ..actor
@@ -231,7 +223,11 @@ impl CollabCore {
         target_id: Option<&str>,
     ) -> Result<IdentityContext> {
         require_non_blank!(agent_id);
-        self.read(async |connection| identity_context_for(connection, agent_id, target_id).await)
-            .await
+        self.read(async |connection| {
+            MembershipStore::new(connection)
+                .identity_context_for(agent_id, target_id)
+                .await
+        })
+        .await
     }
 }

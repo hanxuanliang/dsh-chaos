@@ -7,7 +7,7 @@ pub use model::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub(crate) use model::{NewMessage, Recipient, StoredTextBody, stored_text};
 
 use crate::actor::ActorId;
-use crate::changefeed::insert_target_change;
+use crate::changefeed::ChangeStore;
 use crate::target::require_target_access;
 use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
@@ -107,15 +107,15 @@ impl CollabCore {
             let (recipient_ids, wake_agent_ids) = delivery
                 .record_deliveries(&draft, message_seq, &recipients)
                 .await?;
-            insert_target_change(
-                connection,
-                ChangeKind::MessageCreated,
-                &request.target_id,
-                &draft.id,
-                &[request.author_id.as_str()],
-                now,
-            )
-            .await?;
+            ChangeStore::new(connection)
+                .insert_target_change(
+                    ChangeKind::MessageCreated,
+                    &request.target_id,
+                    &draft.id,
+                    &[request.author_id.as_str()],
+                    now,
+                )
+                .await?;
 
             Ok(SendMessageResult {
                 message: Message {
