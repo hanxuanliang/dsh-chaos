@@ -44,3 +44,18 @@ pub(crate) fn placeholders(count: usize) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
+
+/// Fail unless exactly one row was written, naming the operation.
+pub(crate) fn assert_one_row(changed: u64, operation: &str) -> crate::Result<()> {
+    if changed != 1 {
+        return Err(crate::CollabError::Database(format!(
+            "{operation} did not update one row"
+        )));
+    }
+    Ok(())
+}
+
+/// Fail unless a scalar aggregate query produced a row.
+pub(crate) fn require_scalar_row<T>(row: Option<T>, operation: &str) -> crate::Result<T> {
+    row.ok_or_else(|| crate::CollabError::Database(format!("{operation} returned no row")))
+}

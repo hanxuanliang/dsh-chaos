@@ -7,12 +7,11 @@ pub use model::{Task, TaskStatus};
 
 use crate::actor::ActorId;
 use crate::changefeed::insert_target_change;
-use crate::membership::Membership;
 use crate::message::store::MessageStore;
-use crate::target::require_target_access;
+use crate::target::AccessGrant;
 use crate::{Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, now_ms};
 
-use model::{NewTask, TaskEvent, TaskEventKind, task_transition_allowed};
+use model::{LoadedTask, NewTask, TaskDecision, TaskEvent, TaskEventKind};
 use store::TaskStore;
 
 impl CollabCore {
@@ -21,16 +20,15 @@ impl CollabCore {
     pub async fn create_task(&self, message_id: &str, actor_id: &str) -> Result<Task> {
         let now = now_ms()?;
         self.write(async |connection| {
-            Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            let store = TaskStore::new(connection);
             let target_id = MessageStore::new(connection).target_of(message_id).await?;
-            let route = require_target_access(connection, &target_id, actor_id).await?;
-            if route.kind == TargetKind::Thread {
+            let grant = AccessGrant::require(connection, &target_id, actor_id).await?;
+            if grant.route.kind == TargetKind::Thread {
                 return Err(CollabError::InvalidArgument(
                     "Thread replies cannot become Tasks".into(),
                 ));
             }
 
+            let store = TaskStore::new(connection);
             if let Some(task) = store.find_by_message(message_id).await? {
                 return Ok(task);
             }
@@ -88,71 +86,16 @@ impl CollabCore {
     pub async fn claim_task(&self, message_id: &str, actor_id: &str) -> Result<Task> {
         let now = now_ms()?;
         self.write(async |connection| {
-            Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            let store = TaskStore::new(connection);
-            let current =
-                store
-                    .find_by_message(message_id)
-                    .await?
-                    .ok_or_else(|| CollabError::NotFound {
-                        entity: "task",
-                        id: message_id.to_owned(),
-                    })?;
-            require_target_access(connection, &current.target_id, actor_id).await?;
-            if current.status == TaskStatus::Done {
-                return Err(CollabError::TaskTransitionDenied {
-                    message_id: message_id.to_owned(),
-                    status: current.status.as_str().to_owned(),
-                });
-            }
-            if let Some(assignee_id) = &current.assignee_id {
-                if assignee_id == actor_id {
-                    return Ok(current);
+            let loaded = load_task(connection, message_id, actor_id).await?;
+            let task = loaded.task.clone();
+            let task = match loaded.claim(now)? {
+                TaskDecision::Idempotent => task,
+                TaskDecision::Transition(transition) => {
+                    apply_task_transition(connection, &transition, now).await?;
+                    transition.task_after
                 }
-                return Err(CollabError::TaskAlreadyClaimed {
-                    message_id: message_id.to_owned(),
-                    assignee_id: assignee_id.clone(),
-                });
-            }
-
-            let next_version = current.version + 1;
-            store
-                .claim(message_id, actor_id, next_version, current.version, now)
-                .await?;
-            store
-                .record_event(&TaskEvent {
-                    message_id,
-                    actor_id,
-                    kind: TaskEventKind::Claimed,
-                    from_status: Some(current.status),
-                    to_status: Some(TaskStatus::InProgress),
-                    from_assignee_id: None,
-                    to_assignee_id: Some(actor_id),
-                    task_version: next_version,
-                    created_at_ms: now,
-                })
-                .await?;
-            insert_target_change(
-                connection,
-                ChangeKind::TaskUpdated,
-                &current.target_id,
-                message_id,
-                &[],
-                now,
-            )
-            .await?;
-
-            Ok(Task {
-                message_id: message_id.to_owned(),
-                target_id: current.target_id,
-                number: current.number,
-                status: TaskStatus::InProgress,
-                assignee_id: Some(actor_id.to_owned()),
-                version: next_version,
-                created_at_ms: current.created_at_ms,
-                updated_at_ms: now,
-                anchor_text: current.anchor_text,
-            })
+            };
+            Ok(task)
         })
         .await
     }
@@ -172,74 +115,16 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            let store = TaskStore::new(connection);
-            let current =
-                store
-                    .find_by_message(message_id)
-                    .await?
-                    .ok_or_else(|| CollabError::NotFound {
-                        entity: "task",
-                        id: message_id.to_owned(),
-                    })?;
-            require_target_access(connection, &current.target_id, actor_id).await?;
-            if current.version != expected_version {
-                return Err(CollabError::TaskVersionConflict {
-                    message_id: message_id.to_owned(),
-                    expected: expected_version,
-                    actual: current.version,
-                });
-            }
-            let Some(assignee_id) = current.assignee_id.as_deref() else {
-                return Ok(current);
+            let loaded = load_task(connection, message_id, actor_id).await?;
+            let task = loaded.task.clone();
+            let task = match loaded.unclaim(expected_version, now)? {
+                TaskDecision::Idempotent => task,
+                TaskDecision::Transition(transition) => {
+                    apply_task_transition(connection, &transition, now).await?;
+                    transition.task_after
+                }
             };
-            if assignee_id != actor_id {
-                return Err(CollabError::PermissionDenied {
-                    actor_id: actor_id.to_owned(),
-                    action: "unclaim another actor's task in",
-                    target_id: current.target_id,
-                });
-            }
-            if current.status == TaskStatus::Done {
-                return Err(CollabError::TaskTransitionDenied {
-                    message_id: message_id.to_owned(),
-                    status: current.status.as_str().to_owned(),
-                });
-            }
-
-            let next_version = current.version + 1;
-            store
-                .unclaim(message_id, actor_id, next_version, current.version, now)
-                .await?;
-            store
-                .record_event(&TaskEvent {
-                    message_id,
-                    actor_id,
-                    kind: TaskEventKind::Unclaimed,
-                    from_status: Some(current.status),
-                    to_status: Some(current.status),
-                    from_assignee_id: Some(actor_id),
-                    to_assignee_id: None,
-                    task_version: next_version,
-                    created_at_ms: now,
-                })
-                .await?;
-            insert_target_change(
-                connection,
-                ChangeKind::TaskUpdated,
-                &current.target_id,
-                message_id,
-                &[],
-                now,
-            )
-            .await?;
-
-            Ok(Task {
-                assignee_id: None,
-                version: next_version,
-                updated_at_ms: now,
-                ..current
-            })
+            Ok(task)
         })
         .await
     }
@@ -260,97 +145,27 @@ impl CollabCore {
         }
         let now = now_ms()?;
         self.write(async |connection| {
-            Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            let store = TaskStore::new(connection);
-            let current =
-                store
-                    .find_by_message(message_id)
-                    .await?
-                    .ok_or_else(|| CollabError::NotFound {
-                        entity: "task",
-                        id: message_id.to_owned(),
-                    })?;
-            require_target_access(connection, &current.target_id, actor_id).await?;
-            if current.version != expected_version {
-                return Err(CollabError::TaskVersionConflict {
-                    message_id: message_id.to_owned(),
-                    expected: expected_version,
-                    actual: current.version,
-                });
-            }
-            if current
-                .assignee_id
-                .as_deref()
-                .is_some_and(|assignee_id| assignee_id != actor_id)
-            {
-                let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-                if !Membership::require(connection, &current.target_id, &actor)
-                    .await?
-                    .is_owner()
-                {
-                    return Err(CollabError::PermissionDenied {
-                        actor_id: actor_id.to_owned(),
-                        action: "update another actor's task in",
-                        target_id: current.target_id,
-                    });
+            let loaded = load_task(connection, message_id, actor_id).await?;
+            let task = loaded.task.clone();
+            let task = match loaded.change_status(status, expected_version, now)? {
+                TaskDecision::Idempotent => task,
+                TaskDecision::Transition(transition) => {
+                    apply_task_transition(connection, &transition, now).await?;
+                    transition.task_after
                 }
-            }
-            if current.status == status {
-                return Ok(current);
-            }
-            if !task_transition_allowed(current.status, status) {
-                return Err(CollabError::TaskTransitionDenied {
-                    message_id: message_id.to_owned(),
-                    status: current.status.as_str().to_owned(),
-                });
-            }
-
-            let next_version = current.version + 1;
-            store
-                .apply_status(message_id, status, next_version, current.version, now)
-                .await?;
-            store
-                .record_event(&TaskEvent {
-                    message_id,
-                    actor_id,
-                    kind: TaskEventKind::StatusChanged,
-                    from_status: Some(current.status),
-                    to_status: Some(status),
-                    from_assignee_id: current.assignee_id.as_deref(),
-                    to_assignee_id: current.assignee_id.as_deref(),
-                    task_version: next_version,
-                    created_at_ms: now,
-                })
-                .await?;
-            insert_target_change(
-                connection,
-                ChangeKind::TaskUpdated,
-                &current.target_id,
-                message_id,
-                &[],
-                now,
-            )
-            .await?;
-
-            Ok(Task {
-                status,
-                version: next_version,
-                updated_at_ms: now,
-                ..current
-            })
+            };
+            Ok(task)
         })
         .await
     }
-}
 
-impl CollabCore {
     /// List Task metadata visible to one actor, optionally narrowed to an
     /// exact target.
     pub async fn list_tasks(&self, actor_id: &str, target_id: Option<&str>) -> Result<Vec<Task>> {
         self.read(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             if let Some(target_id) = target_id {
-                require_target_access(connection, target_id, actor_id).await?;
+                AccessGrant::require(connection, target_id, actor_id).await?;
             }
             TaskStore::new(connection)
                 .tasks_for_actor(actor_id, target_id)
@@ -358,4 +173,42 @@ impl CollabCore {
         })
         .await
     }
+}
+
+/// Assemble one Task's evidence: the loaded row plus the acting actor's
+/// proven access.
+async fn load_task(
+    connection: &turso::Connection,
+    message_id: &str,
+    actor_id: &str,
+) -> Result<LoadedTask> {
+    let task = TaskStore::new(connection)
+        .find_by_message(message_id)
+        .await?
+        .ok_or_else(|| LoadedTask::not_found(message_id))?;
+    let grant = AccessGrant::require(connection, &task.target_id, actor_id).await?;
+    Ok(LoadedTask { task, grant })
+}
+
+/// Persist one committed decision: the fenced row update, its audit event,
+/// and the change notification, all in the caller's transaction.
+async fn apply_task_transition(
+    connection: &turso::Connection,
+    transition: &model::TaskTransition,
+    now: i64,
+) -> Result<()> {
+    let store = TaskStore::new(connection);
+    store.apply(transition, now).await?;
+    if transition.publish {
+        insert_target_change(
+            connection,
+            ChangeKind::TaskUpdated,
+            &transition.target_id,
+            &transition.message_id,
+            &[],
+            now,
+        )
+        .await?;
+    }
+    Ok(())
 }

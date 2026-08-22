@@ -5,7 +5,7 @@ use turso::Connection;
 
 use crate::actor::{Actor, ActorId};
 use crate::changefeed::insert_target_change;
-use crate::membership::Membership;
+use crate::membership::{Membership, MembershipRole};
 use crate::{ChangeKind, CollabCore, CollabError, Result, new_id, now_ms};
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
@@ -141,6 +141,36 @@ pub(crate) async fn require_target_access(
     let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
     Membership::require(connection, route.permission_target_id(target_id), &actor).await?;
     Ok(route)
+}
+
+/// One access's complete evidence: the loaded actor plus its proven route and
+/// role. Obtained exclusively through [`AccessGrant::require`].
+#[derive(Clone, Debug)]
+pub(crate) struct AccessGrant {
+    pub actor: Actor,
+    pub route: TargetRoute,
+    pub role: MembershipRole,
+}
+
+impl AccessGrant {
+    /// Certify that `actor_id` exists and is an active member of
+    /// `target_id`'s permission target, carrying every fact downstream
+    /// decisions need (identity, topology, role) in one value.
+    pub(crate) async fn require(
+        connection: &Connection,
+        target_id: &str,
+        actor_id: &str,
+    ) -> Result<Self> {
+        let route = TargetRoute::require(connection, target_id).await?;
+        let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
+        let membership =
+            Membership::require(connection, route.permission_target_id(target_id), &actor).await?;
+        Ok(Self {
+            actor,
+            route,
+            role: membership.role(),
+        })
+    }
 }
 
 // ── 能力 ─────────────────────────────────────────────────────────────────────

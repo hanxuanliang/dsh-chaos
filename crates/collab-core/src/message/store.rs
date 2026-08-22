@@ -1,6 +1,6 @@
 use turso::{Connection, Row};
 
-use crate::db::{FromRow, QueryRows};
+use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::{ActorKind, CollabError, Message, Result};
 
 use super::model::{NewMessage, StoredTextBody, stored_text};
@@ -164,14 +164,14 @@ impl<'connection> MessageStore<'connection> {
     }
 
     pub(crate) async fn count_in_target(&self, target_id: &str) -> Result<i64> {
-        self.connection
+        let row = self
+            .connection
             .query_row::<CountRow>(
                 "SELECT COUNT(*) FROM messages WHERE target_id = ?1",
                 [target_id],
             )
-            .await?
-            .map(|row| row.0)
-            .ok_or_else(|| CollabError::Database("count returned no row".into()))
+            .await?;
+        Ok(require_scalar_row(row, "message count")?.0)
     }
 
     /// Read the true latest `limit` messages, ascending.
