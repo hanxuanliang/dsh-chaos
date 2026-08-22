@@ -48,5 +48,4 @@ use message::*;
 use profile::*;
 use runtime::*;
 use target::*;
-use task::*;
 use thread::query::followed_thread_ids_for_actor;

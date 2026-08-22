@@ -1,6 +1,7 @@
 //! Durable, recipient-filtered change notifications for client synchronization.
 
 use super::*;
+use crate::task::store::TaskStore;
 
 impl CollabCore {
     /// Return one authorization-filtered bootstrap projection and the global
@@ -12,7 +13,9 @@ impl CollabCore {
         let cursor = latest_change_seq(&connection).await?;
         let targets = targets_for_actor(&connection, actor_id).await?;
         let followed_thread_ids = followed_thread_ids_for_actor(&connection, actor_id).await?;
-        let tasks = tasks_for_actor(&connection, actor_id, None).await?;
+        let tasks = TaskStore::new(&connection)
+            .tasks_for_actor(actor_id, None)
+            .await?;
         Ok(CollabSnapshot {
             actor,
             cursor,
