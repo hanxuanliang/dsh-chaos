@@ -2,7 +2,13 @@ use crate::test_support::*;
 
 #[tokio::test]
 async fn agent_membership_directory_is_top_level_and_viewer_filtered() -> Result<()> {
-    let (core, owner, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user: owner,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let direct = core.create_direct(&owner.id, &alpha.id).await?;
     let root = core
         .send_message(SendMessageRequest {
@@ -38,7 +44,14 @@ async fn agent_membership_directory_is_top_level_and_viewer_filtered() -> Result
 
 #[tokio::test]
 async fn identity_context_returns_role_bearing_inherited_roster() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let channel_context = core.identity_context(&alpha.id, Some(&channel.id)).await?;
     assert_eq!(channel_context.agent.actor.handle, "alpha");
     assert_eq!(channel_context.target.as_ref(), Some(&channel));
@@ -84,7 +97,14 @@ async fn identity_context_returns_role_bearing_inherited_roster() -> Result<()> 
 
 #[tokio::test]
 async fn list_target_members_returns_only_active_channel_members() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let outsider = core.create_user("outsider", "Outsider").await?;
 
     // The projection is the Channel membership, not the actor directory:

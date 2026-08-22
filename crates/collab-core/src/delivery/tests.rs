@@ -2,7 +2,13 @@ use crate::test_support::*;
 
 #[tokio::test]
 async fn runtime_generation_fences_model_seen_receipts() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let first_binding = core
         .bind_runtime(&alpha.id, "session-1", "openai", "codex", "default")
         .await?;
@@ -64,7 +70,13 @@ async fn runtime_generation_fences_model_seen_receipts() -> Result<()> {
 
 #[tokio::test]
 async fn wake_watermark_is_level_triggered_and_generation_fenced() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let first = core
         .bind_runtime(&alpha.id, "wake-session-1", "openai", "codex", "default")
         .await?;

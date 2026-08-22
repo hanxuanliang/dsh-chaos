@@ -4,7 +4,14 @@ use crate::{CollabCore, CollabError, Result, SendMessageRequest};
 
 #[tokio::test]
 async fn send_commits_message_deliveries_and_wakes_together() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let result = core
         .send_message(SendMessageRequest {
             target_id: channel.id,
@@ -33,7 +40,12 @@ async fn send_commits_message_deliveries_and_wakes_together() -> Result<()> {
 
 #[tokio::test]
 async fn send_rolls_back_message_when_recipient_phase_fails() -> Result<()> {
-    let (core, user, _alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        channel,
+        ..
+    } = World::create().await?;
     let failure = core
         .send_message_inner(
             SendMessageRequest {
@@ -56,7 +68,12 @@ async fn send_rolls_back_message_when_recipient_phase_fails() -> Result<()> {
 
 #[tokio::test]
 async fn repeated_send_request_is_idempotent() -> Result<()> {
-    let (core, user, _alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        channel,
+        ..
+    } = World::create().await?;
     let request = SendMessageRequest {
         target_id: channel.id,
         author_id: user.id,
@@ -76,7 +93,13 @@ async fn repeated_send_request_is_idempotent() -> Result<()> {
 
 #[tokio::test]
 async fn exact_target_reads_recheck_current_membership() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let outsider = core.create_user("outsider", "Outsider").await?;
     let sent = core
         .send_message(SendMessageRequest {
@@ -114,7 +137,13 @@ async fn exact_target_reads_recheck_current_membership() -> Result<()> {
 
 #[tokio::test]
 async fn read_messages_tail_returns_exact_count_and_true_tail() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let outsider = core.create_user("tail-outsider", "Tail Outsider").await?;
     let mut sent = Vec::new();
     for index in 0..5 {

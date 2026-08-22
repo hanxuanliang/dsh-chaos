@@ -3,7 +3,13 @@ use crate::{ChangeKind, CollabError, Result, SendMessageRequest, TargetKind};
 
 #[tokio::test]
 async fn follow_and_unfollow_are_idempotent_notifications() -> Result<()> {
-    let (core, owner, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user: owner,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let root = core
         .send_message(SendMessageRequest {
             target_id: channel.id,
@@ -42,7 +48,14 @@ async fn follow_and_unfollow_are_idempotent_notifications() -> Result<()> {
 
 #[tokio::test]
 async fn summaries_order_distinct_repliers_by_their_latest_message() -> Result<()> {
-    let (core, owner, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user: owner,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let root = core
         .send_message(SendMessageRequest {
             target_id: channel.id,
@@ -81,7 +94,14 @@ async fn summaries_order_distinct_repliers_by_their_latest_message() -> Result<(
 
 #[tokio::test]
 async fn thread_inherits_parent_access_and_delivers_only_to_followers() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let outsider = core.create_user("thread-outsider", "Outsider").await?;
     let root = core
         .send_message(SendMessageRequest {

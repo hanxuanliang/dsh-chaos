@@ -3,7 +3,13 @@ use crate::{ChangeKind, CollabError, Result, SendMessageRequest, TaskStatus};
 
 #[tokio::test]
 async fn task_reads_carry_authoritative_anchor_text() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     let anchor = core
         .send_message(SendMessageRequest {
             target_id: channel.id.clone(),
@@ -48,7 +54,14 @@ async fn task_reads_carry_authoritative_anchor_text() -> Result<()> {
 
 #[tokio::test]
 async fn task_lifecycle_uses_version_fencing_and_emits_changes() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let before = core.snapshot(&user.id).await?.cursor;
     let sent = core
         .send_message(SendMessageRequest {
@@ -159,7 +172,14 @@ async fn task_lifecycle_uses_version_fencing_and_emits_changes() -> Result<()> {
 
 #[tokio::test]
 async fn only_one_concurrent_task_claim_wins() -> Result<()> {
-    let (core, user, alpha, beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
     let sent = core
         .send_message(SendMessageRequest {
             target_id: channel.id,

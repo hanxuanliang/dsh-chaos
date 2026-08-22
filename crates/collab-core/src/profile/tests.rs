@@ -3,6 +3,37 @@ use crate::{
     AgentCharter, AgentLifecycle, ChangeKind, CollabCore, CollabError, Result, SendMessageRequest,
 };
 
+use turso::Connection;
+
+async fn count_where(
+    connection: &Connection,
+    table: &str,
+    column: &str,
+    value: &str,
+) -> Result<i64> {
+    let allowed = [
+        ("memberships", "actor_id"),
+        ("runtime_bindings", "agent_id"),
+        ("agents", "actor_id"),
+        ("agent_wake_state", "agent_id"),
+        ("inbox_batches", "agent_id"),
+        ("actors", "id"),
+        ("messages", "author_id"),
+    ];
+    assert!(allowed.contains(&(table, column)));
+    let mut rows = connection
+        .query(
+            format!("SELECT COUNT(*) FROM {table} WHERE {column} = ?1"),
+            [value],
+        )
+        .await?;
+    let row = rows
+        .next()
+        .await?
+        .ok_or_else(|| CollabError::Database("count returned no row".into()))?;
+    Ok(row.get(0)?)
+}
+
 #[tokio::test]
 async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
     let core = CollabCore::open_memory().await?;
@@ -67,7 +98,13 @@ async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
 
 #[tokio::test]
 async fn agent_profile_directory_is_complete_and_handle_ordered() -> Result<()> {
-    let (core, user, alpha, beta, _channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        beta,
+        ..
+    } = World::create().await?;
     let profiles = core.list_agent_profiles(&user.id).await?;
     assert_eq!(
         profiles
@@ -85,7 +122,13 @@ async fn agent_profile_directory_is_complete_and_handle_ordered() -> Result<()> 
 
 #[tokio::test]
 async fn delete_agent_removes_operational_state_but_keeps_history() -> Result<()> {
-    let (core, user, alpha, _beta, channel) = fixture().await?;
+    let World {
+        core,
+        user,
+        alpha,
+        channel,
+        ..
+    } = World::create().await?;
     core.create_direct(&user.id, &alpha.id).await?;
     let binding = core
         .bind_runtime(&alpha.id, "session-delete", "openai", "codex", "default")
@@ -165,7 +208,7 @@ async fn delete_agent_removes_operational_state_but_keeps_history() -> Result<()
 
 #[tokio::test]
 async fn delete_agent_rejects_users_and_missing_actors() -> Result<()> {
-    let (core, user, _alpha, _beta, _channel) = fixture().await?;
+    let World { core, user, .. } = World::create().await?;
     assert!(matches!(
         core.delete_agent(&user.id).await,
         Err(CollabError::NotFound {
