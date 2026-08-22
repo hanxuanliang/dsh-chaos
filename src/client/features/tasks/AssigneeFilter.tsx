@@ -2,7 +2,7 @@ import { useState, type JSX } from 'react'
 import { IconChevronDownOutline14, IconUserOutline16, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor } from '../../../native.ts'
 import type { ChaosTranslate } from '../../locales.ts'
-import css from '../../blocks/TaskBoard.module.css'
+import css from './TaskBoard.module.css'
 
 export function AssigneeFilter({ t, members, value, onChange }: {
   t: ChaosTranslate

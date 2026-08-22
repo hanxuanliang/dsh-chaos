@@ -233,25 +233,21 @@ feature, store, RPC client, or domain model.
 
 ## 6. Target client organization
 
-### 6.1 Current problems
+### 6.1 Organization status
 
-The current `src/client` tree is organized partly by visual size and partly by
-feature. This makes ownership unclear:
+The client is organized by ownership rather than visual size:
 
-- Agent files are split between the root and `blocks/`.
-- Message and Task concepts are split between `atoms/`, `blocks/`, and root.
-- `api.ts`, event wiring, store state, host mounting, and product views share one
-  directory.
-- `ChannelTasksBoard.tsx`, `MessageStream.tsx`, and `ChannelComposer.tsx` each
-  carry several independent responsibilities.
-- Buttons, fields, empty states, and icon actions repeat local CSS contracts.
-- The broad `.panel button` reset leaks parent specificity into child
-  components. The former Mark all read mismatch is a concrete example.
-- Fixed pane widths are encoded inside individual feature styles instead of a
-  shared layout primitive.
+- `entry/` owns host registration, mounting, navigation, and workspace
+  composition.
+- `data/` owns the typed RPC client, change feed, and client-side store.
+- `features/` owns Activity, Agents, Channels, Messages, Threads, and Tasks.
+- `shared/ui` and `shared/layout` contain domain-free visual and layout
+  contracts.
 
-The goal is not smaller files for their own sake. The goal is one obvious owner
-for each domain behavior and one reusable implementation for each visual rule.
+The former root-level product components and the `atoms/` / `blocks/`
+directories have been removed. Larger feature components may still be split
+when doing so creates a meaningful behavior boundary; file length alone is not
+a reason to introduce another layer.
 
 ### 6.2 Target tree
 
@@ -302,31 +298,29 @@ Rules:
 - `shared/layout` owns sizing, scrolling, resizing, and responsive transitions.
 - CSS Modules stay next to their component.
 - No new feature files are added directly under `src/client/`.
-- Remove `atoms/` and `blocks/` after their contents have moved. Those names
-  describe visual size, not ownership, and currently scatter one feature across
-  several directories.
+- Do not reintroduce `atoms/` or `blocks/`. Those names describe visual size,
+  not ownership, and scatter one feature across several directories.
 
-## 7. Migration order
+## 7. Migration history
 
-This is an incremental refactor. Do not move the whole client tree in one
-commit.
+The frontend foundation was adopted incrementally in the following order:
 
-1. **Foundation:** add shared sizing/state styles, `IconButton`, `Field`,
-   `Tabs`, `SegmentedControl`, `PanelHeader`, and `SplitPane`. Remove the broad
-   button reset and add focused behavior tests.
-2. **Activity:** move Activity files into one feature, adopt the resizable
-   list/detail layout, and preserve the current RPC/state contract.
-3. **Agents:** move Agent files into one feature, use the settings section/row
-   pattern, and expose the effective `Full access` Session state.
-4. **Tasks:** split the current large board component into filter, board/list,
+1. **Foundation:** added shared sizing/state styles, `IconButton`, `Field`,
+   `Tabs`, `SegmentedControl`, `PanelHeader`, and `SplitPane`; removed the broad
+   button reset and added focused behavior tests.
+2. **Activity:** moved Activity files into one feature and adopted the resizable
+   list/detail layout while preserving the current RPC/state contract.
+3. **Agents:** moved Agent files into one feature, used the settings section/row
+   pattern, and exposed the effective `Full access` Session state.
+4. **Tasks:** split the board into filter, board/list,
    lane, item, and detail components.
-5. **Channels, Messages, Threads:** move by vertical, then delete the old
+5. **Channels, Messages, Threads:** moved by vertical and deleted the old
    `atoms/` and `blocks/` directories.
-6. **Cleanup:** reduce `CollabPanel` to composition and host integration; remove
+6. **Cleanup:** reduced `CollabPanel` to composition and host integration and removed
    duplicated button, field, empty, loading, and focus rules.
 
-Each step must preserve public RPCs and behavior, land as a reviewable commit,
-and pass the official-host visual matrix before the next step starts.
+Future structural changes follow the same rule: preserve public RPCs and
+behavior, land as reviewable commits, and pass the official-host visual matrix.
 
 ## 8. Acceptance matrix
 

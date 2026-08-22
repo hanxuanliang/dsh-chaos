@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTask } from '../../../native.ts'
-import { StatusChip } from '../../atoms/StatusChip.tsx'
-import css from '../../blocks/TaskBoard.module.css'
+import { TaskStatusButton } from './TaskStatusButton.tsx'
+import css from './TaskBoard.module.css'
 import type { ChaosTranslate } from '../../locales.ts'
 import { TASK_LANES, TASK_LANE_LABEL_KEY, TASK_TRANSITIONS, type TaskStatus } from './task-model.ts'
 
@@ -33,7 +33,7 @@ export function TaskStatusDropdown({ task, t, onMove }: {
   const reachable = TASK_TRANSITIONS[task.status]
   return (
     <span ref={rootRef} className={css.statusDropdown}>
-      <StatusChip status={task.status} label={t(TASK_LANE_LABEL_KEY[task.status])} title={t('tasks.statusChange')} onClick={() => { setOpen(current => !current) }} />
+      <TaskStatusButton status={task.status} label={t(TASK_LANE_LABEL_KEY[task.status])} title={t('tasks.statusChange')} onClick={() => { setOpen(current => !current) }} />
       {open && (
         <span role="menu" className={css.statusMenu}>
           {TASK_LANES.map(status => {
