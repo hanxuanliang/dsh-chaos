@@ -3,8 +3,7 @@ use crate::ids::ActorId;
 use crate::message::store::MessageStore;
 use crate::target::{is_owner, require_target_access};
 use crate::{
-    Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, Task, TaskStatus, not_found,
-    now_ms,
+    Actor, ChangeKind, CollabCore, CollabError, Result, TargetKind, Task, TaskStatus, now_ms,
 };
 
 use super::model::{NewTask, TaskEvent, TaskEventKind, task_transition_allowed};
@@ -85,10 +84,14 @@ impl CollabCore {
         self.write(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             let store = TaskStore::new(connection);
-            let current = store
-                .find_by_message(message_id)
-                .await?
-                .ok_or_else(|| not_found("task", message_id))?;
+            let current =
+                store
+                    .find_by_message(message_id)
+                    .await?
+                    .ok_or_else(|| CollabError::NotFound {
+                        entity: "task",
+                        id: message_id.to_owned(),
+                    })?;
             require_target_access(connection, &current.target_id, actor_id).await?;
             if current.status == TaskStatus::Done {
                 return Err(CollabError::TaskTransitionDenied {
@@ -165,10 +168,14 @@ impl CollabCore {
         self.write(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             let store = TaskStore::new(connection);
-            let current = store
-                .find_by_message(message_id)
-                .await?
-                .ok_or_else(|| not_found("task", message_id))?;
+            let current =
+                store
+                    .find_by_message(message_id)
+                    .await?
+                    .ok_or_else(|| CollabError::NotFound {
+                        entity: "task",
+                        id: message_id.to_owned(),
+                    })?;
             require_target_access(connection, &current.target_id, actor_id).await?;
             if current.version != expected_version {
                 return Err(CollabError::TaskVersionConflict {
@@ -249,10 +256,14 @@ impl CollabCore {
         self.write(async |connection| {
             Actor::require(connection, &ActorId::parse(actor_id)?).await?;
             let store = TaskStore::new(connection);
-            let current = store
-                .find_by_message(message_id)
-                .await?
-                .ok_or_else(|| not_found("task", message_id))?;
+            let current =
+                store
+                    .find_by_message(message_id)
+                    .await?
+                    .ok_or_else(|| CollabError::NotFound {
+                        entity: "task",
+                        id: message_id.to_owned(),
+                    })?;
             require_target_access(connection, &current.target_id, actor_id).await?;
             if current.version != expected_version {
                 return Err(CollabError::TaskVersionConflict {

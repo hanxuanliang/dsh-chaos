@@ -20,7 +20,7 @@ impl CollabCore {
             ("model", model),
             ("preset", preset),
         ] {
-            require_non_empty(name, value)?;
+            CollabError::require_non_blank(name, value)?;
         }
 
         let now = now_ms()?;
@@ -63,7 +63,7 @@ impl CollabCore {
     /// Return the current runtime binding for one stable Agent.
     pub async fn runtime_binding(&self, agent_id: &str) -> Result<Option<RuntimeBinding>> {
         self.assert_open()?;
-        require_non_empty("agent_id", agent_id)?;
+        CollabError::require_non_blank("agent_id", agent_id)?;
         let connection = self.connection.lock().await;
         find_runtime_binding(&connection, "agent_id", agent_id).await
     }
@@ -81,9 +81,9 @@ impl CollabCore {
         preset: &str,
     ) -> Result<RuntimeBinding> {
         self.assert_open()?;
-        require_non_empty("agent_id", agent_id)?;
-        require_non_empty("session_id", session_id)?;
-        require_non_empty("preset", preset)?;
+        CollabError::require_non_blank("agent_id", agent_id)?;
+        CollabError::require_non_blank("session_id", session_id)?;
+        CollabError::require_non_blank("preset", preset)?;
         let mut connection = self.connection.lock().await;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -136,7 +136,7 @@ impl CollabCore {
         session_id: &str,
     ) -> Result<Option<RuntimeBinding>> {
         self.assert_open()?;
-        require_non_empty("session_id", session_id)?;
+        CollabError::require_non_blank("session_id", session_id)?;
         let connection = self.connection.lock().await;
         find_runtime_binding(&connection, "session_id", session_id).await
     }
@@ -229,7 +229,10 @@ pub(crate) async fn require_current_binding(
         )
         .await?;
     let Some(row) = rows.next().await? else {
-        return Err(not_found("runtime binding", agent_id));
+        return Err(CollabError::NotFound {
+            entity: "runtime binding",
+            id: agent_id.to_owned(),
+        });
     };
     let current_session = row.get::<String>(0)?;
     let current_generation = row.get::<i64>(1)?;

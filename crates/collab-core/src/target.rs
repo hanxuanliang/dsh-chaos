@@ -7,8 +7,8 @@ impl CollabCore {
     /// Create a Channel and make its creator the owner/member.
     pub async fn create_channel(&self, name: &str, creator_id: &str) -> Result<Target> {
         self.assert_open()?;
-        require_non_empty("channel name", name)?;
-        require_non_empty("creator_id", creator_id)?;
+        CollabError::require_non_blank("channel name", name)?;
+        CollabError::require_non_blank("creator_id", creator_id)?;
 
         let now = now_ms()?;
         let target = Target {
@@ -65,8 +65,8 @@ impl CollabCore {
     /// creating it and its two memberships when absent.
     pub async fn create_direct(&self, actor_id: &str, peer_id: &str) -> Result<Target> {
         self.assert_open()?;
-        require_non_empty("actor_id", actor_id)?;
-        require_non_empty("peer_id", peer_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
+        CollabError::require_non_blank("peer_id", peer_id)?;
         if actor_id == peer_id {
             return Err(CollabError::InvalidArgument(
                 "a Direct target requires two distinct actors".into(),
@@ -175,7 +175,10 @@ impl TargetRoute {
             )
             .await?;
         let Some(row) = rows.next().await? else {
-            return Err(not_found("active target", target_id));
+            return Err(CollabError::NotFound {
+                entity: "active target",
+                id: target_id.to_owned(),
+            });
         };
         let kind_text = row.get::<String>(0)?;
         let parent_target_id = row.get::<Option<String>>(1)?;
@@ -200,7 +203,10 @@ impl TargetRoute {
                 )
                 .await?;
             let Some(parent_row) = parent_rows.next().await? else {
-                return Err(not_found("active Thread parent target", parent_target_id));
+                return Err(CollabError::NotFound {
+                    entity: "active Thread parent target",
+                    id: parent_target_id.to_owned(),
+                });
             };
             let parent_kind_text = parent_row.get::<String>(0)?;
             let parent_kind = parse_target_kind(parent_target_id, &parent_kind_text)?;
@@ -301,7 +307,10 @@ pub(crate) async fn actor_handle(connection: &Connection, actor_id: &str) -> Res
         .await?;
     match rows.next().await? {
         Some(row) => Ok(row.get(0)?),
-        None => Err(not_found("actor", actor_id)),
+        None => Err(CollabError::NotFound {
+            entity: "actor",
+            id: actor_id.to_owned(),
+        }),
     }
 }
 
@@ -315,7 +324,10 @@ pub(crate) async fn find_target(connection: &Connection, target_id: &str) -> Res
         )
         .await?;
     let Some(row) = rows.next().await? else {
-        return Err(not_found("active target", target_id));
+        return Err(CollabError::NotFound {
+            entity: "active target",
+            id: target_id.to_owned(),
+        });
     };
     let kind_text = row.get::<String>(1)?;
     Ok(Target {

@@ -4,7 +4,7 @@ use crate::target::require_target_access;
 use crate::thread::store::ThreadStore;
 use crate::{
     ChangeKind, CollabCore, CollabError, Message, Result, SendMessageRequest, SendMessageResult,
-    TargetKind, new_id, now_ms, require_non_empty,
+    TargetKind, new_id, now_ms,
 };
 
 use super::model::{NewMessage, SendFailpoint, StoredTextBody};
@@ -28,7 +28,7 @@ impl CollabCore {
             ("client_request_id", request.client_request_id.as_str()),
             ("text", request.text.as_str()),
         ] {
-            require_non_empty(name, value)?;
+            CollabError::require_non_blank(name, value)?;
         }
 
         let now = now_ms()?;

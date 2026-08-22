@@ -144,8 +144,8 @@ impl CollabCore {
         target_id: &str,
     ) -> Result<Vec<TargetMember>> {
         self.assert_open()?;
-        require_non_empty("actor_id", actor_id)?;
-        require_non_empty("target_id", target_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
+        CollabError::require_non_blank("target_id", target_id)?;
         let connection = self.connection.lock().await;
         let route = require_target_access(&connection, target_id, actor_id).await?;
         target_memberships(&connection, route.permission_target_id(target_id)).await
@@ -160,8 +160,8 @@ impl CollabCore {
         agent_id: &str,
     ) -> Result<Vec<AgentMembership>> {
         self.assert_open()?;
-        require_non_empty("actor_id", actor_id)?;
-        require_non_empty("agent_id", agent_id)?;
+        CollabError::require_non_blank("actor_id", actor_id)?;
+        CollabError::require_non_blank("agent_id", agent_id)?;
         let connection = self.connection.lock().await;
         Actor::require(&connection, &ActorId::parse(actor_id)?).await?;
         ProfileStore::new(&connection)
@@ -331,7 +331,7 @@ pub(crate) async fn identity_context_for(
             members: Vec::new(),
         });
     };
-    require_non_empty("target_id", target_id)?;
+    CollabError::require_non_blank("target_id", target_id)?;
     let route = require_target_access(connection, target_id, agent_id).await?;
     let target = find_target(connection, target_id).await?;
     let membership_target_id = route.permission_target_id(target_id);
