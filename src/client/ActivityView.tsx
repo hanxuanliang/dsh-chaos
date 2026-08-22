@@ -11,7 +11,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useRef, useState, type JSX } from 'react'
-import { Button, IconCheckOutline16, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../native.ts'
 import css from './blocks/ActivityView.module.css'
 import type { ChaosTranslate } from './locales.ts'
@@ -33,6 +33,14 @@ interface ActivityViewProps {
  * 有 threadRootId 时才在旁边展开 (ChannelChatPane 同一件)。
  */
 interface Dock { channelId: string, threadRootId?: string }
+function MarkAllReadIcon(): JSX.Element {
+  return (
+    <span className={css.markAllGlyph} aria-hidden="true">
+      <IconCheckOutline14 size={14} />
+      <IconCheckOutline14 size={8} />
+    </span>
+  )
+}
 function relativeTime(atMs: number): string {
   const deltaSeconds = Math.max(0, Math.floor((Date.now() - atMs) / 1000))
   if (deltaSeconds < 60) return '1m'
@@ -126,16 +134,13 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
     ]}
   />
   const markAll = unreadCount > 0 ? (
-    <Button
+    <IconButton
       className={css.markAllButton}
-      variant="ghost"
-      size="sm"
-      icon={<IconCheckOutline16 size={14} />}
+      label={t('activity.markAllRead')}
+      icon={<MarkAllReadIcon />}
       disabled={busy !== undefined}
       onClick={() => { markAllDone() }}
-    >
-      {t('activity.markAllRead')}
-    </Button>
+    />
   ) : undefined
   const rows = (
     <div className={cardCss.list} role="list">

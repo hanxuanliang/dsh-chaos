@@ -3,7 +3,7 @@
  * → 最新回复 → 底行 StatusChip + N replies; 右悬停靠 ✓ done。rowMain 负责
  * 打开 dock (channel/thread 双类由 caller 分派)。
  */
-import { IconCheckOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { TaskChip } from '../atoms/TaskChip.tsx'
 import { ReplyExcerpt } from '../atoms/ReplyExcerpt.tsx'
 import { ThreadPreview } from './MessageRow.tsx'
@@ -68,7 +68,9 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
         disabled={busy}
         onClick={onDone}
       >
-        <IconCheckOutline16 />
+        <span className={css.doneGlyph} aria-hidden="true">
+          <IconCheckOutline14 size={9} />
+        </span>
       </button>
     </div>
   )

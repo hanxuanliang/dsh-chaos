@@ -22,25 +22,27 @@
 .activityError { margin: 0 10px 6px; }
 
 .markAllButton {
-  height: auto;
-  border: 0;
-  border-radius: 5px;
-  padding: 3px 8px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font-size: 11px;
-  line-height: 18px;
-  white-space: nowrap;
+  width: 28px;
+  height: 28px;
 }
 
-.markAllButton:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
+.markAllGlyph {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
-.markAllButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
+.markAllGlyph svg { position: absolute; }
+
+.markAllGlyph svg:first-child {
+  left: 0;
+  top: 1px;
+}
+
+.markAllGlyph svg:last-child {
+  right: 0;
+  top: 5px;
 }
 
 .activityDetailPane {
@@ -54,7 +56,6 @@
 
 .activityDetailPane > * { flex: 1; min-height: 0; }
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: 0 !important; }
-.activityDetailPane > [class*='threadPanel'] [class*='threadResizeHandle'] { display: none !important; }
 
 .desktopClose { display: inline-flex; flex: none; }
 .mobileDetailHeader { display: none; }
