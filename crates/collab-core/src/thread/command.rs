@@ -7,7 +7,7 @@ use crate::{
     Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
 };
 
-use super::model::ThreadAccess;
+use super::model::{FollowOutcome, ThreadAccess, ThreadSubscription};
 use super::store::ThreadStore;
 
 impl CollabCore {
@@ -82,34 +82,24 @@ impl CollabCore {
 
     /// Follow one Thread after rechecking access to its parent target.
     pub async fn follow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
-        let thread_id = ThreadId::parse(thread_target_id)?;
-        let actor_id = ActorId::parse(actor_id)?;
-        let now = now_ms()?;
-        self.write(async |connection| {
-            let store = ThreadStore::new(connection);
-            let scope = ThreadAccess::require(connection, &actor_id, &thread_id).await?;
-            let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
-            let outcome = subscription.follow();
-            store.save_subscription(&subscription, outcome, now).await?;
-            if outcome.changed() {
-                let recipients = active_member_ids(connection, &scope.permission_target_id).await?;
-                insert_change(
-                    connection,
-                    ChangeKind::ThreadFollowChanged,
-                    Some(scope.thread_id.as_str()),
-                    actor_id.as_str(),
-                    &recipients,
-                    now,
-                )
-                .await?;
-            }
-            Ok(())
-        })
-        .await
+        self.transition_subscription(thread_target_id, actor_id, ThreadSubscription::follow)
+            .await
     }
 
     /// Stop future ordinary Thread delivery for one current parent member.
     pub async fn unfollow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
+        self.transition_subscription(thread_target_id, actor_id, ThreadSubscription::unfollow)
+            .await
+    }
+
+    /// Apply one subscription transition, then publish the follow change only
+    /// when the state actually moved.
+    async fn transition_subscription(
+        &self,
+        thread_target_id: &str,
+        actor_id: &str,
+        transition: fn(&mut ThreadSubscription) -> FollowOutcome,
+    ) -> Result<()> {
         let thread_id = ThreadId::parse(thread_target_id)?;
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
@@ -117,7 +107,7 @@ impl CollabCore {
             let store = ThreadStore::new(connection);
             let scope = ThreadAccess::require(connection, &actor_id, &thread_id).await?;
             let mut subscription = store.load_subscription(&thread_id, &actor_id).await?;
-            let outcome = subscription.unfollow();
+            let outcome = transition(&mut subscription);
             store.save_subscription(&subscription, outcome, now).await?;
             if outcome.changed() {
                 let recipients = active_member_ids(connection, &scope.permission_target_id).await?;

@@ -36,7 +36,7 @@ impl RootMessageIds {
                     "root_message_id must be a backend-assigned id".into(),
                 ));
             }
-            if !unique.iter().any(|existing| existing == value) {
+            if !unique.contains(value) {
                 unique.push(value.clone());
             }
         }
