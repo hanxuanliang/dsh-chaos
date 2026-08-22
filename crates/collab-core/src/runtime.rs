@@ -5,7 +5,7 @@ use turso::{Connection, Row};
 
 use crate::actor::{Actor, ActorId};
 use crate::db::{FromRow, QueryRows};
-use crate::{CollabCore, CollabError, Result, now_ms};
+use crate::{CollabCore, CollabError, NonBlank, Result, now_ms};
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,10 @@ impl CollabCore {
         preset: &str,
     ) -> Result<RuntimeBinding> {
         let _ = ActorId::parse(agent_id)?;
-        require_non_blank!(session_id, provider, model, preset);
+        NonBlank::parse("session_id", session_id)?;
+        NonBlank::parse("provider", provider)?;
+        NonBlank::parse("model", model)?;
+        NonBlank::parse("preset", preset)?;
         let now = now_ms()?;
         self.write(async |connection| {
             Actor::require_agent(connection, &ActorId::parse(agent_id)?).await?;
@@ -86,7 +89,8 @@ impl CollabCore {
         preset: &str,
     ) -> Result<RuntimeBinding> {
         let _ = ActorId::parse(agent_id)?;
-        require_non_blank!(session_id, preset);
+        NonBlank::parse("session_id", session_id)?;
+        NonBlank::parse("preset", preset)?;
         self.write(async |connection| {
             let current = RuntimeStore::new(connection)
                 .binding_for_agent(agent_id)

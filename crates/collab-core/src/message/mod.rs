@@ -11,7 +11,7 @@ use crate::changefeed::ChangeStore;
 use crate::target::require_target_access;
 use crate::thread::ThreadId;
 use crate::thread::store::ThreadStore;
-use crate::{ChangeKind, CollabCore, CollabError, Result, TargetKind, new_id, now_ms};
+use crate::{ChangeKind, CollabCore, CollabError, NonBlank, Result, TargetKind, new_id, now_ms};
 
 use model::SendFailpoint;
 use store::MessageStore;
@@ -31,12 +31,10 @@ impl CollabCore {
         request: SendMessageRequest,
         _failpoint: SendFailpoint,
     ) -> Result<SendMessageResult> {
-        require_non_blank!(
-            target_id = request.target_id,
-            author_id = request.author_id,
-            client_request_id = request.client_request_id,
-            text = request.text
-        );
+        NonBlank::parse("target_id", &request.target_id)?;
+        NonBlank::parse("author_id", &request.author_id)?;
+        NonBlank::parse("client_request_id", &request.client_request_id)?;
+        NonBlank::parse("text", &request.text)?;
 
         let now = now_ms()?;
         self.write(async |connection| {

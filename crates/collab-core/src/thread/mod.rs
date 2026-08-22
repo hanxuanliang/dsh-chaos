@@ -12,7 +12,8 @@ use crate::membership::{Membership, MembershipStore};
 use crate::message::store::MessageStore;
 use crate::target::require_target;
 use crate::{
-    Actor, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, new_id, now_ms,
+    Actor, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, new_id,
+    now_ms,
 };
 
 use model::{FollowOutcome, RootMessageIds, ThreadAccess, ThreadSubscription};
@@ -22,7 +23,7 @@ impl CollabCore {
     /// Return the one Thread target rooted at a top-level Message. The creator
     /// and root author follow it immediately when they retain parent access.
     pub async fn create_thread(&self, root_message_id: &str, actor_id: &str) -> Result<Target> {
-        require_non_blank!(root_message_id);
+        NonBlank::parse("root_message_id", root_message_id)?;
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
         self.write(async |connection| {
