@@ -1,10 +1,10 @@
 use turso::{Connection, Row};
 
-use crate::db::{FromRow, QueryRows};
+use crate::db::{FromRow, QueryRows, assert_one_row};
 use crate::message::StoredTextBody;
 use crate::{CollabError, Result, Task, TaskStatus};
 
-use super::model::{NewTask, TaskEvent};
+use super::model::{NewTask, TaskEvent, TaskTransition};
 
 /// Column order of the canonical Task projection: the Task row plus the anchor
 /// Message body through a LEFT JOIN. Shared by every SELECT in this store.
@@ -234,12 +234,7 @@ impl<'connection> TaskStore<'connection> {
                 (message_id, actor_id, next_version, now, expected_version),
             )
             .await?;
-        if changed != 1 {
-            return Err(CollabError::Database(
-                "task claim compare-and-set did not update one row".into(),
-            ));
-        }
-        Ok(())
+        assert_one_row(changed, "task claim compare-and-set")
     }
 
     /// Compare-and-set the release of a Task claimed by this actor.
@@ -260,12 +255,7 @@ impl<'connection> TaskStore<'connection> {
                 (message_id, next_version, now, actor_id, expected_version),
             )
             .await?;
-        if changed != 1 {
-            return Err(CollabError::Database(
-                "task unclaim compare-and-set did not update one row".into(),
-            ));
-        }
-        Ok(())
+        assert_one_row(changed, "task unclaim compare-and-set")
     }
 
     /// Compare-and-set one lifecycle status at the expected version.
@@ -292,12 +282,7 @@ impl<'connection> TaskStore<'connection> {
                 ),
             )
             .await?;
-        if changed != 1 {
-            return Err(CollabError::Database(
-                "task status compare-and-set did not update one row".into(),
-            ));
-        }
-        Ok(())
+        assert_one_row(changed, "task status compare-and-set")
     }
 
     pub(crate) async fn record_event(&self, event: &TaskEvent<'_>) -> Result<()> {
@@ -320,6 +305,57 @@ impl<'connection> TaskStore<'connection> {
                 ),
             )
             .await?;
+        Ok(())
+    }
+}
+
+impl TaskStore<'_> {
+    /// Persist one committed TaskTransition: the CAS row update and its audit
+    /// event in one call. The change notification stays with the caller.
+    pub(crate) async fn apply(&self, transition: &TaskTransition, now: i64) -> Result<()> {
+        let next_assignee = transition
+            .next_assignee_id
+            .as_ref()
+            .map(|assignee| assignee.as_deref());
+        match (transition.next_status, next_assignee) {
+            (Some(TaskStatus::InProgress), Some(Some(assignee))) => {
+                self.claim(
+                    &transition.message_id,
+                    assignee,
+                    transition.next_version,
+                    transition.next_version - 1,
+                    now,
+                )
+                .await?;
+            }
+            (None, Some(None)) => {
+                self.unclaim(
+                    &transition.message_id,
+                    &transition.actor_id,
+                    transition.next_version,
+                    transition.next_version - 1,
+                    now,
+                )
+                .await?;
+            }
+            (Some(status), None) => {
+                self.apply_status(
+                    &transition.message_id,
+                    status,
+                    transition.next_version,
+                    transition.next_version - 1,
+                    now,
+                )
+                .await?;
+            }
+            _ => {
+                return Err(crate::CollabError::Database(format!(
+                    "task transition for '{}' carries an unsupported row delta",
+                    transition.message_id
+                )));
+            }
+        }
+        self.record_event(&transition.event(now)).await?;
         Ok(())
     }
 }

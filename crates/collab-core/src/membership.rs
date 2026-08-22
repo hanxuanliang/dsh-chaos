@@ -145,8 +145,8 @@ impl Membership {
         Ok(Self { role })
     }
 
-    pub(crate) const fn is_owner(self) -> bool {
-        matches!(self.role, MembershipRole::Owner)
+    pub(crate) const fn role(self) -> MembershipRole {
+        self.role
     }
 
     fn manage_denied(target_id: &str, actor_id: &str) -> CollabError {

@@ -5,7 +5,7 @@ use turso::{Connection, Row};
 
 use crate::actor::Actor;
 use crate::actor::ActorId;
-use crate::db::{FromRow, QueryRows};
+use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::membership::target_change_recipients;
 use crate::target::targets_for_actor;
 use crate::task::store::TaskStore;
@@ -218,12 +218,7 @@ pub(crate) async fn latest_change_seq(connection: &Connection) -> Result<i64> {
     let mut rows = connection
         .query("SELECT COALESCE(MAX(seq), 0) FROM change_events", ())
         .await?;
-    let Some(row) = rows.next().await? else {
-        return Err(CollabError::Database(
-            "change sequence query returned no row".into(),
-        ));
-    };
-    let latest = row.get::<i64>(0)?;
+    let latest = require_scalar_row(rows.next().await?, "change sequence query")?.get::<i64>(0)?;
     drop(rows);
     Ok(latest.max(change_retention_floor(connection).await?))
 }

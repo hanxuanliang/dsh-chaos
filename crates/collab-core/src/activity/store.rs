@@ -1,7 +1,7 @@
 use turso::{Connection, Row};
 
 use crate::actor::parse_actor_kind;
-use crate::db::{FromRow, QueryRows};
+use crate::db::{FromRow, QueryRows, require_scalar_row};
 use crate::message::stored_text;
 use crate::target::parse_target_kind;
 use crate::{
@@ -240,14 +240,14 @@ impl<'connection> ActivityStore<'connection> {
     }
 
     pub(crate) async fn active_count(&self, actor_id: &str) -> Result<i64> {
-        self.connection
+        let row = self
+            .connection
             .query_row::<CountRow>(
                 &format!("{ACTIVITY_INBOX_CANDIDATES_CTE} SELECT COUNT(*) FROM active"),
                 [actor_id],
             )
-            .await?
-            .map(|row| row.0)
-            .ok_or_else(|| CollabError::Database("Activity count returned no row".into()))
+            .await?;
+        Ok(require_scalar_row(row, "Activity count")?.0)
     }
 
     /// Read one page after `cursor`, fetching `limit + 1` rows so the caller
@@ -277,14 +277,14 @@ impl<'connection> ActivityStore<'connection> {
 
     /// The newest Message sequence of one target, `None` when it has none.
     pub(crate) async fn latest_seq(&self, target_id: &str) -> Result<Option<i64>> {
-        self.connection
+        let row = self
+            .connection
             .query_row::<MaxSeqRow>(
                 "SELECT MAX(seq) FROM messages WHERE target_id = ?1",
                 [target_id],
             )
-            .await?
-            .map(|row| row.0)
-            .ok_or_else(|| CollabError::Database("latest Activity query returned no row".into()))
+            .await?;
+        Ok(require_scalar_row(row, "latest Activity query")?.0)
     }
 
     /// Advance the actor's Done fence; returns `true` when the fence moved.

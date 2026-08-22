@@ -91,19 +91,20 @@ impl CollabCore {
 
     /// Follow one Thread after rechecking access to its parent target.
     pub async fn follow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
-        self.transition_subscription(thread_target_id, actor_id, ThreadSubscription::follow)
+        self.apply_subscription(thread_target_id, actor_id, ThreadSubscription::follow)
             .await
     }
 
     /// Stop future ordinary Thread delivery for one current parent member.
     pub async fn unfollow_thread(&self, thread_target_id: &str, actor_id: &str) -> Result<()> {
-        self.transition_subscription(thread_target_id, actor_id, ThreadSubscription::unfollow)
+        self.apply_subscription(thread_target_id, actor_id, ThreadSubscription::unfollow)
             .await
     }
 
-    /// Apply one subscription transition, then publish the follow change only
-    /// when the state actually moved.
-    async fn transition_subscription(
+    /// The fixed write pipeline for one subscription transition: load the
+    /// proven scope, decide the state move, persist, and publish only when
+    /// the state actually moved.
+    async fn apply_subscription(
         &self,
         thread_target_id: &str,
         actor_id: &str,
