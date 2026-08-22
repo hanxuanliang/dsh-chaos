@@ -4,30 +4,6 @@
 /// argument after its own expression; pass `name = value` only when the
 /// expression is not the parameter name itself, and `"label" = value` when
 /// neither is.
-macro_rules! require_non_blank {
-    ($($name:ident),+ $(,)?) => {$(
-        if $name.trim().is_empty() {
-            return Err(crate::CollabError::InvalidArgument(
-                concat!(stringify!($name), " must not be blank").into(),
-            ));
-        }
-    )+};
-    ($($name:ident = $value:expr),+ $(,)?) => {$(
-        if $value.trim().is_empty() {
-            return Err(crate::CollabError::InvalidArgument(
-                concat!(stringify!($name), " must not be blank").into(),
-            ));
-        }
-    )+};
-    ($label:literal = $value:expr $(,)?) => {
-        if $value.trim().is_empty() {
-            return Err(crate::CollabError::InvalidArgument(
-                concat!($label, " must not be blank").into(),
-            ));
-        }
-    };
-}
-
 mod activity;
 mod actor;
 mod changefeed;
@@ -71,6 +47,26 @@ use uuid::Uuid;
 
 pub(crate) fn new_id() -> String {
     Uuid::now_v7().to_string()
+}
+
+/// A string parameter proven non-blank at the type boundary. Every entry
+/// value (names, labels, bodies) parses into this once; no guard macros.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NonBlank<'a>(&'a str);
+
+impl<'a> NonBlank<'a> {
+    pub(crate) fn parse(name: &str, value: &'a str) -> Result<Self> {
+        if value.trim().is_empty() {
+            return Err(CollabError::InvalidArgument(format!(
+                "{name} must not be blank"
+            )));
+        }
+        Ok(Self(value))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        self.0
+    }
 }
 
 pub(crate) fn now_ms() -> Result<i64> {

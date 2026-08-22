@@ -9,7 +9,8 @@ use crate::actor::{ActorId, insert_actor};
 use crate::changefeed::ChangeStore;
 use crate::membership::MembershipStore;
 use crate::{
-    Actor, ActorKind, ChangeKind, CollabCore, CollabError, IdentityContext, Result, now_ms,
+    Actor, ActorKind, ChangeKind, CollabCore, CollabError, IdentityContext, NonBlank, Result,
+    now_ms,
 };
 
 use model::{encode_charter, normalize_charter};
@@ -65,7 +66,7 @@ impl CollabCore {
         workspace_path: &str,
         charter: &AgentCharter,
     ) -> Result<Actor> {
-        require_non_blank!(workspace_path);
+        NonBlank::parse("workspace_path", workspace_path)?;
         let charter_json = encode_charter(charter)?;
         let now = now_ms()?;
         self.write(async |connection| {
@@ -157,7 +158,8 @@ impl CollabCore {
 
     /// Return the stable User for one handle, creating it when absent.
     pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
-        require_non_blank!(handle, display_name);
+        NonBlank::parse("handle", handle)?;
+        NonBlank::parse("display_name", display_name)?;
         let now = now_ms()?;
         self.write(async |connection| {
             if let Some(actor) = Actor::find_by_handle(connection, handle).await? {
@@ -198,7 +200,7 @@ impl CollabCore {
 impl CollabCore {
     /// Read one active stable Agent Profile independently from its DSH Session.
     pub async fn agent_profile(&self, agent_id: &str) -> Result<AgentProfile> {
-        require_non_blank!(agent_id);
+        NonBlank::parse("agent_id", agent_id)?;
         self.read(async |connection| {
             ProfileStore::new(connection)
                 .require_profile(agent_id)
@@ -222,7 +224,7 @@ impl CollabCore {
         agent_id: &str,
         target_id: Option<&str>,
     ) -> Result<IdentityContext> {
-        require_non_blank!(agent_id);
+        NonBlank::parse("agent_id", agent_id)?;
         self.read(async |connection| {
             MembershipStore::new(connection)
                 .identity_context_for(agent_id, target_id)

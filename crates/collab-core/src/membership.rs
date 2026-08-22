@@ -14,7 +14,7 @@ use crate::target::{
     TargetRoute, TargetStore, parse_target_kind, require_target, require_target_access,
 };
 use crate::{
-    AgentProfile, ChangeKind, CollabCore, CollabError, Result, Target, TargetKind, now_ms,
+    AgentProfile, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, now_ms,
 };
 
 // ── 类型 ─────────────────────────────────────────────────────────────────────
@@ -449,7 +449,7 @@ impl<'connection> MembershipStore<'connection> {
                 members: Vec::new(),
             });
         };
-        require_non_blank!(target_id);
+        NonBlank::parse("target_id", target_id)?;
         let route = require_target_access(self.connection, target_id, agent_id).await?;
         let target = TargetStore::new(self.connection).find(target_id).await?;
         let membership_target_id = route.permission_target_id(target_id);

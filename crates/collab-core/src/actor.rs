@@ -4,7 +4,7 @@ use turso::{Connection, Row};
 
 use crate::changefeed::ChangeStore;
 use crate::db::{FromRow, QueryRows};
-use crate::{ChangeKind, CollabError, Result, new_id};
+use crate::{ChangeKind, CollabError, NonBlank, Result, new_id};
 
 /// Stable actor identifier, non-blank by construction.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -124,12 +124,13 @@ pub(crate) async fn insert_actor(
     display_name: &str,
     now: i64,
 ) -> Result<Actor> {
-    require_non_blank!(handle, display_name);
+    let handle = NonBlank::parse("handle", handle)?;
+    let display_name = NonBlank::parse("display_name", display_name)?;
     let actor = Actor {
         id: new_id(),
         kind,
-        handle: handle.to_owned(),
-        display_name: display_name.to_owned(),
+        handle: handle.as_str().to_owned(),
+        display_name: display_name.as_str().to_owned(),
         created_at_ms: now,
     };
     ActorStore::new(connection).insert(&actor).await?;
