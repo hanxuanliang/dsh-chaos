@@ -280,6 +280,8 @@ src/client/
     hooks/
     styles/
       foundations.module.css
+  shims/
+    node-min.ts
   features/
     activity/
     agents/
@@ -300,6 +302,10 @@ Rules:
 - No new feature files are added directly under `src/client/`.
 - Do not reintroduce `atoms/` or `blocks/`. Those names describe visual size,
   not ownership, and scatter one feature across several directories.
+- `shims/` is a build boundary, not a UI layer. `node-min.ts` provides the
+  minimal browser-safe `node:path`, `node:process`, and `node:url` exports that
+  `react-markdown`'s `vfile` dependency imports. DSH's browser module table does
+  not provide Node builtins, so this shim remains required for plugin loading.
 
 ## 7. Migration history
 

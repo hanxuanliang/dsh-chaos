@@ -18,7 +18,6 @@
   gap: 8px;
 }
 /* ---- status dropdown + assignee filter pill (plocal TaskStatusMenu) ------- */
-.taskBoard .filterPill,
 .taskBoard .filterPill {
   color: var(--dsw-alias-label-secondary);
   background: transparent;
@@ -70,20 +69,22 @@
 }
 .taskDetailDialog {
   --dsh-chaos-lane-review: #7287fd;
-  width: min(520px, calc(100vw - 32px));
-  max-width: min(520px, calc(100vw - 32px));
+  width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+  padding-bottom: 0;
 }
 .taskDetailDialogContent {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding-bottom: 20px;
+  padding-bottom: 12px;
 }
+.taskDetailDialogContent > :last-child { margin-top: 0; }
 .taskDetailContent {
-  padding: 4px 0 20px;
+  padding: 0 0 14px;
 }
 .taskDetailContent h3 {
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   color: var(--dsw-alias-label-primary);
   font-size: 17px;
   font-weight: 600;
@@ -91,19 +92,19 @@
   overflow-wrap: anywhere;
 }
 .taskDetailDescription {
-  margin: 0 0 18px;
+  margin: 0 0 12px;
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
-  line-height: 21px;
+  line-height: 19px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.taskDetailContent h3 + :global(button) { margin-top: 8px; }
-.taskDetailDivider { height: 1px; margin: 0 0 18px; background: var(--dsw-alias-border-l1); }
+.taskDetailContent h3 + :global(button) { margin-top: 6px; }
+.taskDetailDivider { height: 1px; margin: 0 0 12px; background: var(--dsw-alias-border-l1); }
 .taskDetailMeta {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
   margin: 0;
 }
 .taskDetailRow {
@@ -111,7 +112,7 @@
   grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 28px;
+  min-height: 26px;
   font-size: 12px;
 }
 .taskDetailRow > dt {

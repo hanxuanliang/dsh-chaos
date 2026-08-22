@@ -160,14 +160,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   color: var(--dsw-alias-label-tertiary);
 }
 
-.empty {
-  max-width: 320px;
-  margin: 0;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 13px;
-  line-height: 20px;
-  text-align: center;
-}
+.mainSkeleton { width: min(100%, 560px); }
 /* Bottom growth (plocal MessageScroller truth: an elastic spacer pushes the
    rendered window to the bottom, so fresh replies grow upward — channel and
    thread streams grow identically). */
@@ -186,17 +179,6 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* Host state ramp has no fourth hue; plocal taskStatus.ts maps in_review to
  * lavender (#7287fd). Plugin-scoped token until the host grows a review state. */
 /* Card = whole-button; must beat .panel button { font: inherit } (S5). */
-.statusChip:hover {
-  filter: brightness(0.97);
-}
-.filterPill:focus-visible,
-.statusChip:focus-visible,
-.statusMenuItem:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
-}
-
 @media (max-width: 700px) {
   .mobileChannelsButton { display: inline-flex; }
 }
-.activityList { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 2px; overflow-y: auto; }

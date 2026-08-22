@@ -27,9 +27,6 @@
   flex: none;
 }
 
-/* dock 内复用 .threadClose, 但 channel 头没有 tabs/成员占右侧 —— ✕ 归右 */
-.dockedChannel .threadClose { margin-left: auto; }
-
 .threadPanel .threadBody {
   display: flex;
   flex: 1;

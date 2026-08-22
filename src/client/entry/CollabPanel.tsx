@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type JSX } from 'react'
-import { IconBrowseOutline16, IconChevronLeftOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconBrowseOutline16, IconChevronLeftOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStore } from '../data/store.ts'
 import { ChannelRail } from '../features/channels/ChannelRail.tsx'
 import { ActivityView } from '../features/activity/ActivityView.tsx'
@@ -8,7 +8,7 @@ import { ChannelCreateDialog } from '../features/channels/ChannelCreateDialog.ts
 import type { ChaosTranslate } from '../locales.ts'
 import css from './CollabPanel.module.css'
 import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './navigation.ts'
-import { IconButton, Tabs } from '../shared/ui/index.ts'
+import { EmptyState, IconButton, SkeletonList, Tabs } from '../shared/ui/index.ts'
 import { ResponsiveDrilldown } from '../shared/layout/index.ts'
 
 export interface CollabPanelProps {
@@ -20,10 +20,7 @@ export interface CollabPanelProps {
 }
 
 /**
- * Collab overlay panel (P0-2): header + channel rail + active channel view.
- * P0-1 landed the skeleton and full-pane takeover; this revision fills the
- * rail and main region with live chaos-kernel data (channels, message
- * history, composer). Thread surface stays a later milestone (P0-5).
+ * Collab overlay panel: header + channel rail + active channel view.
  */
 export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProps): JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
@@ -54,29 +51,24 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
   const mainView = <main className={css.main}>
     {state.removedNotice && (
       <div className={css.mainEmpty} role="status">
-        <p className={css.empty}>{t('channel.removed')}</p>
+        <EmptyState title={t('channel.removed')} />
       </div>
     )}
     {!state.removedNotice && state.bootstrapError !== undefined && (
       <div className={css.mainEmpty} role="alert">
-        <p className={css.empty}>{t('panel.loadFailed', { error: state.bootstrapError })}</p>
-        <button type="button" className={css.retryButton} onClick={() => { store.start() }}>
-          {t('panel.retry')}
-        </button>
+        <EmptyState
+          title={t('panel.loadFailed', { error: state.bootstrapError })}
+          action={<Button variant="outline" size="sm" onClick={() => { store.start() }}>{t('panel.retry')}</Button>}
+        />
       </div>
     )}
     {!state.removedNotice && state.bootstrapError === undefined && !state.bootstrapped && (
       <div className={css.mainEmpty} role="status" aria-label={t('channel.loading')}>
-        <div className={css.skeletonRow} />
-        <div className={css.skeletonRow} />
-        <div className={css.skeletonRow} />
+        <SkeletonList className={css.mainSkeleton} rows={3} label={t('channel.loading')} />
       </div>
     )}
     {!state.removedNotice && state.bootstrapError === undefined && state.bootstrapped && active === undefined && (
-      <div className={css.mainEmpty}>
-        <IconBrowseOutline16 size={24} />
-        <p className={css.empty}>{t('panel.selectChannel')}</p>
-      </div>
+      <EmptyState className={css.mainEmpty} icon={<IconBrowseOutline16 size={24} />} title={t('panel.selectChannel')} />
     )}
     {!state.removedNotice && active !== undefined && (
       <ChannelView
