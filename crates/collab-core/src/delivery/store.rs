@@ -29,14 +29,9 @@ impl<'connection> DeliveryStore<'connection> {
                  JOIN (
                    SELECT d.recipient_id AS agent_id, MAX(d.message_seq) AS pending_seq
                    FROM deliveries d
-                   JOIN targets target ON target.id = d.target_id
-                   JOIN memberships mem
-                     ON mem.target_id = CASE
-                       WHEN target.kind = 'thread' THEN target.parent_target_id
-                       ELSE target.id
-                     END
-                    AND mem.actor_id = d.recipient_id
-                    AND mem.left_at_ms IS NULL
+                   JOIN v_target_access access
+                     ON access.target_id = d.target_id
+                    AND access.actor_id = d.recipient_id
                    WHERE d.model_seen_at_ms IS NULL
                    GROUP BY d.recipient_id
                  ) pending ON pending.agent_id = rb.agent_id
@@ -44,14 +39,9 @@ impl<'connection> DeliveryStore<'connection> {
                     OR wake.notified_generation <> rb.generation
                     OR EXISTS (
                       SELECT 1 FROM deliveries d
-                      JOIN targets target ON target.id = d.target_id
-                      JOIN memberships mem
-                        ON mem.target_id = CASE
-                          WHEN target.kind = 'thread' THEN target.parent_target_id
-                          ELSE target.id
-                        END
-                       AND mem.actor_id = d.recipient_id
-                       AND mem.left_at_ms IS NULL
+                      JOIN v_target_access access
+                        ON access.target_id = d.target_id
+                       AND access.actor_id = d.recipient_id
                       WHERE d.recipient_id = rb.agent_id
                         AND d.model_seen_at_ms IS NULL
                         AND (d.notified_at_ms IS NULL
@@ -113,15 +103,9 @@ impl<'connection> DeliveryStore<'connection> {
                    AND message_seq <= ?2
                    AND model_seen_at_ms IS NULL
                    AND EXISTS (
-                     SELECT 1 FROM targets target
-                     JOIN memberships mem
-                       ON mem.target_id = CASE
-                         WHEN target.kind = 'thread' THEN target.parent_target_id
-                         ELSE target.id
-                       END
-                     WHERE target.id = deliveries.target_id
-                       AND mem.actor_id = deliveries.recipient_id
-                       AND mem.left_at_ms IS NULL
+                     SELECT 1 FROM v_target_access access
+                     WHERE access.target_id = deliveries.target_id
+                       AND access.actor_id = deliveries.recipient_id
                    )",
                 (agent_id, pending_seq, now, generation),
             )
@@ -157,16 +141,10 @@ impl<'connection> DeliveryStore<'connection> {
                         m.client_request_id, m.body_json, m.created_at_ms
                  FROM deliveries d
                  JOIN messages m ON m.id = d.message_id
-                 JOIN targets target ON target.id = m.target_id
-                 JOIN memberships mem
-                   ON mem.target_id = CASE
-                     WHEN target.kind = 'thread' THEN target.parent_target_id
-                     ELSE target.id
-                   END
-                  AND mem.actor_id = ?1
+                 JOIN v_target_access access
+                   ON access.target_id = m.target_id AND access.actor_id = ?1
                  WHERE d.recipient_id = ?1
                    AND d.model_seen_at_ms IS NULL
-                   AND mem.left_at_ms IS NULL
                  ORDER BY m.seq
                  LIMIT ?2",
                 (agent_id, i64::from(limit)),

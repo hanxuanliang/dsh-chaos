@@ -20,13 +20,8 @@ WITH eligible AS (
          target.root_message_id,
          COALESCE(done.done_through_seq, 0) AS done_through_seq
   FROM targets AS target
-  JOIN memberships AS membership
-    ON membership.target_id = CASE
-      WHEN target.kind = 'thread' THEN target.parent_target_id
-      ELSE target.id
-    END
-   AND membership.actor_id = ?1
-   AND membership.left_at_ms IS NULL
+  JOIN v_target_access AS access
+    ON access.target_id = target.id AND access.actor_id = ?1
   LEFT JOIN targets AS parent ON parent.id = target.parent_target_id
   LEFT JOIN activity_inbox_done AS done
     ON done.actor_id = ?1 AND done.target_id = target.id

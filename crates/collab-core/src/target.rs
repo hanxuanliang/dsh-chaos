@@ -361,15 +361,9 @@ pub(crate) async fn targets_for_actor(
             "SELECT DISTINCT target.id, target.kind, target.name,
                     target.parent_target_id, target.root_message_id,
                     target.created_by, target.created_at_ms
-             FROM targets target
-             JOIN memberships membership
-               ON membership.target_id = CASE
-                 WHEN target.kind = 'thread' THEN target.parent_target_id
-                 ELSE target.id
-               END
-              AND membership.actor_id = ?1
-              AND membership.left_at_ms IS NULL
-             WHERE target.archived_at_ms IS NULL
+             FROM v_target_access access
+             JOIN targets target ON target.id = access.target_id
+             WHERE access.actor_id = ?1
                AND (
                  target.kind <> 'thread'
                  OR EXISTS (

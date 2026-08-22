@@ -128,16 +128,10 @@ impl<'connection> TaskStore<'connection> {
                     &format!(
                         "SELECT {TASK_COLUMNS}
                          FROM tasks task
-                         JOIN targets target ON target.id = task.target_id
-                         JOIN memberships membership
-                           ON membership.target_id = CASE
-                             WHEN target.kind = 'thread' THEN target.parent_target_id
-                             ELSE target.id
-                           END
-                          AND membership.actor_id = ?1
-                          AND membership.left_at_ms IS NULL
+                         JOIN v_target_access access
+                           ON access.target_id = task.target_id AND access.actor_id = ?1
                          LEFT JOIN messages message ON message.id = task.message_id
-                         WHERE task.target_id = ?2 AND target.archived_at_ms IS NULL
+                         WHERE task.target_id = ?2
                          ORDER BY task.number"
                     ),
                     (actor_id, target_id),
@@ -149,16 +143,9 @@ impl<'connection> TaskStore<'connection> {
                     &format!(
                         "SELECT {TASK_COLUMNS}
                          FROM tasks task
-                         JOIN targets target ON target.id = task.target_id
-                         JOIN memberships membership
-                           ON membership.target_id = CASE
-                             WHEN target.kind = 'thread' THEN target.parent_target_id
-                             ELSE target.id
-                           END
-                          AND membership.actor_id = ?1
-                          AND membership.left_at_ms IS NULL
+                         JOIN v_target_access access
+                           ON access.target_id = task.target_id AND access.actor_id = ?1
                          LEFT JOIN messages message ON message.id = task.message_id
-                         WHERE target.archived_at_ms IS NULL
                          ORDER BY task.target_id, task.number"
                     ),
                     [actor_id],
