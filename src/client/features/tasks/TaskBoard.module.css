@@ -1,4 +1,4 @@
-/* TaskBoard: 看板+filterPill+状态 Menu+taskDetail 详情弹层 系 */
+/* TaskBoard: board + filters + status menu + same-canvas task detail. */
 /* ---- tasks board (P0-4) -------------------------------------------------- */
 /* Anatomy: dsh-web-ui/packages/dsh-task-board board.module.css remapped to the
  * panel's padding/scale. .panel prefixes per S5 (taskCard is a button). */
@@ -68,63 +68,137 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.taskDetailTitle {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  text-decoration: underline transparent;
-  text-underline-offset: 3px;
-  transition: color 120ms ease, text-decoration-color 120ms ease;
-}
-/* Detail: head row is the title only; status lives in meta rows now. */
-.taskDetailTitleRow {
+.taskDetailSurface {
+  --dsh-chaos-lane-review: #7287fd;
   display: flex;
-  margin-bottom: 12px;
-}
-.taskDetailTitleLink {
-  appearance: none;
-  display: block;
   min-width: 0;
-  max-width: 100%;
-  border: 0;
-  padding: 0;
-  box-shadow: none;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
   color: var(--dsw-alias-label-primary);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
+  background: var(--dsw-alias-bg-base);
 }
-.taskDetailTitleLink:hover .taskDetailTitle {
-  color: var(--dsw-alias-state-business-primary);
-  text-decoration-color: currentColor;
+.taskDetailError { margin: 10px 16px 0; }
+.taskDetailLayout {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  overflow: hidden;
 }
-.taskDetailTitleLink:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 3px;
-  border-radius: 2px;
+.taskDetailMain {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.taskDetailContent {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 36px 40px 64px;
+}
+.taskDetailEyebrow {
+  margin: 0 0 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 17px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.taskDetailContent h1 {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 32px;
+  overflow-wrap: anywhere;
+}
+.taskDetailDescription {
+  margin: 18px 0 24px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 14px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.taskDetailContent h1 + :global(button) { margin-top: 24px; }
+.taskDetailProperties {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  padding: 20px 16px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 94%, var(--dsw-alias-interactive-bg-hover));
+}
+.taskDetailProperties h2 {
+  margin: 0 0 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
 }
 .taskDetailMeta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 0 0 12px;
+  gap: 14px;
+  margin: 0;
 }
 .taskDetailRow {
-  display: flex;
-  gap: 12px;
-  font-size: 13px;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  font-size: 12px;
 }
 .taskDetailRow > dt {
-  flex: none;
-  width: 104px;
   color: var(--dsw-alias-label-tertiary);
 }
 .taskDetailRow > dd {
+  min-width: 0;
   margin: 0;
   color: var(--dsw-alias-label-primary);
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
-/* Task-anchor jump flash: warn-tinted wash that fades (paper §3.2 高亮 1s). */
+.statusDropdown { position: relative; display: inline-flex; }
+.statusMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  padding: 7px 10px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.statusMenuItem:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
+.statusMenuItem:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }
+.statusMenuItem:disabled { opacity: 0.4; cursor: not-allowed; }
+.statusDot { width: 7px; height: 7px; flex: none; border-radius: 50%; }
+.statusDot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
+.statusDot[data-status='in_progress'] { background: var(--dsw-alias-state-warn-primary); }
+.statusDot[data-status='in_review'] { background: var(--dsh-chaos-lane-review); }
+.statusDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
+
+@media (max-width: 700px) {
+  .taskDetailLayout {
+    display: block;
+    overflow-y: auto;
+  }
+  .taskDetailMain { overflow: visible; }
+  .taskDetailContent { padding: 24px 18px 32px; }
+  .taskDetailContent h1 { font-size: 20px; line-height: 28px; }
+  .taskDetailProperties {
+    overflow: visible;
+    border-top: 1px solid var(--dsw-alias-border-l1);
+    border-left: 0;
+    padding: 20px 18px 32px;
+  }
+  .taskDetailRow { grid-template-columns: 100px minmax(0, 1fr); }
+}
