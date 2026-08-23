@@ -25,9 +25,11 @@ The npm CLI requires a package to exist before a trusted publisher can be config
 2. Run the repository CI and `pnpm release:check` on a clean checkout.
 3. Confirm the release commit is on `main`, then create and push an annotated `vX.Y.Z` tag.
 4. The Release workflow builds and checks all four native modules, runs the repository release gates, then publishes the native packages followed by the root package under the `next` dist-tag.
-5. Once all five npm versions exist, the same publish job promotes them to `latest`. The workflow then creates the GitHub Release with checksums and build artifacts.
+5. Once all five npm versions are visible from the registry, the same publish job promotes them to `latest` and the release workflow is complete.
 
 Installing the published plugin into complete DSH profiles on every operating system is an independent compatibility exercise, not a release gate. The release path already verifies each native package on its build platform and runs the repository's Rust, TypeScript, package, and smoke checks before publishing; keeping full DSH installation outside the tag workflow avoids registry/network/installer resource failures blocking an otherwise valid package release.
+
+GitHub Releases are also independent from npm publication. The immutable Git tag remains the source-install target; create a GitHub Release separately only when downloadable release assets or a rendered release-notes page are needed.
 
 Never reuse a native artifact across operating systems, CPU architectures, or incompatible Linux C libraries. Version `0.1.1` supports Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
 

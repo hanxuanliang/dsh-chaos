@@ -176,13 +176,28 @@ jobs:
           else
             npm publish ./release/hanxuanliang-dsh-chaos-*.tgz --access public --provenance --tag next
           fi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: npm-release-packages
-          path: |
-            release/*.tgz
-            npm/*/dsh_chaos_core.node
-          if-no-files-found: error
+      - name: Verify published versions are visible
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          verify_published() {
+            package_name="$1"
+            for attempt in 1 2 3 4 5; do
+              actual="$(npm view "${package_name}@${VERSION}" version --registry=https://registry.npmjs.org 2>/dev/null || true)"
+              if [ "${actual}" = "${VERSION}" ]; then
+                echo "${package_name}@${VERSION} is visible"
+                return 0
+              fi
+              sleep 3
+            done
+            echo "${package_name}@${VERSION} is not visible in the npm registry" >&2
+            return 1
+          }
+          verify_published @hanxuanliang/dsh-chaos-linux-x64-gnu
+          verify_published @hanxuanliang/dsh-chaos-win32-x64-msvc
+          verify_published @hanxuanliang/dsh-chaos-darwin-x64
+          verify_published @hanxuanliang/dsh-chaos-darwin-arm64
+          verify_published @hanxuanliang/dsh-chaos
       - name: Promote published packages to latest
         env:
           VERSION: ${{ steps.version.outputs.value }}
@@ -192,29 +207,3 @@ jobs:
           npm dist-tag add @hanxuanliang/dsh-chaos-darwin-x64@${VERSION} latest
           npm dist-tag add @hanxuanliang/dsh-chaos-darwin-arm64@${VERSION} latest
           npm dist-tag add @hanxuanliang/dsh-chaos@${VERSION} latest
-
-  github-release:
-    name: Publish GitHub release
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_REF }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: npm-release-packages
-          path: release
-      - name: Create checksums
-        working-directory: release
-        run: find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: dsh-chaos ${{ env.RELEASE_TAG }}
-          body_path: release-notes/${{ env.RELEASE_TAG }}.md
-          files: |
-            release/**/*
-          fail_on_unmatched_files: true
