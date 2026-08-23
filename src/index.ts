@@ -3,7 +3,6 @@
  * @module dsh-chaos
  */
 
-import { mkdir } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -23,6 +22,7 @@ import { DeliveryBridge } from './delivery.ts'
 import { installCollabRemote } from './remote.ts'
 import { RuntimeManager, type CreateRuntimeInput } from './runtime.ts'
 import { loadNativeModule, type NativeCollabHandle, type NativeRuntimeBinding } from './native.ts'
+import { isSupportedAgentPreset, requireSupportedAgentPreset } from './preset-policy.ts'
 
 export { DeliveryBridge } from './delivery.ts'
 export { RuntimeManager } from './runtime.ts'
@@ -249,7 +249,7 @@ export class CollabService extends Service {
     if (!AGENT_HANDLE.test(handle)) {
       throw new Error('[invalid_argument] handle must be 1..40 lowercase letters, numbers, or interior hyphens')
     }
-    const preset = await this.ctx.agentPresets.resolve(presetId)
+    const preset = await this.ctx.agentPresets.resolve(requireSupportedAgentPreset(presetId))
     if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
     const template = join(dshHome(), 'agents', '{id}')
     const nativeProfile = await this.requireHandle().createAgentProfile(
@@ -262,7 +262,6 @@ export class CollabService extends Service {
     let binding: NativeRuntimeBinding | undefined
     let setupError: string | undefined
     try {
-      await mkdir(workspacePath, { recursive: true })
       binding = await this.createRuntime({
         agentId: nativeProfile.actor.id,
         workspacePath,
@@ -293,6 +292,7 @@ export class CollabService extends Service {
   async deleteAgent(agentId: string) {
     await this.stopRuntime(agentId)
     await this.requireHandle().deleteAgent(agentId)
+    this.runtimes?.forgetIdentity(agentId)
     this.publishChange()
   }
 
@@ -369,14 +369,16 @@ export class CollabService extends Service {
 
   async listAgentPresets(): Promise<AgentPresetSummary[]> {
     const defaultId = this.ctx.agentPresets.defaultId
-    return (await this.ctx.agentPresets.list()).map(preset => ({
-      id: preset.id,
-      trust: preset.trust,
-      isDefault: preset.id === defaultId,
-      ...preset.name === undefined ? {} : { name: preset.name },
-      ...preset.description === undefined ? {} : { description: preset.description },
-      ...preset.broken === undefined ? {} : { broken: preset.broken },
-    }))
+    return (await this.ctx.agentPresets.list())
+      .filter(preset => isSupportedAgentPreset(preset.id))
+      .map(preset => ({
+        id: preset.id,
+        trust: preset.trust,
+        isDefault: preset.id === defaultId,
+        ...preset.name === undefined ? {} : { name: preset.name },
+        ...preset.description === undefined ? {} : { description: preset.description },
+        ...preset.broken === undefined ? {} : { broken: preset.broken },
+      }))
   }
 
   async agentProfile(viewerId: string, agentId: string): Promise<AgentProfile> {
@@ -427,6 +429,7 @@ export class CollabService extends Service {
       { ...profile.charter, schemaVersion: 1, summary: description },
       expectedProfileVersion,
     )
+    this.runtimes?.updateIdentityProjection(updated)
     const binding = await this.requireHandle().runtimeBinding(agentId)
     this.publishChange()
     return {
@@ -451,6 +454,7 @@ export class CollabService extends Service {
       avatarDataUrl,
       expectedProfileVersion,
     )
+    this.runtimes?.updateIdentityProjection(updated)
     const binding = await this.requireHandle().runtimeBinding(agentId)
     this.publishChange()
     return {
@@ -472,9 +476,8 @@ export class CollabService extends Service {
     expectedGeneration?: string,
   ): Promise<NativeRuntimeBinding> {
     const profile = await this.agentProfile(viewerId, agentId)
-    const preset = await this.ctx.agentPresets.resolve(presetId)
+    const preset = await this.ctx.agentPresets.resolve(requireSupportedAgentPreset(presetId))
     if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
-    await mkdir(profile.workspacePath, { recursive: true })
     const binding = await this.requireRuntimes().reset({
       agentId,
       workspacePath: profile.workspacePath,

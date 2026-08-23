@@ -22,6 +22,7 @@ const dependencies = [
       runtimeAgent.id = String(options.sessionId)
       await options.setup({
         on: () => {},
+        systemPrompt: { section: () => () => {} },
         tools: { register: definition => { scopedTools.set(definition.name, definition) } },
       })
       return { agent: runtimeAgent, dispose: async () => {} }
@@ -49,7 +50,7 @@ try {
     workspacePath: join(root, 'alpha'),
     provider: 'openai',
     model: 'codex',
-    preset: 'default',
+    preset: 'standard',
     sessionId: 'service-session',
   })
   assert.equal(binding.preset, 'standard')

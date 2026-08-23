@@ -1,9 +1,81 @@
 import { isUtf8 } from 'node:buffer'
-import { lstat, open, readdir, realpath } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { lstat, link, mkdir, open, readdir, realpath, rm } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { AgentWorkspaceEntry, AgentWorkspaceFile } from './agent-settings-types.ts'
+import type { NativeAgentProfile } from './native.ts'
 
 const MAX_PREVIEW_BYTES = 512 * 1024
+
+const WORKSPACE_INSTRUCTIONS = `# Workspace continuity
+
+This workspace is persistent and agent-owned. Its layout is intentionally unspecified; organize it as the work requires.
+
+Keep MEMORY.md as the recovery entry point. Read it when starting or recovering work. Before long-running work, make the current objective and next action recoverable there. After a durable decision or learning, keep the relevant material and its MEMORY pointer current.
+
+Local memory is continuity material, not shared authority. Current collaboration Messages, Tasks, Memberships, system signals, and executable evidence override conflicting local memory.
+`
+
+function initialMemory(profile: NativeAgentProfile): string {
+  return `# ${profile.actor.displayName}
+
+## Role
+${profile.charter.summary}
+
+## Key Knowledge
+- No durable knowledge recorded yet.
+
+## Active Context
+- First startup.
+`
+}
+
+function errno(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : undefined
+}
+
+async function requireRegularFile(path: string): Promise<void> {
+  const info = await lstat(path)
+  if (info.isSymbolicLink() || !info.isFile()) {
+    throw new Error(`[invalid_argument] workspace seed path is not a regular file: ${path}`)
+  }
+}
+
+/** Publish a complete seed without replacing an Agent-owned existing file. */
+async function seedFile(root: string, name: string, content: string): Promise<void> {
+  const target = join(root, name)
+  const temporary = join(root, `.chaos-seed-${randomUUID()}`)
+  const file = await open(temporary, 'wx', 0o600)
+  try {
+    await file.writeFile(content, 'utf8')
+    await file.close()
+    try {
+      await link(temporary, target)
+    } catch (error) {
+      if (errno(error) !== 'EEXIST') throw error
+      await requireRegularFile(target)
+    }
+  } finally {
+    await file.close().catch(() => {})
+    await rm(temporary, { force: true })
+  }
+}
+
+/** Ensure the two discoverability entry points without prescribing any layout. */
+export async function initializeAgentWorkspace(
+  root: string,
+  profile: NativeAgentProfile,
+): Promise<void> {
+  await mkdir(root, { recursive: true, mode: 0o700 })
+  const info = await lstat(root)
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    throw new Error('[invalid_argument] Agent workspace is not a regular directory')
+  }
+  await seedFile(root, 'AGENTS.md', WORKSPACE_INSTRUCTIONS)
+  await seedFile(root, 'MEMORY.md', initialMemory(profile))
+}
 
 function workspaceSegments(path: string): string[] {
   if (path === '') return []

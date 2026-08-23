@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -11,6 +11,7 @@ process.env.DSH_HOME = root
 const ctx = new Context()
 let rpcRegistration
 let sseRoute
+const promptSections = []
 const runtimeAgent = {
   id: 'unused-session',
   status: 'idle',
@@ -24,6 +25,12 @@ const dependencies = [
       runtimeAgent.id = String(options.sessionId)
       await options.setup({
         on: () => {},
+        systemPrompt: {
+          section: definition => {
+            promptSections.push(definition)
+            return () => {}
+          },
+        },
         tools: { register: () => {} },
       })
       return { agent: runtimeAgent, dispose: async () => {} }
@@ -35,6 +42,8 @@ const dependencies = [
     async list() {
       return [
         { id: 'standard', trust: 'system', name: 'Standard' },
+        { id: 'code', trust: 'system', name: 'PTC' },
+        { id: 'cordis', trust: 'system', name: 'Cordis' },
         { id: 'minimal', trust: 'system', name: 'Minimal', description: 'Small tool set' },
       ]
     },
@@ -127,22 +136,44 @@ try {
   const presets = await call('agent.presets', {})
   assert.equal(presets.ok, true)
   assert.equal(presets.value[0].isDefault, true)
+  assert.deepEqual(presets.value.map(preset => preset.id), ['standard', 'code', 'cordis'])
+  const unsupportedCreate = await call('agent.create', {
+    displayName: 'Unsupported Agent',
+    handle: 'unsupported-agent',
+    description: 'Must not be created',
+    provider: 'openai',
+    model: 'codex',
+    presetId: 'minimal',
+  })
+  assert.equal(unsupportedCreate.ok, false)
+  assert.equal(unsupportedCreate.error.code, 'invalid_argument')
   const createdAgent = await call('agent.create', {
     displayName: 'Workspace Agent',
     handle: 'workspace-agent',
     description: 'Own workspace verification',
     provider: 'openai',
     model: 'codex',
-    presetId: 'minimal',
+    presetId: 'code',
   })
   assert.equal(createdAgent.ok, true)
-  assert.equal(createdAgent.value.profile.binding.preset, 'minimal')
+  assert.equal(createdAgent.value.profile.binding.preset, 'code')
   const agentId = createdAgent.value.profile.actor.id
   const profile = await call('agent.profile', { agentId })
   assert.equal(profile.ok, true)
   assert.equal(profile.value.binding.sessionId, createdAgent.value.profile.binding.sessionId)
   assert.equal(profile.value.charter.summary, 'Own workspace verification')
   assert.equal(profile.value.workspacePath, join(root, 'agents', agentId))
+  const identityPrompt = promptSections.at(-1)
+  assert(identityPrompt)
+  assert.match(identityPrompt.text(), /You are Workspace Agent \(@workspace-agent\)/)
+  assert.match(identityPrompt.text(), /Own workspace verification/)
+  assert.match(identityPrompt.text(), /message_check/)
+  assert.equal(identityPrompt.text().includes(profile.value.workspacePath), true)
+  const agentsSeed = await readFile(join(profile.value.workspacePath, 'AGENTS.md'), 'utf8')
+  const memorySeed = await readFile(join(profile.value.workspacePath, 'MEMORY.md'), 'utf8')
+  assert.match(agentsSeed, /layout is intentionally unspecified/)
+  assert.match(memorySeed, /# Workspace Agent/)
+  assert.match(memorySeed, /## Key Knowledge/)
   const profiles = await call('agent.profiles', {})
   assert.equal(profiles.ok, true)
   assert(profiles.value.some(item => item.actor.id === agentId && item.binding.sessionId === profile.value.binding.sessionId))
@@ -155,6 +186,8 @@ try {
   assert.equal(updatedProfile.ok, true)
   assert.equal(updatedProfile.value.actor.displayName, 'Workspace Reviewer')
   assert.equal(updatedProfile.value.charter.summary, 'Review workspace behavior')
+  assert.match(identityPrompt.text(), /You are Workspace Reviewer \(@workspace-agent\)/)
+  assert.match(identityPrompt.text(), /Review workspace behavior/)
   const avatar = await call('agent.avatar.update', {
     agentId,
     avatarDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -181,8 +214,11 @@ try {
     includeHidden: false,
   })
   assert.equal(workspace.ok, true)
-  assert.deepEqual(workspace.value.map(entry => entry.name), ['binary.bin', 'hello.txt', 'large.txt', 'escape'])
-  assert.equal(workspace.value[3].kind, 'symlink')
+  assert.deepEqual(
+    workspace.value.map(entry => entry.name),
+    ['AGENTS.md', 'binary.bin', 'hello.txt', 'large.txt', 'MEMORY.md', 'escape'],
+  )
+  assert.equal(workspace.value[5].kind, 'symlink')
   const hiddenWorkspace = await call('agent.workspace.list', {
     agentId,
     dirPath: '',
@@ -231,15 +267,40 @@ try {
   })
   assert.equal(paired.ok, true)
   assert.equal(paired.value.profile.binding.provider, 'openai')
-  const replaced = await call('agent.runtime.replace', {
+  await writeFile(
+    join(paired.value.profile.workspacePath, 'AGENTS.md'),
+    '# Agent-owned instructions\n',
+  )
+  await writeFile(
+    join(paired.value.profile.workspacePath, 'MEMORY.md'),
+    '# Agent-owned memory\n',
+  )
+  const unsupportedReset = await call('agent.runtime.replace', {
     agentId: paired.value.profile.actor.id,
     provider: 'openai',
     model: 'codex-next',
     presetId: 'minimal',
     expectedGeneration: paired.value.profile.binding.generation,
   })
+  assert.equal(unsupportedReset.ok, false)
+  assert.equal(unsupportedReset.error.code, 'invalid_argument')
+  const replaced = await call('agent.runtime.replace', {
+    agentId: paired.value.profile.actor.id,
+    provider: 'openai',
+    model: 'codex-next',
+    presetId: 'cordis',
+    expectedGeneration: paired.value.profile.binding.generation,
+  })
   assert.equal(replaced.ok, true)
   assert.equal(replaced.value.generation, '2')
+  assert.equal(
+    await readFile(join(paired.value.profile.workspacePath, 'AGENTS.md'), 'utf8'),
+    '# Agent-owned instructions\n',
+  )
+  assert.equal(
+    await readFile(join(paired.value.profile.workspacePath, 'MEMORY.md'), 'utf8'),
+    '# Agent-owned memory\n',
+  )
   const staleRuntime = await call('agent.runtime.replace', {
     agentId: paired.value.profile.actor.id,
     provider: 'openai',
