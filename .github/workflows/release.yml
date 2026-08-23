@@ -34,12 +34,12 @@ jobs:
             source: target/x86_64-pc-windows-msvc/release/dsh_chaos_core.dll
             verify: true
           - id: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
             target: x86_64-apple-darwin
             source: target/x86_64-apple-darwin/release/libdsh_chaos_core.dylib
             verify: true
           - id: darwin-arm64
-            runner: macos-14
+            runner: macos-15
             target: aarch64-apple-darwin
             source: target/aarch64-apple-darwin/release/libdsh_chaos_core.dylib
             verify: false
@@ -159,8 +159,8 @@ jobs:
         runner:
           - ubuntu-latest
           - windows-latest
-          - macos-13
-          - macos-14
+          - macos-15-intel
+          - macos-15
     steps:
       - uses: actions/setup-node@v4
         with:
