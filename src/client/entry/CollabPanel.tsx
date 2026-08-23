@@ -112,10 +112,9 @@ export function CollabPanel({ t, onClose, store, activeLocale }: CollabPanelProp
         pendingThreadRoot={pendingThreadRoot}
         onPendingThreadConsumed={() => { setPendingThreadRoot(undefined) }}
         headerLeading={<span className={css.mobileChannelsButton}><IconButton label={t('panel.channels')} icon={<IconChevronLeftOutline14 size={14} />} onClick={() => { setMobileChannelsOpen(true) }} /></span>}
-        headerActions={active.lifecycle === 'archived' ? <>
-          <StatusChip tone="neutral" label={t('channel.archived')} />
-          {active.createdBy === state.selfId && <Button variant="outline" size="sm" disabled={channelActionBusy} onClick={() => { runLifecycle(() => store.restoreChannel(active.id)) }}>{t('channel.restore')}</Button>}
-        </> : undefined}
+        headerActions={active.lifecycle === 'archived'
+          ? <StatusChip tone="neutral" label={t('channel.archived')} />
+          : undefined}
       />
     )}
   </main>

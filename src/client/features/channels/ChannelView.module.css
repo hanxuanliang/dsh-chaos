@@ -44,14 +44,6 @@
   font-weight: 500;
 }
 
-.channel .channelInfo {
-  width: 26px;
-  height: 26px;
-  flex: none;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-
 /* Assignee editor chip: bordered value + pencil (raft task panel idiom). */
 
 /* ---- thread panel (P0-5, spec §2.1) -------------------------------------- */
