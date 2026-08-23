@@ -223,8 +223,8 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
         )}
       </div>
       <div className={css.actionsTrailing}>
-        <Button variant="outline" disabled={submitting} onClick={onCancel}>{t('create.cancel')}</Button>
-        <Button variant="primary" disabled={!canSubmit} onClick={submit}>
+        <Button variant="outline" size="sm" disabled={submitting} onClick={onCancel}>{t('create.cancel')}</Button>
+        <Button variant="primary" size="sm" disabled={!canSubmit} onClick={submit}>
           {submitting ? t('create.submitting') : t('create.submit')}
         </Button>
       </div>
