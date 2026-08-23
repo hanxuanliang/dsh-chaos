@@ -183,46 +183,9 @@ jobs:
             release/*.tgz
             npm/*/dsh_chaos_core.node
           if-no-files-found: error
-
-  verify-install:
-    name: Install ${{ matrix.runner }}
-    needs: publish
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner:
-          - ubuntu-latest
-          - windows-latest
-          - macos-15-intel
-          - macos-15
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install published plugin without Rust
+      - name: Promote published packages to latest
         env:
-          DSH_HOME: ${{ runner.temp }}/dsh-home
-        run: npx --yes @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add @hanxuanliang/dsh-chaos@${{ needs.publish.outputs.version }}
-
-  promote:
-    name: Promote npm packages to latest
-    needs: [publish, verify-install]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - run: npm install --global npm@11
-      - name: Promote verified packages
-        env:
-          VERSION: ${{ needs.publish.outputs.version }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           npm dist-tag add @hanxuanliang/dsh-chaos-linux-x64-gnu@${VERSION} latest
           npm dist-tag add @hanxuanliang/dsh-chaos-win32-x64-msvc@${VERSION} latest
@@ -232,7 +195,7 @@ jobs:
 
   github-release:
     name: Publish GitHub release
-    needs: promote
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
