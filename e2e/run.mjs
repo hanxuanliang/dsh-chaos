@@ -424,6 +424,24 @@ try {
   await page.clickExpression('Collab entry', `[...document.querySelectorAll('button')]
     .find(button => button.getAttribute('aria-label') === 'Collab')`)
   await page.waitForExpression('Channels navigation', `document.querySelector('nav[aria-label="Channels"]')?.offsetParent !== null`)
+  await page.waitForExpression('active Channel group starts expanded', `(() => {
+    const button = document.querySelector('button[data-channel-group-toggle="active"]');
+    const chevron = button?.querySelector('[data-open="true"]');
+    return button?.getAttribute('aria-expanded') === 'true'
+      && document.querySelector('[data-channel-group-list="active"]') !== null
+      && chevron instanceof HTMLElement
+      && getComputedStyle(chevron).transform !== 'none';
+  })()`)
+  await page.clickExpression('collapse active Channel group', `document.querySelector('button[data-channel-group-toggle="active"]')`)
+  await page.waitForExpression('active Channel group collapsed', `(() => {
+    const button = document.querySelector('button[data-channel-group-toggle="active"]');
+    return button?.getAttribute('aria-expanded') === 'false'
+      && document.querySelector('[data-channel-group-list="active"]') === null
+      && button?.querySelector('[data-open="true"]') === null;
+  })()`)
+  await page.clickExpression('expand active Channel group', `document.querySelector('button[data-channel-group-toggle="active"]')`)
+  await page.waitForExpression('active Channel group reopened', `document.querySelector('button[data-channel-group-toggle="active"]')?.getAttribute('aria-expanded') === 'true'
+    && document.querySelector('[data-channel-group-list="active"]') !== null`)
 
   const channelName = `e2e-core-${Date.now().toString(36)}`
   const messageText = `E2E message ${Date.now().toString(36)}`
@@ -514,6 +532,15 @@ try {
   await page.screenshot('channel-archived.png')
   await page.clickExpression('Archived group', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim().startsWith('Archived'))`)
+  await page.waitForExpression('Archived group expands with rotating chevron and Channel spacing', `(() => {
+    const button = document.querySelector('button[data-channel-group-toggle="archived"]');
+    const list = document.querySelector('[data-channel-group-list="archived"]');
+    const chevron = button?.querySelector('[data-open="true"]');
+    if (!(button instanceof HTMLElement) || !(list instanceof HTMLElement) || !(chevron instanceof HTMLElement)) return false;
+    return button.getAttribute('aria-expanded') === 'true'
+      && getComputedStyle(chevron).transform !== 'none'
+      && list.getBoundingClientRect().top - button.getBoundingClientRect().bottom >= 5;
+  })()`)
   await page.clickExpression('Archived Channel actions', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
   await page.waitForExpression('Restore archived Channel action', `!![...document.querySelectorAll('[role="menuitem"]')]

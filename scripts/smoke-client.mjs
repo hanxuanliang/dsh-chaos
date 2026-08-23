@@ -40,6 +40,24 @@ globalThis.window = {
 
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
+// Non-Latin display names must receive distinct valid defaults instead of
+// collapsing every Agent to the reserved-looking fallback "agent". Existing
+// handles also force a deterministic numeric suffix, and users may still edit
+// the visible handle field before creation.
+{
+  const { generatedAgentHandle, isValidAgentHandle } = await import('../lib/client/features/agents/agent-handle.js')
+  const chinese = generatedAgentHandle('前端助手', [])
+  const reviewer = generatedAgentHandle('代码审查', [])
+  assert.match(chinese, /^agent-[a-z0-9]+$/)
+  assert.match(reviewer, /^agent-[a-z0-9]+$/)
+  assert.notEqual(chinese, reviewer)
+  assert.equal(generatedAgentHandle('Frontend Reviewer', []), 'frontend-reviewer')
+  assert.equal(generatedAgentHandle('Frontend Reviewer', ['frontend-reviewer']), 'frontend-reviewer-2')
+  assert.equal(generatedAgentHandle('前端助手', [chinese]), `${chinese}-2`)
+  assert.equal(isValidAgentHandle(chinese), true)
+  assert.equal(isValidAgentHandle('中文'), false)
+}
+
 // The P0 client declares the services it needs and registers a single
 // settings.section entry (id 'chaos-agents') for the Agents management page.
 assert.deepEqual(clientModule.inject, ['slots', 'connection', 'locale', 'sessions', 'conversation', 'workspaces'])
