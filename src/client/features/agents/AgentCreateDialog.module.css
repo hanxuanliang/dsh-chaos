@@ -37,13 +37,13 @@
   color: var(--dsw-alias-label-primary);
   background: transparent;
   font: inherit;
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
   outline: none;
 }
 
-.titleInput::placeholder { color: var(--dsw-alias-label-tertiary); }
+.titleInput::placeholder { color: var(--dsw-alias-label-tertiary); font-weight: 500; }
 .titleInput:disabled { opacity: 0.6; }
 .titleInput[aria-invalid='true'] { color: var(--dsw-alias-state-error-primary, inherit); }
 
@@ -56,7 +56,8 @@
   background: transparent;
   font: inherit;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-secondary);
   resize: vertical;
   outline: none;
 }
