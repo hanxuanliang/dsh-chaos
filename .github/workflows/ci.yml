@@ -33,3 +33,5 @@ jobs:
       - run: pnpm smoke:remote
       - run: pnpm smoke:transport
       - run: pnpm smoke:client
+      - run: pnpm public:check
+      - run: pnpm release:check

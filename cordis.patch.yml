@@ -1,4 +1,4 @@
 - insert:
     - id: dsh-chaos
-      name: dsh-chaos
+      name: '@hanxuanliang/dsh-chaos'
       config: {}

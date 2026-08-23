@@ -51,7 +51,17 @@ pnpm test:e2e
 
 See [Testing](./testing.md) for the quick loop and failure criteria.
 
-## Tarball install
+## Published install
+
+Published packages include a prebuilt native module selected for the current operating system and architecture. End users do not need Rust:
+
+```sh
+dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.1
+```
+
+The supported `0.1.1` targets are Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
+
+## Tarball install during development
 
 Build the tarball on the target operating system and architecture whenever possible:
 
@@ -65,12 +75,12 @@ pnpm pack
 Install the resulting file into an isolated Web profile:
 
 ```sh
-dsh plugin --profile web add "$REPO_ROOT/dsh-chaos-0.1.0.tgz"
+dsh plugin --profile web add "$REPO_ROOT/hanxuanliang-dsh-chaos-0.1.1.tgz"
 dsh --profile web --dump-config
 dsh web --host 127.0.0.1 --port "$PORT"
 ```
 
-The tarball contains a platform-specific native module. Do not reuse a build across operating systems, CPU architectures, or incompatible C libraries. A source build on the target machine is the portable fallback.
+The root tarball expects the matching `@hanxuanliang/dsh-chaos-*` native package to be available from npm. Before the first public release, use a linked source install for local development; after publication, the tarball resolves the same prebuilt native package as a normal npm install.
 
 ## Acceptance checks
 

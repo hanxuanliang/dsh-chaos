@@ -1,9 +1,24 @@
 {
-  "name": "dsh-chaos",
-  "version": "0.1.0",
+  "name": "@hanxuanliang/dsh-chaos",
+  "version": "0.1.1",
   "description": "Peer multi-Agent collaboration for DeepSeek Harness",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "chxldxyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hanxuanliang/dsh-chaos.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hanxuanliang/dsh-chaos/issues"
+  },
+  "homepage": "https://github.com/hanxuanliang/dsh-chaos#readme",
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "multi-agent",
+    "collaboration"
+  ],
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "exports": {
@@ -20,10 +35,17 @@
   },
   "files": [
     "lib",
-    "native/dsh_chaos_core.node",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "assets/readme/hero.svg",
+    "release-notes",
+    "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "packageManager": "pnpm@9.6.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -43,18 +65,26 @@
     }
   },
   "scripts": {
-    "build": "pnpm build:native && pnpm build:ts && pnpm build:client",
+    "clean": "node scripts/clean-output.mjs",
+    "clean:lib": "node scripts/clean-output.mjs lib",
+    "build": "pnpm clean && pnpm build:native && pnpm build:ts && pnpm build:client",
+    "build:package": "pnpm clean:lib && pnpm build:ts && pnpm build:client",
     "build:client": "tsdown --config tsdown.client.config.ts",
     "build:native": "cargo build -p dsh-chaos-core --features napi --release && node scripts/stage-native.mjs release",
     "build:native:debug": "cargo build -p dsh-chaos-core --features napi && node scripts/stage-native.mjs debug",
     "build:ts": "tsc -p tsconfig.json",
     "check:rust": "cargo check --workspace",
     "smoke:native": "node scripts/smoke-native.mjs",
+    "smoke:packed": "node scripts/smoke-packed-release.mjs",
     "smoke:client": "node scripts/smoke-client.mjs",
     "smoke:remote": "node scripts/smoke-remote.mjs",
     "smoke:service": "node scripts/smoke-service.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:transport": "node scripts/smoke-web-transport.mjs",
+    "prepare": "pnpm build:package",
+    "prepublishOnly": "pnpm release:check",
+    "public:check": "node scripts/check-public.mjs",
+    "release:check": "node scripts/check-release.mjs",
     "test:e2e": "pnpm build:native:debug && pnpm build:ts && pnpm build:client && node e2e/run.mjs",
     "test:e2e:run": "node e2e/run.mjs",
     "test:rust": "cargo test --workspace",
@@ -109,5 +139,11 @@
     "react-resizable-panels": "^4.12.3",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
+  },
+  "optionalDependencies": {
+    "@hanxuanliang/dsh-chaos-darwin-arm64": "workspace:0.1.1",
+    "@hanxuanliang/dsh-chaos-darwin-x64": "workspace:0.1.1",
+    "@hanxuanliang/dsh-chaos-linux-x64-gnu": "workspace:0.1.1",
+    "@hanxuanliang/dsh-chaos-win32-x64-msvc": "workspace:0.1.1"
   }
 }

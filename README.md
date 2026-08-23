@@ -7,7 +7,7 @@
 `dsh-chaos` adds a local collaboration workspace to the official DSH Web UI. Create stable Agents, bring them into Channels, discuss work in Threads, turn Messages into Tasks, and follow progress through a truthful Activity view. The collaboration record is stored in a transactional local ledger and survives browser refreshes, plugin restarts, and Agent session replacement.
 
 > [!IMPORTANT]
-> This project is a development preview. It is installed from source, is not published to npm, and currently targets the DSH `0.1.0-rc.7` package line.
+> Version `0.1.1` is the first public preview and targets the DSH `0.1.0-rc.7` package line.
 
 > [!WARNING]
 > Every new Chaos-managed Agent Session starts with DSH's `danger-full-access` permission preset. The Agent can run commands without approval prompts and can read, modify, or delete any file available to the operating-system account running DSH; this does not grant privileges beyond that account. Use Chaos only with trusted models and in an appropriately isolated account or machine. This is currently a fixed policy, not a user-selectable setting.
@@ -35,10 +35,25 @@ Chaos learns from that way of thinking and carries the inspiration into DeepSeek
 
 - Node.js `^22.19.0` or `>=24.0.0`
 - pnpm 9
-- Rust toolchain
 - An installed `dsh` CLI from the `0.1.0-rc.7` package line
 
-Build and link the current checkout into the DSH Web profile:
+Install the prebuilt plugin from npm:
+
+```sh
+dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.1
+```
+
+Or install the same tagged source from GitHub:
+
+```sh
+npx @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add github:hanxuanliang/dsh-chaos#v0.1.1
+```
+
+Both routes select a prebuilt native module for the current platform; users do not need a Rust toolchain. Supported targets are Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
+
+If pnpm explicitly reports that the GitHub package's build was blocked, retry with `--allow-build=@hanxuanliang/dsh-chaos`. Published npm installs do not run a native build.
+
+To build and link the current checkout instead, install Rust and run:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -128,7 +143,8 @@ Example profile override:
 - The plugin stores provider/model/Preset references, not provider credentials. Provider credentials stay in DSH.
 - Turso is the durable source of truth. Provider transcripts and browser caches are not collaboration authority.
 - One local DSH host process owns the database and runtime bridge. Coordinating multiple processes against the same file is outside the current contract.
-- The native module is platform-specific. A source install must build it on the target operating system and architecture.
+- Published installs select a platform-specific native package automatically. Linux arm64, Linux musl, and Windows arm64 are not supported in `0.1.1`.
+- A source checkout can build the native module locally with Rust when developing the plugin.
 
 ## Testing
 
@@ -148,6 +164,7 @@ See [Testing](./docs/testing.md) for fast rebuild loops, boundary smoke tests, E
 | --- | --- |
 | [Testing](./docs/testing.md) | Fast validation, isolated official-host E2E, evidence, and failure triage. |
 | [Local development](./docs/local-dev-install.md) | Linked development installs, rebuild/restart boundaries, and tarball testing. |
+| [Releasing](./docs/releasing.md) | Multi-platform native packages, npm/GitHub release order, and first-release credentials. |
 | [Documentation index](./docs/README.md) | Supported product and contributor documentation. |
 
 ## Development
