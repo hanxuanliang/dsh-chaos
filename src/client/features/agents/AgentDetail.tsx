@@ -14,6 +14,7 @@ import type { ChaosTranslate } from '../../locales.ts'
 import { PanelHeader, Toolbar } from '../../shared/layout/index.ts'
 import { ErrorBanner, Field, IconButton, StatusChip, Tabs } from '../../shared/ui/index.ts'
 import { AgentAvatarEditor } from './AgentAvatarEditor.tsx'
+import { PillSelect } from './PillSelect.tsx'
 import css from './AgentDetail.module.css'
 
 type Tab = 'identity' | 'runtime' | 'collaboration'
@@ -179,9 +180,35 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
           {catalogError !== null && <ErrorBanner>{t('create.routeFailed', { error: catalogError })} <button type="button" className={css.inlineAction} onClick={loadCatalog}>{t('create.routeRetry')}</button></ErrorBanner>}
           {catalog === null && catalogError === null && <p className={css.state} role="status">{t('create.routeLoading')}</p>}
           {catalog !== null && <div className={css.runtimeGrid}>
-            <Field label={t('create.provider')} required><select value={provider} disabled={runtimeSaving} onChange={event => { setProvider(event.target.value); setModel(''); setRuntimeError(null) }}><option value="" disabled>{t('create.providerPlaceholder')}</option>{catalog.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></Field>
-            <Field label={t('create.model')} required><select value={model} disabled={runtimeSaving || provider === ''} onChange={event => { setModel(event.target.value); setRuntimeError(null) }}><option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>{models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-            <Field label={t('create.preset')} required><select value={presetId} disabled={runtimeSaving} onChange={event => { setPresetId(event.target.value); setRuntimeError(null) }}>{presets.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>{item.name?.trim() || item.id}</option>)}</select></Field>
+            <div className={css.pillRow} role="group" aria-label={t('agents.runtime')}>
+              <PillSelect
+                label={t('create.provider')}
+                placeholder={t('create.providerPlaceholder')}
+                value={catalog.groups.find(group => group.id === provider)?.name ?? provider}
+                entries={catalog.groups.map(group => ({ id: group.id, label: group.name }))}
+                selectedId={provider}
+                disabled={runtimeSaving}
+                onSelect={id => { setProvider(id); setModel(''); setRuntimeError(null) }}
+              />
+              <PillSelect
+                label={t('create.model')}
+                placeholder={models.length === 0 ? t('create.modelNone') : t('create.modelPick')}
+                value={models.find(item => item.id === model)?.name ?? model}
+                entries={models.map(item => ({ id: item.id, label: item.name }))}
+                selectedId={model}
+                disabled={runtimeSaving || provider === ''}
+                onSelect={id => { setModel(id); setRuntimeError(null) }}
+              />
+              <PillSelect
+                label={t('create.preset')}
+                placeholder={t('create.presetPlaceholder')}
+                value={presets.find(item => item.id === presetId)?.name?.trim() ?? presetId}
+                entries={presets.map(item => ({ id: item.id, label: item.name?.trim() || item.id, disabled: item.broken !== undefined }))}
+                selectedId={presetId}
+                disabled={runtimeSaving}
+                onSelect={id => { setPresetId(id); setRuntimeError(null) }}
+              />
+            </div>
           </div>}
           <p className={css.runtimeWarning}>{t('agents.runtimeWarning')}</p>
           <footer className={css.footer}>
