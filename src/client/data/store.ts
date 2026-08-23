@@ -419,23 +419,10 @@ export class CollabStore {
     return result.message
   }
 
-  /**
-   * Create = create + claim, one sequence (agreed convention 2026-08-19,
-   * "方案A"): whoever creates the task on THIS surface becomes its first
-   * assignee immediately; the native pool semantics remain untouched, the
-   * claim is just issued automatically right after. If the claim leg loses a
-   * race, the created task is still surfaced truthfully.
-   */
+  /** Local composer "As task": create a todo in the shared, unassigned pool. */
   async createTask(messageId: string): Promise<NativeTask> {
-    const created = await this.client.taskCreate(messageId)
-    this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [created.messageId]: created } })
-    let task = created
-    try {
-      task = await this.client.taskClaim(messageId)
-      this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [task.messageId]: task } })
-    } catch {
-      // Already-claimed by someone else: keep the created truth as-is.
-    }
+    const task = await this.client.taskCreate(messageId)
+    this.set({ tasksByMessage: { ...this.snapshot.tasksByMessage, [task.messageId]: task } })
     return task
   }
 
