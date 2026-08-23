@@ -203,7 +203,7 @@ These are the minimal shared components Chaos should own:
 | `Tabs` | Real tab/panel semantics, arrow-key navigation, active indicator |
 | `SegmentedControl` | Filters or view modes, button-group semantics and pressed state |
 | `StatusChip` | Real domain status only, never decorative tagging |
-| `AvatarChip` | One custom local image or a stable, differentiable two-glyph fallback |
+| `AvatarChip` | Custom local image precedence, stable generated Agent art, and one shared human silhouette fallback |
 | `EntityRow` | Selection, primary/secondary/meta slots, row action slot |
 | `PanelHeader` | Title, optional back action, compact action group |
 | `Toolbar` | Filters, view controls, and overflow behavior |
