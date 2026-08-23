@@ -151,7 +151,8 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
           />
         </div>}
       {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
-        presetsError={presetsError} onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
+        presetsError={presetsError} existingHandles={profiles.map(profile => profile.actor.handle)}
+        onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
       {deleteProfile !== null && <RiskConfirmation open title={t('agents.deleteTitle', { name: deleteProfile.actor.displayName })}
         description={t('agents.deleteDescription')} acknowledgeLabel={t('agents.deleteAcknowledge')} cancelLabel={t('agents.cancel')}
         confirmLabel={deleting ? t('agents.deleting') : t('agents.deleteConfirm')} acknowledged={deleteAcknowledged}

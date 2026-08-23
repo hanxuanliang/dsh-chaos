@@ -5,6 +5,7 @@ import type { AgentPresetSummary, CreatedAgent } from '../../../agent-settings-t
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import { ErrorBanner, Field, TextInput } from '../../shared/ui/index.ts'
+import { generatedAgentHandle, isValidAgentHandle } from './agent-handle.ts'
 import css from './AgentCreateDialog.module.css'
 
 export interface AgentCreateDialogProps {
@@ -12,22 +13,19 @@ export interface AgentCreateDialogProps {
   presets: AgentPresetSummary[] | null
   presetsLoading: boolean
   presetsError: string | null
+  existingHandles: readonly string[]
   onPresetsRetry(): void
   onClose(): void
   onCreated(result: CreatedAgent): void
   t: ChaosTranslate
 }
 
-function generatedHandle(name: string): string {
-  const handle = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return (handle === '' ? 'agent' : handle).slice(0, 40)
-}
-
 /** One-page identity-first creation; runtime failure still returns the durable Profile. */
 export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
-  const { connection, presets, presetsLoading, presetsError, onPresetsRetry, onClose, onCreated, t } = props
+  const { connection, presets, presetsLoading, presetsError, existingHandles, onPresetsRetry, onClose, onCreated, t } = props
   const client = useMemo(() => new ChaosClient(connection), [connection])
   const [displayName, setDisplayName] = useState('')
+  const [customHandle, setCustomHandle] = useState<string | null>(null)
   const [description, setDescription] = useState('')
   const [presetId, setPresetId] = useState('')
   const [provider, setProvider] = useState('')
@@ -67,8 +65,20 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
   }, [loadCatalog])
 
   const models = catalog?.groups.find(group => group.id === provider)?.models ?? []
-  const handle = generatedHandle(displayName)
+  const suggestedHandle = useMemo(
+    () => generatedAgentHandle(displayName, existingHandles),
+    [displayName, existingHandles],
+  )
+  const handle = customHandle ?? suggestedHandle
+  const normalizedHandle = handle.trim().toLowerCase()
+  const handleExists = existingHandles.some(existing => existing.toLowerCase() === normalizedHandle)
+  const handleError = !isValidAgentHandle(normalizedHandle)
+    ? t('create.handleInvalid')
+    : handleExists
+      ? t('create.handleExists')
+      : undefined
   const canSubmit = displayName.trim() !== ''
+    && handleError === undefined
     && description.trim() !== ''
     && provider !== ''
     && model !== ''
@@ -83,7 +93,7 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
     setFailure(null)
     const request: CreateAgentRequest = {
       displayName: displayName.trim(),
-      handle,
+      handle: normalizedHandle,
       description: description.trim(),
       provider,
       model,
@@ -121,6 +131,11 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
           <TextInput id="chaos-agent-create-name" value={displayName}
             onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
             placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
+        </Field>
+        <Field label={t('create.handle')} required hint={t('create.handleHint')} error={handleError}>
+          <TextInput id="chaos-agent-create-handle" value={handle}
+            onChange={event => { setCustomHandle(event.target.value.toLowerCase()); setFailure(null) }} maxLength={40}
+            placeholder={t('create.handlePlaceholder')} autoComplete="off" disabled={submitting} />
         </Field>
         <Field label={t('create.charter')} required hint={t('create.charterHint')}>
           <textarea id="chaos-agent-create-charter" className={css.textarea} value={description}

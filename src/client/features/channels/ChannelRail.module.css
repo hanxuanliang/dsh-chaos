@@ -59,7 +59,16 @@
 .rail .railTitle:hover {
   color: var(--dsw-alias-label-secondary);
 }
-.railChevron { transition: transform var(--chaos-motion-fast) ease; }
+.railChevron {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--chaos-motion-fast) ease;
+}
+.railChevron svg { width: 10px; height: 10px; }
 .railChevron[data-open='true'] { transform: rotate(90deg); }
 .rail .railLabel {
   overflow: hidden;
@@ -151,7 +160,6 @@
 .rail .archiveGroup {
   display: flex;
   flex-direction: column;
-  gap: 1px;
   margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid var(--dsw-alias-border-l1);

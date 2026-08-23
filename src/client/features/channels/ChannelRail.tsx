@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react'
+import { useId, useState, type JSX } from 'react'
 import {
   IconArchiveOutline20,
   IconChevronRightOutline14,
@@ -103,10 +103,20 @@ function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onA
   })}</>
 }
 
+function GroupChevron({ open }: { open: boolean }): JSX.Element {
+  return (
+    <span className={css.railChevron} data-open={open ? 'true' : undefined} aria-hidden="true">
+      <IconChevronRightOutline14 size={10} />
+    </span>
+  )
+}
+
 export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onArchive, onRestore, onDelete }: ChannelRailProps): JSX.Element {
   const [activeOpen, setActiveOpen] = useState(true)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [menuId, setMenuId] = useState<string | undefined>(undefined)
+  const activeListId = useId()
+  const archivedListId = useId()
   const activeChannels = state.channels.filter(channel => channel.lifecycle === 'active')
   const archivedChannels = state.channels.filter(channel => channel.lifecycle === 'archived')
   const rows = { state, menuId, setMenuId, onSelect, onEdit, onArchive, onRestore, onDelete, t }
@@ -114,8 +124,9 @@ export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onArchive, o
   return (
     <nav className={css.rail} aria-label={t('panel.channels')}>
       <div className={css.railHead}>
-        <button type="button" className={css.railTitle} aria-expanded={activeOpen} onClick={() => { setActiveOpen(!activeOpen) }}>
-          <IconChevronRightOutline14 className={css.railChevron} data-open={activeOpen ? 'true' : undefined} size={10} />
+        <button type="button" className={css.railTitle} aria-expanded={activeOpen} aria-controls={activeListId}
+          data-channel-group-toggle="active" onClick={() => { setActiveOpen(open => !open) }}>
+          <GroupChevron open={activeOpen} />
           <span className={css.railLabel}>{t('panel.channels')}</span>
           <span className={css.railCount}>{activeChannels.length}</span>
         </button>
@@ -125,19 +136,22 @@ export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onArchive, o
       </div>
       <div className={css.railScroll}>
         {activeOpen && (
-          <div role="list">
+          <div id={activeListId} data-channel-group-list="active" role="list">
             {activeChannels.length === 0 && <p className={css.railEmpty}>{t('panel.railEmpty')}</p>}
             <ChannelRows channels={activeChannels} {...rows} />
           </div>
         )}
         {archivedChannels.length > 0 && (
           <section className={css.archiveGroup}>
-            <button type="button" className={css.railTitle} aria-expanded={archivedOpen} onClick={() => { setArchivedOpen(!archivedOpen) }}>
-              <IconChevronRightOutline14 className={css.railChevron} data-open={archivedOpen ? 'true' : undefined} size={10} />
-              <span className={css.railLabel}>{t('channel.archivedGroup')}</span>
-              <span className={css.railCount}>{archivedChannels.length}</span>
-            </button>
-            {archivedOpen && <div role="list"><ChannelRows channels={archivedChannels} {...rows} /></div>}
+            <div className={css.railHead}>
+              <button type="button" className={css.railTitle} aria-expanded={archivedOpen} aria-controls={archivedListId}
+                data-channel-group-toggle="archived" onClick={() => { setArchivedOpen(open => !open) }}>
+                <GroupChevron open={archivedOpen} />
+                <span className={css.railLabel}>{t('channel.archivedGroup')}</span>
+                <span className={css.railCount}>{archivedChannels.length}</span>
+              </button>
+            </div>
+            {archivedOpen && <div id={archivedListId} data-channel-group-list="archived" role="list"><ChannelRows channels={archivedChannels} {...rows} /></div>}
           </section>
         )}
       </div>
