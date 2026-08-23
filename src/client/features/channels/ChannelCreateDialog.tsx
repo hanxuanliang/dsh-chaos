@@ -19,17 +19,28 @@ export interface ChannelCreateDialogProps {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
+  draft: ChannelCreateDraft
+  onDraftChange(draft: ChannelCreateDraft): void
+  onCreateAgent(): void
   onClose(): void
+}
+
+export interface ChannelCreateDraft {
+  name: string
+  description: string
+  selected: ReadonlySet<string>
+}
+
+export function emptyChannelCreateDraft(): ChannelCreateDraft {
+  return { name: '', description: '', selected: new Set() }
 }
 
 function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
 
-export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateDialogProps): JSX.Element {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+export function ChannelCreateDialog({ t, store, state, draft, onDraftChange, onCreateAgent, onClose }: ChannelCreateDialogProps): JSX.Element {
+  const { name, description, selected } = draft
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
@@ -41,12 +52,10 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
   const canSubmit = trimmed !== '' && trimmedDescription !== '' && !duplicate && !submitting
 
   const toggle = (memberId: string): void => {
-    setSelected((previous) => {
-      const next = new Set(previous)
-      if (next.has(memberId)) next.delete(memberId)
-      else next.add(memberId)
-      return next
-    })
+    const next = new Set(selected)
+    if (next.has(memberId)) next.delete(memberId)
+    else next.add(memberId)
+    onDraftChange({ ...draft, selected: next })
     setFailure(null)
   }
 
@@ -89,13 +98,13 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
       <Field
         label={t('channelCreate.name')}
         required
-        hint={duplicate ? undefined : t('channelCreate.nameHint')}
+        help={t('channelCreate.nameHint')}
         error={duplicate ? t('channelCreate.nameExists') : undefined}
       >
         <TextInput
           id="chaos-channel-create-name"
           value={name}
-          onChange={(event) => { setName(event.target.value); setFailure(null) }}
+          onChange={(event) => { onDraftChange({ ...draft, name: event.target.value }); setFailure(null) }}
           maxLength={64}
           placeholder={t('channelCreate.namePlaceholder')}
           autoComplete="off"
@@ -108,7 +117,8 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
       <Field
         label={t('channelCreate.description')}
         required
-        hint={t('channelCreate.descriptionHint', { count: description.length })}
+        help={t('channelCreate.descriptionHint')}
+        meta={t('channelCreate.descriptionCount', { count: description.length })}
       >
         <textarea
           id="chaos-channel-create-description"
@@ -116,13 +126,18 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
           maxLength={280}
           placeholder={t('channelCreate.descriptionPlaceholder')}
           disabled={submitting}
-          onChange={(event) => { setDescription(event.target.value); setFailure(null) }}
+          onChange={(event) => { onDraftChange({ ...draft, description: event.target.value }); setFailure(null) }}
         />
       </Field>
 
       <div className={css.field}>
         <span className={css.labelText}>{t('channelCreate.members')}</span>
-        {agents.length === 0 && <small className={css.hint}>{t('channelCreate.membersEmpty')}</small>}
+        {agents.length === 0 && (
+          <div className={css.emptyAction}>
+            <span>{t('channelCreate.membersEmpty')}</span>
+            <Button variant="outline" size="sm" onClick={onCreateAgent}>{t('agents.create')}</Button>
+          </div>
+        )}
         {agents.length > 0 && (
           <div className={css.memberPick} role="group" aria-label={t('channelCreate.members')}>
             {agents.map((agent) => {

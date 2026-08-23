@@ -550,6 +550,11 @@ export class CollabStore {
     })
   }
 
+  /** Project an authoritative Agent creation result immediately; SSE still reconciles the full roster. */
+  upsertActor(actor: NativeActor): void {
+    this.set({ actors: [...this.snapshot.actors.filter(candidate => candidate.id !== actor.id), actor] })
+  }
+
   async memberAdd(targetId: string, memberId: string): Promise<void> {
     await this.client.memberAdd(targetId, memberId)
     // Refetch immediately: dropping the cache key would also disqualify this

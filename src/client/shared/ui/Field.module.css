@@ -1,5 +1,10 @@
 .field { display: flex; min-width: 0; flex-direction: column; gap: var(--chaos-space-2); }
+.labelRow { display: flex; min-width: 0; min-height: 18px; align-items: center; gap: var(--chaos-space-1); }
 .label { display: inline-flex; align-items: baseline; gap: var(--chaos-space-1); color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
+.help { display: inline-grid; width: 18px; height: 18px; flex: none; place-items: center; border: 0; border-radius: 5px; padding: 0; color: var(--dsw-alias-label-tertiary); background: transparent; cursor: help; }
+.help:hover { color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-interactive-bg-hover); }
+.help:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+.meta { margin-left: auto; flex: none; color: var(--dsw-alias-label-tertiary); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 17px; }
 .required, .error { color: var(--dsw-alias-state-error-primary); }
 .hint, .error { margin-top: calc(var(--chaos-space-1) * -1); font-size: 11px; line-height: 17px; }
 .hint { color: var(--dsw-alias-label-tertiary); }

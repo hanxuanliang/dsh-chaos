@@ -61,7 +61,7 @@ export function ChannelEditDialog({ t, store, state, channel, onClose }: {
       <Field
         label={t('channelCreate.name')}
         required
-        hint={duplicate ? undefined : t('channelCreate.nameHint')}
+        help={t('channelCreate.nameHint')}
         error={duplicate ? t('channelCreate.nameExists') : undefined}
       >
         <TextInput
@@ -78,7 +78,8 @@ export function ChannelEditDialog({ t, store, state, channel, onClose }: {
       <Field
         label={t('channelCreate.description')}
         required
-        hint={t('channelCreate.descriptionHint', { count: description.length })}
+        help={t('channelCreate.descriptionHint')}
+        meta={t('channelCreate.descriptionCount', { count: description.length })}
       >
         <textarea
           id="chaos-channel-edit-description"

@@ -65,6 +65,8 @@
 .dialogBody .labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
 .dialogBody .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
 .dialogBody .error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.dialogBody .emptyAction { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
+.dialogBody .emptyAction > button { flex: none; white-space: nowrap; }
 
 .dialogBody .memberPick {
   display: flex;
@@ -146,4 +148,8 @@
   font-weight: 700;
   line-height: 16px;
   letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  .dialogBody .emptyAction { align-items: flex-start; flex-direction: column; }
 }
