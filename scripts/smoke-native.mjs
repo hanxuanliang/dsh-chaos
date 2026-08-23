@@ -2,10 +2,9 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createRequire } from 'node:module'
+import { loadNativeModule } from '../lib/native.js'
 
-const require = createRequire(import.meta.url)
-const native = require('../native/dsh_chaos_core.node')
+const native = loadNativeModule()
 const root = await mkdtemp(join(tmpdir(), 'dsh-chaos-'))
 
 try {

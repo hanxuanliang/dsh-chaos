@@ -3,12 +3,13 @@ import { basename, dirname, resolve } from 'node:path'
 import { transform } from 'lightningcss'
 import type { UserConfig } from 'tsdown'
 
-const id = 'dsh-chaos'
+const packageName = '@hanxuanliang/dsh-chaos'
+const cssNamespace = 'dsh-chaos'
 const CSS_VIRTUAL_PREFIX = '\0dsh-chaos-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 export default {
-  name: `${id}/client`,
+  name: `${cssNamespace}/client`,
   entry: { client: 'src/client/entry/index.tsx' },
   outDir: 'lib',
   format: 'cjs',
@@ -69,10 +70,10 @@ export default {
       for (const [local, value] of Object.entries(cssExports ?? {})) classes[local] = value.name
       return [
         `const css = ${JSON.stringify(code.toString())};`,
-        `const tagId = ${JSON.stringify(`${id}/${basename(path)}`)};`,
+        `const tagId = ${JSON.stringify(`${cssNamespace}/${basename(path)}`)};`,
         'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
         '  const tag = document.createElement(\'style\');',
-        `  tag.dataset.plugin = ${JSON.stringify(id)};`,
+        `  tag.dataset.plugin = ${JSON.stringify(cssNamespace)};`,
         '  tag.dataset.pluginCss = tagId;',
         '  tag.textContent = css;',
         '  document.head.appendChild(tag);',
@@ -83,7 +84,7 @@ export default {
   }],
   outputOptions: {
     entryFileNames: 'client.js',
-    banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(id)}, factory: (require) => {`,
+    banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(packageName)}, factory: (require) => {`,
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
   },

@@ -24,7 +24,7 @@ let clientModule
 globalThis.window = {
   __ModuleLoader__: {
     load({ id, factory }) {
-      assert.equal(id, 'dsh-chaos')
+      assert.equal(id, '@hanxuanliang/dsh-chaos')
       clientModule = factory(specifier => {
         // The host module table serves ui-primitives in the browser; in Node
         // its real entry pulls katex CSS, so the smoke harness stubs the

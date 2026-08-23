@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -305,12 +306,45 @@ interface NativeModule {
 
 let loaded: NativeModule | undefined
 
+const nativePackages: Readonly<Record<string, string>> = {
+  'darwin-arm64': '@hanxuanliang/dsh-chaos-darwin-arm64',
+  'darwin-x64': '@hanxuanliang/dsh-chaos-darwin-x64',
+  'linux-x64': '@hanxuanliang/dsh-chaos-linux-x64-gnu',
+  'win32-x64': '@hanxuanliang/dsh-chaos-win32-x64-msvc',
+}
+
 export function loadNativeModule(): NativeModule {
   if (loaded !== undefined) return loaded
   const require = createRequire(import.meta.url)
   const packageRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
-  const nativePath = process.env.DSH_CHAOS_NATIVE_PATH
-    ?? resolve(packageRoot, 'native', 'dsh_chaos_core.node')
-  loaded = require(nativePath) as NativeModule
+  const override = process.env.DSH_CHAOS_NATIVE_PATH
+  if (override !== undefined && override !== '') {
+    loaded = require(override) as NativeModule
+    return loaded
+  }
+
+  // Source checkouts stage the locally-built image here. Published packages
+  // omit that directory and resolve the matching optional native package.
+  const localPath = resolve(packageRoot, 'native', 'dsh_chaos_core.node')
+  if (existsSync(localPath)) {
+    loaded = require(localPath) as NativeModule
+    return loaded
+  }
+
+  const platformKey = `${process.platform}-${process.arch}`
+  const nativePackage = nativePackages[platformKey]
+  if (nativePackage === undefined) {
+    throw new Error(
+      `dsh-chaos does not provide a native module for ${platformKey}; supported platforms are darwin-arm64, darwin-x64, linux-x64 (glibc), and win32-x64`,
+    )
+  }
+  try {
+    loaded = require(nativePackage) as NativeModule
+  } catch (cause) {
+    throw new Error(
+      `dsh-chaos could not load ${nativePackage}; reinstall @hanxuanliang/dsh-chaos with optional dependencies enabled`,
+      { cause },
+    )
+  }
   return loaded
 }

@@ -1,0 +1,219 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'release/**'
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x64-gnu
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            source: target/x86_64-unknown-linux-gnu/release/libdsh_chaos_core.so
+            verify: true
+          - id: win32-x64-msvc
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            source: target/x86_64-pc-windows-msvc/release/dsh_chaos_core.dll
+            verify: true
+          - id: darwin-x64
+            runner: macos-13
+            target: x86_64-apple-darwin
+            source: target/x86_64-apple-darwin/release/libdsh_chaos_core.dylib
+            verify: true
+          - id: darwin-arm64
+            runner: macos-14
+            target: aarch64-apple-darwin
+            source: target/aarch64-apple-darwin/release/libdsh_chaos_core.dylib
+            verify: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: cargo build -p dsh-chaos-core --features napi --release --locked --target ${{ matrix.target }}
+      - run: node scripts/stage-release-native.mjs npm/${{ matrix.id }} ${{ matrix.source }}
+      - if: matrix.verify
+        run: node scripts/verify-native-package.mjs npm/${{ matrix.id }}
+      - run: npm pack --dry-run --ignore-scripts ./npm/${{ matrix.id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.id }}
+          path: npm/${{ matrix.id }}/dsh_chaos_core.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish npm packages
+    if: github.ref_type == 'tag'
+    needs: build-native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          version="$(node --print "require('./package.json').version")"
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm public:check
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-linux-x64-gnu
+          path: npm/linux-x64-gnu
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-win32-x64-msvc
+          path: npm/win32-x64-msvc
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-darwin-x64
+          path: npm/darwin-x64
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-darwin-arm64
+          path: npm/darwin-arm64
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace
+      - run: pnpm typecheck
+      - run: pnpm build:package
+      - run: pnpm smoke:native
+      - run: pnpm smoke:service
+      - run: pnpm smoke:runtime
+      - run: pnpm smoke:remote
+      - run: pnpm smoke:transport
+      - run: pnpm smoke:client
+      - name: Verify tag and package contents
+        run: node scripts/check-release.mjs
+      - name: Publish native packages first
+        run: |
+          npm publish ./npm/linux-x64-gnu --access public --provenance --tag next
+          npm publish ./npm/win32-x64-msvc --access public --provenance --tag next
+          npm publish ./npm/darwin-x64 --access public --provenance --tag next
+          npm publish ./npm/darwin-arm64 --access public --provenance --tag next
+      - name: Pack and publish root plugin
+        run: |
+          mkdir -p release
+          pnpm pack --pack-destination release
+          npm publish release/hanxuanliang-dsh-chaos-*.tgz --access public --provenance --tag next
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-release-packages
+          path: |
+            release/*.tgz
+            npm/*/dsh_chaos_core.node
+          if-no-files-found: error
+
+  verify-install:
+    name: Install ${{ matrix.runner }}
+    needs: publish
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - windows-latest
+          - macos-13
+          - macos-14
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install published plugin without Rust
+        env:
+          DSH_HOME: ${{ runner.temp }}/dsh-home
+        run: npx --yes @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add @hanxuanliang/dsh-chaos@${{ needs.publish.outputs.version }}
+
+  promote:
+    name: Promote npm packages to latest
+    needs: [publish, verify-install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11
+      - name: Promote verified packages
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          npm dist-tag add @hanxuanliang/dsh-chaos-linux-x64-gnu@${VERSION} latest
+          npm dist-tag add @hanxuanliang/dsh-chaos-win32-x64-msvc@${VERSION} latest
+          npm dist-tag add @hanxuanliang/dsh-chaos-darwin-x64@${VERSION} latest
+          npm dist-tag add @hanxuanliang/dsh-chaos-darwin-arm64@${VERSION} latest
+          npm dist-tag add @hanxuanliang/dsh-chaos@${VERSION} latest
+
+  github-release:
+    name: Publish GitHub release
+    needs: promote
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-release-packages
+          path: release
+      - name: Create checksums
+        working-directory: release
+        run: find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: dsh-chaos ${{ github.ref_name }}
+          body_path: release-notes/${{ github.ref_name }}.md
+          files: |
+            release/**/*
+          fail_on_unmatched_files: true

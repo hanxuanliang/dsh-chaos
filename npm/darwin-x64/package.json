@@ -1,0 +1,21 @@
+{
+  "name": "@hanxuanliang/dsh-chaos-darwin-x64",
+  "version": "0.1.1",
+  "description": "macOS x64 native module for @hanxuanliang/dsh-chaos",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hanxuanliang/dsh-chaos.git"
+  },
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "main": "dsh_chaos_core.node",
+  "files": ["dsh_chaos_core.node", "README.md"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
