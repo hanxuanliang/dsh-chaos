@@ -4,7 +4,9 @@ import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary, CreatedAgent } from '../../../agent-settings-types.ts'
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
+import { PanelHeader, Toolbar } from '../../shared/layout/index.ts'
 import { ErrorBanner, Field, Tabs, TextInput } from '../../shared/ui/index.ts'
+import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
 import { hasAgentHandle, initialAgentHandle } from './agent-handle.ts'
 import css from './AgentCreateDialog.module.css'
 
@@ -113,21 +115,19 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
     })
   }
 
-  return (
-    <div className={css.form} data-variant={variant}>
-      <Tabs<CreateTab>
-        className={css.formTabs}
-        value={tab}
-        onValueChange={setTab}
-        label={t('create.tabs')}
-        align="stretch"
-        items={[
-          { id: 'identity', label: t('create.identity'), tabId: 'chaos-create-tab-identity', panelId: 'chaos-create-panel-identity' },
-          { id: 'runtime', label: t('create.runtime'), tabId: 'chaos-create-tab-runtime', panelId: 'chaos-create-panel-runtime' },
-        ]}
-      />
-
-      {tab === 'identity' && (
+  const tabs = <Tabs<CreateTab>
+    className={variant === 'dialog' ? css.formTabs : css.inlineTabs}
+    value={tab}
+    onValueChange={setTab}
+    label={t('create.tabs')}
+    align={variant === 'dialog' ? 'stretch' : 'lead'}
+    items={[
+      { id: 'identity', label: t('create.identity'), tabId: 'chaos-create-tab-identity', panelId: 'chaos-create-panel-identity' },
+      { id: 'runtime', label: t('create.runtime'), tabId: 'chaos-create-tab-runtime', panelId: 'chaos-create-panel-runtime' },
+    ]}
+  />
+  const panel = tab === 'identity'
+    ? (
         <section id="chaos-create-panel-identity" role="tabpanel" aria-labelledby="chaos-create-tab-identity" className={css.panel}>
           <Field label={t('create.name')} required error={handleExists ? t('create.nameExists') : undefined}>
             <TextInput id="chaos-agent-create-name" value={displayName}
@@ -140,9 +140,8 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
               placeholder={t('create.charterPlaceholder')} disabled={submitting} />
           </Field>
         </section>
-      )}
-
-      {tab === 'runtime' && (
+      )
+    : (
         <section id="chaos-create-panel-runtime" role="tabpanel" aria-labelledby="chaos-create-tab-runtime" className={css.panel}>
           {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
           {catalogError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>}>{t('create.routeFailed', { error: catalogError })}</ErrorBanner>}
@@ -172,15 +171,37 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
             </select>
           </Field>
         </section>
-      )}
-
-      {failure !== null && <ErrorBanner>{t('create.failed', { error: failure })}</ErrorBanner>}
+      )
+  const actions = (
       <footer className={css.actions}>
         <Button variant="outline" disabled={submitting} onClick={onCancel}>{t('create.cancel')}</Button>
         {tab === 'identity'
           ? <Button variant="primary" disabled={!identityReady || submitting} onClick={() => { setTab('runtime') }}>{t('create.next')}</Button>
           : <Button variant="primary" disabled={!canSubmit} onClick={submit}>{submitting ? t('create.submitting') : t('create.submit')}</Button>}
       </footer>
+  )
+  const content = <>{panel}{failure !== null && <ErrorBanner>{t('create.failed', { error: failure })}</ErrorBanner>}{actions}</>
+
+  if (variant === 'inline') {
+    return (
+      <div className={css.form} data-variant={variant}>
+        <PanelHeader
+          className={css.inlineHeader}
+          title={displayName.trim() || t('create.title')}
+          leading={<AvatarChip kind="agent" size="xl" handle={handle || 'new-agent'} displayName={displayName.trim() || t('create.title')} />}
+          backLabel={t('create.cancel')}
+          onBack={onCancel}
+        />
+        <Toolbar className={css.inlineToolbar} start={tabs} label={t('create.tabs')} />
+        <div className={css.inlineSections}>{content}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={css.form} data-variant={variant}>
+      {tabs}
+      {content}
     </div>
   )
 }

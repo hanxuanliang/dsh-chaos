@@ -144,7 +144,6 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
       {phase === 'loading' && <SkeletonList className={css.skeleton} rows={4} label={t('agents.loadingAria')} />}
       {phase === 'error' && <EmptyState title={t('agents.loadFailed', { error: loadError ?? '' })} action={<Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button>} />}
       {phase === 'ready' && createOpen && <section className={css.createBlock} data-agent-create-inline aria-label={t('create.title')}>
-          <h2>{t('create.title')}</h2>
           <AgentCreateForm connection={connection} presets={presets} presetsLoading={presetsLoading}
             presetsError={presetsError} existingHandles={profiles.map(profile => profile.actor.handle)}
             onPresetsRetry={loadPresets} onCancel={() => { setCreateOpen(false) }} onCreated={created}

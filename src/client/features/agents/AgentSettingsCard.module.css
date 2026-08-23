@@ -5,8 +5,7 @@
 .titleBlock h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; }
 .titleBlock p { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; }
 .refreshing { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; }
-.createBlock { display: flex; width: min(100%, 640px); min-width: 0; flex-direction: column; gap: 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); padding: 14px; background: var(--dsw-alias-bg-layer-1); }
-.createBlock h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 20px; }
+.createBlock { display: flex; width: 100%; height: min(620px, calc(100vh - 220px)); min-width: 0; min-height: 420px; overflow: hidden; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); background: var(--dsw-alias-bg-base); }
 .workspace { display: flex; width: 100%; height: min(620px, calc(100vh - 220px)); min-width: 0; min-height: 420px; overflow: hidden; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); }
 .skeleton { border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); }
-@media (max-width: 700px) { .page { gap: 12px; } .createBlock { width: 100%; padding: 12px; } .workspace { height: min(640px, calc(100vh - 180px)); min-height: 360px; } }
+@media (max-width: 700px) { .page { gap: 12px; } .createBlock, .workspace { height: min(640px, calc(100vh - 180px)); min-height: 360px; } }
