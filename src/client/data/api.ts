@@ -35,7 +35,6 @@ type CollabDomainResult<T> =
 
 export interface CreateAgentRequest {
   displayName: string
-  handle: string
   description: string
   provider: string
   model: string

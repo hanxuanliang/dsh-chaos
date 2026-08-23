@@ -501,9 +501,33 @@ try {
     const input = document.querySelector('#chaos-agent-create-name');
     const dialogs = [...document.querySelectorAll('[role="dialog"]')]
       .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
-    return input?.offsetParent !== null && dialogs.length === 1;
+    const tabs = [...document.querySelectorAll('[role="tab"]')]
+      .filter(tab => tab instanceof HTMLElement && tab.offsetParent !== null);
+    return input?.offsetParent !== null
+      && dialogs.length === 1
+      && tabs.some(tab => tab.textContent?.trim() === 'Identity')
+      && tabs.some(tab => tab.textContent?.trim() === 'Runtime')
+      && document.body.innerText.includes('Handle') === false;
   })()`)
   await page.screenshot('agent-create-compact.png')
+  await page.clickExpression('Agent Runtime tab', `[...document.querySelectorAll('[role="tab"]')]
+    .find(tab => tab.offsetParent !== null && tab.textContent?.trim() === 'Runtime')`)
+  await page.waitForExpression('Agent runtime fields use Circle geometry and muted placeholders', `(() => {
+    const selects = [...document.querySelectorAll('#chaos-create-panel-runtime select')];
+    if (selects.length !== 3 || selects.some(select => !(select instanceof HTMLSelectElement))) return false;
+    const rects = selects.map(select => select.getBoundingClientRect());
+    const placeholder = getComputedStyle(selects[0]);
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--dsw-alias-label-tertiary)';
+    document.body.append(probe);
+    const muted = getComputedStyle(probe).color;
+    probe.remove();
+    return rects.every(rect => Math.abs(rect.left - rects[0].left) < 1 && Math.abs(rect.width - rects[0].width) < 1)
+      && placeholder.textAlign === 'left'
+      && placeholder.color === muted
+      && selects.slice(0, 2).every(select => select.dataset.placeholder === 'true');
+  })()`)
+  await page.screenshot('agent-create-runtime.png')
   await page.clickExpression('Cancel Agent creation', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Cancel')`)
   await page.waitForExpression('Channel draft restored after Agent creation cancel', `(() => {
@@ -659,6 +683,66 @@ try {
   })()`)
   await page.screenshot('narrow.png')
 
+  await page.setViewport(1200, 800)
+  await page.clickExpression('Settings', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null
+      && (button.textContent?.trim() === 'Settings'
+        || button.getAttribute('aria-label') === 'Settings'
+        || button.getAttribute('title') === 'Settings'))`)
+  await page.waitForExpression('Collab Agents settings entry', `!![...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Collab Agents')`)
+  await page.clickExpression('Collab Agents settings entry', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Collab Agents')`)
+  await page.waitForExpression('compact Collab Agents empty page', `(() => {
+    const page = document.querySelector('section[aria-label="Collab Agents"]');
+    const create = page?.querySelector('button[aria-label="New Agent"]');
+    if (!(page instanceof HTMLElement) || !(create instanceof HTMLButtonElement)) return false;
+    const rect = create.getBoundingClientRect();
+    return page.offsetParent !== null && !create.disabled
+      && rect.width <= 32 && rect.height <= 32
+      && page.textContent?.includes('No Agents yet') === false
+      && ![...page.querySelectorAll('button')].some(button => button.textContent?.trim() === 'New Agent');
+  })()`)
+  await page.clickExpression('inline New Agent', `document.querySelector('section[aria-label="Collab Agents"] button[aria-label="New Agent"]')`)
+  await page.waitForExpression('Settings uses inline tabbed Agent creation', `(() => {
+    const page = document.querySelector('section[aria-label="Collab Agents"]');
+    const form = page?.querySelector('[data-agent-create-inline]');
+    const dialogs = [...document.querySelectorAll('[role="dialog"]')]
+      .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
+    const tabs = [...form?.querySelectorAll('[role="tab"]') ?? []];
+    return form instanceof HTMLElement && form.offsetParent !== null
+      && dialogs.length === 1
+      && tabs.length === 2
+      && tabs.some(tab => tab.textContent?.trim() === 'Identity')
+      && tabs.some(tab => tab.textContent?.trim() === 'Runtime')
+      && form.textContent?.includes('Handle') === false;
+  })()`)
+  await page.screenshot('agent-settings-inline.png')
+  await page.clickExpression('inline Agent Runtime tab', `(() => {
+    const form = document.querySelector('[data-agent-create-inline]');
+    return [...form?.querySelectorAll('[role="tab"]') ?? []]
+      .find(tab => tab.textContent?.trim() === 'Runtime');
+  })()`)
+  await page.waitForExpression('inline Runtime fields stay in one left-aligned column', `(() => {
+    const block = document.querySelector('[data-agent-create-inline]');
+    const selects = [...block?.querySelectorAll('#chaos-create-panel-runtime select') ?? []];
+    if (!(block instanceof HTMLElement) || selects.length !== 3) return false;
+    const blockRect = block.getBoundingClientRect();
+    const rects = selects.map(select => select.getBoundingClientRect());
+    return rects.every(rect => Math.abs(rect.left - rects[0].left) < 1
+        && Math.abs(rect.width - rects[0].width) < 1
+        && rect.left >= blockRect.left && rect.right <= blockRect.right)
+      && getComputedStyle(selects[0]).textAlign === 'left';
+  })()`)
+  await page.setViewport(650, 800)
+  await page.waitForExpression('inline Agent creation fits narrow Settings viewport', `(() => {
+    const block = document.querySelector('[data-agent-create-inline]');
+    if (!(block instanceof HTMLElement) || block.offsetParent === null) return false;
+    const rect = block.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= 650 && document.documentElement.scrollWidth <= 650;
+  })()`)
+  await page.screenshot('agent-settings-inline-narrow.png')
+
   assert(page.consoleErrors.length === 0, `console errors:\n${page.consoleErrors.join('\n')}`)
   assert(page.pageErrors.length === 0, `page errors:\n${page.pageErrors.join('\n')}`)
   assert(page.requestFailures.length === 0, `request failures:\n${page.requestFailures.join('\n')}`)
@@ -676,6 +760,8 @@ try {
       'Message send completed through the real UI and RPC path',
       'Channel and Message persisted across a full page reload',
       'Channel remained usable at a 650x800 viewport',
+      'Settings kept Agent creation inline with compact controls and tabbed Identity/Runtime fields',
+      'Settings Agent creation remained usable at a 650x800 viewport',
       'no console, page, or request failures were observed',
     ],
   }, null, 2)}\n`)

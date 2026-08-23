@@ -566,6 +566,11 @@ mod mention_tests {
         assert!(!mentions_handle("mail@alpha.example", "alpha"));
         assert!(!mentions_handle("@alpha-two", "alpha"));
         assert!(!mentions_handle("@alpha中文", "alpha"));
+        assert!(mentions_handle(
+            "请 @grok老马melody 看一下",
+            "grok老马melody"
+        ));
+        assert!(!mentions_handle("@grok老马melody扩展", "grok老马melody"));
         assert!(!mentions_handle("@@alpha", "alpha"));
     }
 }

@@ -1,51 +1,59 @@
-/* Visual tokens: host --dsw-alias-* directly (dsh-mnemon precedent; see the
- * sibling AgentSettingsCard.module.css header for the --collab-* TODO). */
-.body {
-  display: flex;
-  max-height: calc(100vh - 210px);
+.dialogBody {
+  max-height: calc(100vh - 180px);
   min-width: 0;
-  flex-direction: column;
-  gap: 14px;
   overflow-y: auto;
   padding-right: 4px;
   color: var(--dsw-alias-label-primary);
 }
 
-/* The host Modal reserves margin-top:20px on its body div for the
- * title → description → body flow; with no description that reads as dead
- * space under the title, so we reclaim it — the 16px content gap above
- * already carries the rhythm. */
-.body > *:last-child { margin-top: 0; }
+.dialogBody > *:last-child { margin-top: 0; }
+.dialogBody > *:first-child { padding-bottom: 0; }
+.dialogBody *, .dialogBody *::before, .dialogBody *::after { box-sizing: border-box; }
 
-/* Same story one level up: the host header reserves padding-bottom:12px for
- * the title → description transition; without a description it doubles the
- * title → first-field gap. */
-.body > *:first-child { padding-bottom: 0; }
-
-.body *, .body *::before, .body *::after { box-sizing: border-box; }
-
-.section {
+.form {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  padding: 14px;
-  background: var(--dsw-alias-bg-layer-1);
+  gap: 14px;
+  color: var(--dsw-alias-label-primary);
 }
 
-.sectionHeading { display: flex; min-width: 0; align-items: center; }
-.sectionHeading strong { font-size: 13px; font-weight: 600; line-height: 20px; }
+.formTabs {
+  width: 100%;
+  margin-left: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 3px;
+  background: var(--dsw-alias-bg-layer-2);
+}
 
+.formTabs [role='tab'] { flex: 1; min-height: 28px; border-radius: 6px; }
+.formTabs [role='tab'][data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+}
+
+.panel { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
+.textarea { min-height: 88px; }
 
-.textarea { min-height: 92px; }
+.form select { text-align: left; text-align-last: left; }
+.form select[data-placeholder='true'] { color: var(--dsw-alias-label-tertiary); }
+.form select option { color: var(--dsw-alias-label-primary); }
 
-.routeGrid { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.actions {
+  display: flex;
+  min-height: 42px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  padding-top: 12px;
+}
+.actions > button { white-space: nowrap; }
 
 @media (max-width: 700px) {
-  .body { max-height: calc(100vh - 180px); }
-  .section { padding: 12px; }
-  .routeGrid { grid-template-columns: minmax(0, 1fr); }
+  .dialogBody { max-height: calc(100vh - 150px); }
+  .form { gap: 12px; }
 }

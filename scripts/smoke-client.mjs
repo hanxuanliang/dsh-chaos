@@ -40,22 +40,16 @@ globalThis.window = {
 
 await import(`../lib/client.js?smoke=${String(Date.now())}`)
 
-// Non-Latin display names must receive distinct valid defaults instead of
-// collapsing every Agent to the reserved-looking fallback "agent". Existing
-// handles also force a deterministic numeric suffix, and users may still edit
-// the visible handle field before creation.
+// The collaboration handle is the exact trimmed initial name. It remains an
+// internal identity key, so creation only needs a collision check and never a
+// transliteration, suffix, or visible Handle field.
 {
-  const { generatedAgentHandle, isValidAgentHandle } = await import('../lib/client/features/agents/agent-handle.js')
-  const chinese = generatedAgentHandle('前端助手', [])
-  const reviewer = generatedAgentHandle('代码审查', [])
-  assert.match(chinese, /^agent-[a-z0-9]+$/)
-  assert.match(reviewer, /^agent-[a-z0-9]+$/)
-  assert.notEqual(chinese, reviewer)
-  assert.equal(generatedAgentHandle('Frontend Reviewer', []), 'frontend-reviewer')
-  assert.equal(generatedAgentHandle('Frontend Reviewer', ['frontend-reviewer']), 'frontend-reviewer-2')
-  assert.equal(generatedAgentHandle('前端助手', [chinese]), `${chinese}-2`)
-  assert.equal(isValidAgentHandle(chinese), true)
-  assert.equal(isValidAgentHandle('中文'), false)
+  const { hasAgentHandle, initialAgentHandle } = await import('../lib/client/features/agents/agent-handle.js')
+  assert.equal(initialAgentHandle('  grok老马melody  '), 'grok老马melody')
+  assert.equal(initialAgentHandle('Frontend Reviewer'), 'Frontend Reviewer')
+  assert.equal(hasAgentHandle('grok老马melody', ['grok老马melody']), true)
+  assert.equal(hasAgentHandle('GROK老马MELODY', ['grok老马melody']), true)
+  assert.equal(hasAgentHandle('代码审查', ['前端助手']), false)
 }
 
 // The P0 client declares the services it needs and registers a single

@@ -14,3 +14,4 @@
 .field > :is(input, textarea, select):focus-visible { border-color: var(--dsw-alias-state-business-primary); outline: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 20%, transparent); outline-offset: 0; }
 .field > :is(input, textarea, select):disabled { cursor: not-allowed; opacity: .55; }
 .field[data-invalid='true'] > :is(input, textarea, select) { border-color: var(--dsw-alias-state-error-secondary); }
+.field :is(input, textarea)::placeholder { color: var(--dsw-alias-label-tertiary); opacity: 1; }

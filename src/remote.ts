@@ -74,7 +74,6 @@ export interface CollabRemoteApi {
   agentWorkspaceFile(viewerId: string, agentId: string, path: string): Promise<AgentWorkspaceFile>
   createConfiguredAgent(
     displayName: string,
-    handle: string,
     description: string,
     provider: string,
     model: string,
@@ -336,7 +335,6 @@ async function dispatchRemote(
     case 'agent.create':
       return await api.createConfiguredAgent(
         requiredString(input, 'displayName'),
-        requiredString(input, 'handle'),
         requiredString(input, 'description'),
         requiredString(input, 'provider'),
         requiredString(input, 'model'),
