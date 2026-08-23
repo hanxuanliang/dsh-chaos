@@ -458,11 +458,20 @@ try {
   await page.waitForExpression('Channel rules use compact help and counter', `(() => {
     const nameHelp = document.querySelector('button[aria-label="The leading # is optional."]');
     const descriptionHelp = document.querySelector('button[aria-label="Included in the Agent’s channel context."]');
+    const stack = document.querySelector('[data-channel-form-stack="create"]');
     const body = document.body.innerText;
+    if (!(stack instanceof HTMLElement) || stack.children.length !== 3) return false;
+    const nameRect = stack.children[0].getBoundingClientRect();
+    const descriptionRect = stack.children[1].getBoundingClientRect();
+    const membersRect = stack.children[2].getBoundingClientRect();
+    const firstGap = descriptionRect.top - nameRect.bottom;
+    const secondGap = membersRect.top - descriptionRect.bottom;
     return nameHelp?.offsetParent !== null
       && descriptionHelp?.offsetParent !== null
       && body.includes('0/280')
       && body.includes('No Agents available')
+      && firstGap >= 11 && firstGap <= 13
+      && secondGap >= 11 && secondGap <= 13
       && body.includes('A leading # is optional; duplicate names are not allowed here.') === false;
   })()`)
   await page.evaluate(`document.querySelector('button[aria-label="The leading # is optional."]')?.focus()`)

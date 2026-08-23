@@ -95,70 +95,72 @@ export function ChannelCreateDialog({ t, store, state, draft, onDraftChange, onC
         </>
       )}
     >
-      <Field
-        label={t('channelCreate.name')}
-        required
-        help={t('channelCreate.nameHint')}
-        error={duplicate ? t('channelCreate.nameExists') : undefined}
-      >
-        <TextInput
-          id="chaos-channel-create-name"
-          value={name}
-          onChange={(event) => { onDraftChange({ ...draft, name: event.target.value }); setFailure(null) }}
-          maxLength={64}
-          placeholder={t('channelCreate.namePlaceholder')}
-          autoComplete="off"
-          autoFocus
-          spellCheck={false}
-          disabled={submitting}
-        />
-      </Field>
+      <div className={css.formStack} data-channel-form-stack="create">
+        <Field
+          label={t('channelCreate.name')}
+          required
+          help={t('channelCreate.nameHint')}
+          error={duplicate ? t('channelCreate.nameExists') : undefined}
+        >
+          <TextInput
+            id="chaos-channel-create-name"
+            value={name}
+            onChange={(event) => { onDraftChange({ ...draft, name: event.target.value }); setFailure(null) }}
+            maxLength={64}
+            placeholder={t('channelCreate.namePlaceholder')}
+            autoComplete="off"
+            autoFocus
+            spellCheck={false}
+            disabled={submitting}
+          />
+        </Field>
 
-      <Field
-        label={t('channelCreate.description')}
-        required
-        help={t('channelCreate.descriptionHint')}
-        meta={t('channelCreate.descriptionCount', { count: description.length })}
-      >
-        <textarea
-          id="chaos-channel-create-description"
-          value={description}
-          maxLength={280}
-          placeholder={t('channelCreate.descriptionPlaceholder')}
-          disabled={submitting}
-          onChange={(event) => { onDraftChange({ ...draft, description: event.target.value }); setFailure(null) }}
-        />
-      </Field>
+        <Field
+          label={t('channelCreate.description')}
+          required
+          help={t('channelCreate.descriptionHint')}
+          meta={t('channelCreate.descriptionCount', { count: description.length })}
+        >
+          <textarea
+            id="chaos-channel-create-description"
+            value={description}
+            maxLength={280}
+            placeholder={t('channelCreate.descriptionPlaceholder')}
+            disabled={submitting}
+            onChange={(event) => { onDraftChange({ ...draft, description: event.target.value }); setFailure(null) }}
+          />
+        </Field>
 
-      <div className={css.field}>
-        <span className={css.labelText}>{t('channelCreate.members')}</span>
-        {agents.length === 0 && (
-          <div className={css.emptyAction}>
-            <span>{t('channelCreate.membersEmpty')}</span>
-            <Button variant="outline" size="sm" onClick={onCreateAgent}>{t('agents.create')}</Button>
-          </div>
-        )}
-        {agents.length > 0 && (
-          <div className={css.memberPick} role="group" aria-label={t('channelCreate.members')}>
-            {agents.map((agent) => {
-              const seed = avatarSeed(agent.handle, agent.displayName)
-              const checked = selected.has(agent.id)
-              return (
-                <label key={agent.id} className={css.memberRow} data-checked={checked || undefined}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={submitting}
-                    onChange={() => { toggle(agent.id) }}
-                  />
-                  <AvatarChip kind="agent" seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
-                  <span className={css.memberName}>{agent.displayName}</span>
-                  <span className={css.memberHandle}>@{agent.handle}</span>
-                </label>
-              )
-            })}
-          </div>
-        )}
+        <div className={css.field}>
+          <span className={css.labelText}>{t('channelCreate.members')}</span>
+          {agents.length === 0 && (
+            <div className={css.emptyAction}>
+              <span>{t('channelCreate.membersEmpty')}</span>
+              <Button variant="outline" size="sm" onClick={onCreateAgent}>{t('agents.create')}</Button>
+            </div>
+          )}
+          {agents.length > 0 && (
+            <div className={css.memberPick} role="group" aria-label={t('channelCreate.members')}>
+              {agents.map((agent) => {
+                const seed = avatarSeed(agent.handle, agent.displayName)
+                const checked = selected.has(agent.id)
+                return (
+                  <label key={agent.id} className={css.memberRow} data-checked={checked || undefined}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={submitting}
+                      onChange={() => { toggle(agent.id) }}
+                    />
+                    <AvatarChip kind="agent" seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
+                    <span className={css.memberName}>{agent.displayName}</span>
+                    <span className={css.memberHandle}>@{agent.handle}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {failure !== null && <p className={css.error} role="alert">{t('channelCreate.failed', { error: failure })}</p>}

@@ -58,37 +58,39 @@ export function ChannelEditDialog({ t, store, state, channel, onClose }: {
         </>
       )}
     >
-      <Field
-        label={t('channelCreate.name')}
-        required
-        help={t('channelCreate.nameHint')}
-        error={duplicate ? t('channelCreate.nameExists') : undefined}
-      >
-        <TextInput
-          id="chaos-channel-edit-name"
-          value={name}
-          onChange={(event) => { setName(event.target.value); setFailure(null) }}
-          maxLength={64}
-          autoComplete="off"
-          autoFocus
-          spellCheck={false}
-          disabled={submitting}
-        />
-      </Field>
-      <Field
-        label={t('channelCreate.description')}
-        required
-        help={t('channelCreate.descriptionHint')}
-        meta={t('channelCreate.descriptionCount', { count: description.length })}
-      >
-        <textarea
-          id="chaos-channel-edit-description"
-          value={description}
-          maxLength={280}
-          disabled={submitting}
-          onChange={(event) => { setDescription(event.target.value); setFailure(null) }}
-        />
-      </Field>
+      <div className={css.formStack} data-channel-form-stack="edit">
+        <Field
+          label={t('channelCreate.name')}
+          required
+          help={t('channelCreate.nameHint')}
+          error={duplicate ? t('channelCreate.nameExists') : undefined}
+        >
+          <TextInput
+            id="chaos-channel-edit-name"
+            value={name}
+            onChange={(event) => { setName(event.target.value); setFailure(null) }}
+            maxLength={64}
+            autoComplete="off"
+            autoFocus
+            spellCheck={false}
+            disabled={submitting}
+          />
+        </Field>
+        <Field
+          label={t('channelCreate.description')}
+          required
+          help={t('channelCreate.descriptionHint')}
+          meta={t('channelCreate.descriptionCount', { count: description.length })}
+        >
+          <textarea
+            id="chaos-channel-edit-description"
+            value={description}
+            maxLength={280}
+            disabled={submitting}
+            onChange={(event) => { setDescription(event.target.value); setFailure(null) }}
+          />
+        </Field>
+      </div>
       {failure !== null && <p className={css.error} role="alert">{t('channelEdit.failed', { error: failure })}</p>}
     </Modal>
   )
