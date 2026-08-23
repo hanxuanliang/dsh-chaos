@@ -165,13 +165,9 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
 
       <div className={css.sections}>
         {tab === 'identity' && <section id={`chaos-agent-${profile.actor.id}-panel-identity`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-identity`}>
-          <div className={css.sectionHeading}>
-            <h3>{t('agents.identity')}</h3>
-            <p>{t('agents.identityHint')}</p>
-          </div>
           {identityError !== null && <ErrorBanner>{t('agents.identityFailed', { error: identityError })}</ErrorBanner>}
           <Field label={t('agents.name')} required><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></Field>
-          <Field label={t('agents.charter')} required><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
+          <Field label={t('agents.charter')} required help={t('create.charterHint')} meta={`${String(description.length)}/800`}><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
           <footer className={css.footer}>
             <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>
             <Button variant="primary" size="sm" disabled={!identityDirty || identitySaving || name.trim() === '' || description.trim() === ''} onClick={saveIdentity}>{identitySaving ? t('agents.saving') : t('agents.saveIdentity')}</Button>
@@ -179,10 +175,6 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
         </section>}
 
         {tab === 'runtime' && <section id={`chaos-agent-${profile.actor.id}-panel-runtime`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-runtime`}>
-          <div className={css.sectionHeading}>
-            <h3>{t('agents.runtime')}</h3>
-            <p>{t('agents.runtimeHint')}</p>
-          </div>
           {runtimeError !== null && <ErrorBanner>{t('agents.runtimeFailed', { error: runtimeError })}</ErrorBanner>}
           {catalogError !== null && <ErrorBanner>{t('create.routeFailed', { error: catalogError })} <button type="button" className={css.inlineAction} onClick={loadCatalog}>{t('create.routeRetry')}</button></ErrorBanner>}
           {catalog === null && catalogError === null && <p className={css.state} role="status">{t('create.routeLoading')}</p>}
@@ -199,10 +191,6 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
         </section>}
 
         {tab === 'collaboration' && <section id={`chaos-agent-${profile.actor.id}-panel-collaboration`} role="tabpanel" className={css.panel} aria-labelledby={`chaos-agent-${profile.actor.id}-tab-collaboration`}>
-          <div className={css.sectionHeading}>
-            <h3>{t('agents.collaboration')}</h3>
-            <p>{t('agents.collaborationHint')}</p>
-          </div>
           {membershipsError !== null && <ErrorBanner>{t('agents.membershipsFailed', { error: membershipsError })}</ErrorBanner>}
           {memberships === null && membershipsError === null && <p className={css.state} role="status">{t('agents.membershipsLoading')}</p>}
           {memberships !== null && memberships.length === 0 && <p className={css.state}>{t('agents.membershipsEmpty')}</p>}

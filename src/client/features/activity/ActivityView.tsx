@@ -27,6 +27,7 @@ interface ActivityViewProps {
   store: CollabStore
   state: CollabStoreSnapshot
   activeLocale(): string
+  onCreateAgent(channelId: string): void
 }
 /**
  * dock 状态: 右栏 **就是那套 channel/thread 内容区**——channel-first,
@@ -52,7 +53,7 @@ function relativeTime(atMs: number): string {
   if (days < 7) return `${days}d`
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
-export function ActivityView({ t, store, state, activeLocale }: ActivityViewProps): JSX.Element {
+export function ActivityView({ t, store, state, activeLocale, onCreateAgent }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const lastTriggerId = useRef<string | null>(null)
@@ -193,6 +194,7 @@ export function ActivityView({ t, store, state, activeLocale }: ActivityViewProp
             state={state}
             channel={dockChannel as NativeTarget}
             activeLocale={activeLocale}
+            onCreateAgent={onCreateAgent}
             headerActions={<span className={css.desktopClose}><IconButton label={t('activity.closeDock')} icon={<IconCloseOutline16 size={16} />} onClick={closeDock} /></span>}
           />
         ) : (

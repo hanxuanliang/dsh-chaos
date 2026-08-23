@@ -34,9 +34,11 @@ export interface ChannelViewProps {
   headerActions?: ReactNode
   /** Optional leading navigation rendered before the Channel title. */
   headerLeading?: ReactNode
+  /** Start the shared Agent creation flow from the member picker. */
+  onCreateAgent(channelId: string): void
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading }: ChannelViewProps): JSX.Element {
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading, onCreateAgent }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
@@ -150,6 +152,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
           state={state}
           channelId={channel.id}
           readOnly={readOnly}
+          onCreateAgent={() => { setMembersOpen(false); onCreateAgent(channel.id) }}
           onClose={() => { setMembersOpen(false) }}
         />
       )}

@@ -442,12 +442,32 @@ try {
   await page.clickExpression('expand active Channel group', `document.querySelector('button[data-channel-group-toggle="active"]')`)
   await page.waitForExpression('active Channel group reopened', `document.querySelector('button[data-channel-group-toggle="active"]')?.getAttribute('aria-expanded') === 'true'
     && document.querySelector('[data-channel-group-list="active"]') !== null`)
+  await page.waitForExpression('compact empty Channel state has a real action', `(() => {
+    const nav = document.querySelector('nav[aria-label="Channels"]');
+    const action = [...document.querySelectorAll('button')]
+      .find(button => button.offsetParent !== null && button.textContent?.trim() === 'New channel');
+    return nav?.textContent?.includes('No channels yet') === true
+      && nav.textContent.includes('press +') === false
+      && action instanceof HTMLButtonElement;
+  })()`)
 
   const channelName = `e2e-core-${Date.now().toString(36)}`
   const messageText = `E2E message ${Date.now().toString(36)}`
   await page.clickExpression('New channel', `document.querySelector('button[aria-label="New channel"]')`)
   await page.waitForExpression('New Channel dialog', `document.querySelector('input[placeholder="e.g. frontend-sync"]')?.offsetParent !== null`)
-  await page.clickExpression('New Channel name input', `document.querySelector('input[placeholder="e.g. frontend-sync"]')`)
+  await page.waitForExpression('Channel rules use compact help and counter', `(() => {
+    const nameHelp = document.querySelector('button[aria-label="The leading # is optional."]');
+    const descriptionHelp = document.querySelector('button[aria-label="Included in the Agent’s channel context."]');
+    const body = document.body.innerText;
+    return nameHelp?.offsetParent !== null
+      && descriptionHelp?.offsetParent !== null
+      && body.includes('0/280')
+      && body.includes('No Agents available')
+      && body.includes('A leading # is optional; duplicate names are not allowed here.') === false;
+  })()`)
+  await page.evaluate(`document.querySelector('button[aria-label="The leading # is optional."]')?.focus()`)
+  await page.waitForExpression('Channel name tooltip', `document.body.innerText.includes('The leading # is optional.')`)
+  await page.evaluate(`document.querySelector('input[placeholder="e.g. frontend-sync"]')?.focus()`)
   await page.waitForExpression('shared blue-focused Channel input', `(() => {
     const input = document.querySelector('input[placeholder="e.g. frontend-sync"]');
     const frame = input?.parentElement;
@@ -466,6 +486,36 @@ try {
   await page.screenshot('channel-create-focus.png')
   await page.fill('input[placeholder="e.g. frontend-sync"]', channelName)
   await page.fill('textarea[placeholder="Describe this channel’s purpose, scope, and collaboration rules."]', 'E2E channel lifecycle validation')
+  await page.clickExpression('New Agent from empty member state', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'New Agent')`)
+  await page.waitForExpression('single Agent creation dialog', `(() => {
+    const input = document.querySelector('#chaos-agent-create-name');
+    const dialogs = [...document.querySelectorAll('[role="dialog"]')]
+      .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
+    return input?.offsetParent !== null && dialogs.length === 1;
+  })()`)
+  await page.screenshot('agent-create-compact.png')
+  await page.clickExpression('Cancel Agent creation', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Cancel')`)
+  await page.waitForExpression('Channel draft restored after Agent creation cancel', `(() => {
+    const name = document.querySelector('input[placeholder="e.g. frontend-sync"]');
+    const description = document.querySelector('textarea[placeholder="Describe this channel’s purpose, scope, and collaboration rules."]');
+    return name instanceof HTMLInputElement
+      && description instanceof HTMLTextAreaElement
+      && name.offsetParent !== null
+      && name.value === ${JSON.stringify(channelName)}
+      && description.value === 'E2E channel lifecycle validation';
+  })()`)
+  await page.setViewport(650, 800)
+  await page.waitForExpression('compact Channel dialog fits narrow viewport', `(() => {
+    const dialog = [...document.querySelectorAll('[role="dialog"]')]
+      .find(candidate => candidate instanceof HTMLElement && candidate.offsetParent !== null);
+    if (!(dialog instanceof HTMLElement)) return false;
+    const rect = dialog.getBoundingClientRect();
+    return rect.left >= 12 && rect.right <= 638 && rect.bottom <= 788;
+  })()`)
+  await page.screenshot('channel-create-narrow.png')
+  await page.setViewport(1200, 800)
   await page.clickExpression('Create channel', `[...document.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === 'Create channel')`)
   await page.waitForExpression('created channel', `!!document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)})`)
@@ -487,6 +537,20 @@ try {
   const composerSelector = `textarea[placeholder^="Message #${channelName}"]`
   await page.waitForExpression('channel composer', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null)`)
+  await page.clickExpression('Channel members', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Members')`)
+  await page.clickExpression('Add member', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Add member')`)
+  await page.waitForExpression('member picker has compact Agent action', `(() => {
+    const action = [...document.querySelectorAll('button')]
+      .find(button => button.offsetParent !== null && button.textContent?.trim() === 'New Agent');
+    return document.body.innerText.includes('No Agents available') && action instanceof HTMLButtonElement;
+  })()`)
+  await page.screenshot('member-empty-action.png')
+  await page.clickExpression('Close members dialog', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Close')`)
+  await page.waitForExpression('closed members dialog', `![...document.querySelectorAll('button')]
+    .some(button => button.offsetParent !== null && button.textContent?.trim() === 'Add member')`)
   await page.fill(composerSelector, messageText)
   await page.waitForExpression('enabled channel send button', `!![...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Send' && !button.disabled)`)

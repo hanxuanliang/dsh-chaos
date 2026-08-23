@@ -22,6 +22,7 @@ export interface ChannelMembersDialogProps {
   state: CollabStoreSnapshot
   channelId: string
   readOnly?: boolean | undefined
+  onCreateAgent(): void
   onClose(): void
 }
 
@@ -43,7 +44,7 @@ function MemberRow({ member, ownerLabel }: { member: NativeTargetMember; ownerLa
   )
 }
 
-export function ChannelMembersDialog({ t, store, state, channelId, readOnly = false, onClose }: ChannelMembersDialogProps): JSX.Element {
+export function ChannelMembersDialog({ t, store, state, channelId, readOnly = false, onCreateAgent, onClose }: ChannelMembersDialogProps): JSX.Element {
   const [stage, setStage] = useState<'list' | 'add'>('list')
   const [addingId, setAddingId] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -118,7 +119,12 @@ export function ChannelMembersDialog({ t, store, state, channelId, readOnly = fa
       {stage === 'add' && (
         <>
           {available.length === 0 && (
-            <p className={css.hint}>{anyAgentAtAll ? t('members.emptyAllIn') : t('members.emptyNoAgents')}</p>
+            anyAgentAtAll
+              ? <p className={css.hint}>{t('members.emptyAllIn')}</p>
+              : <div className={css.emptyAction}>
+                  <span>{t('members.emptyNoAgents')}</span>
+                  <Button variant="outline" size="sm" onClick={onCreateAgent}>{t('agents.create')}</Button>
+                </div>
           )}
           {available.length > 0 && (
             <div className={css.dlgMemberList}>

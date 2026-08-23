@@ -71,6 +71,7 @@ function mountPanel(
         t={t}
         onClose={() => { controller.close() }}
         store={store}
+        connection={ctx.connection}
         activeLocale={() => ctx.locale.getSnapshot().active}
       />,
     )

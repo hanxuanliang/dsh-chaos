@@ -125,19 +125,18 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
       <section className={css.section} aria-labelledby="chaos-create-identity">
         <div className={css.sectionHeading}>
           <strong id="chaos-create-identity">{t('create.identity')}</strong>
-          <span>{t('create.identityHint')}</span>
         </div>
         <Field label={t('create.name')} required>
           <TextInput id="chaos-agent-create-name" value={displayName}
             onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
             placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
         </Field>
-        <Field label={t('create.handle')} required hint={t('create.handleHint')} error={handleError}>
+        <Field label={t('create.handle')} required help={t('create.handleHint')} error={handleError}>
           <TextInput id="chaos-agent-create-handle" value={handle}
             onChange={event => { setCustomHandle(event.target.value.toLowerCase()); setFailure(null) }} maxLength={40}
             placeholder={t('create.handlePlaceholder')} autoComplete="off" disabled={submitting} />
         </Field>
-        <Field label={t('create.charter')} required hint={t('create.charterHint')}>
+        <Field label={t('create.charter')} required help={t('create.charterHint')} meta={`${String(description.length)}/800`}>
           <textarea id="chaos-agent-create-charter" className={css.textarea} value={description}
             onChange={event => { setDescription(event.target.value); setFailure(null) }} maxLength={800}
             placeholder={t('create.charterPlaceholder')} disabled={submitting} />
@@ -147,7 +146,6 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
       <section className={css.section} aria-labelledby="chaos-create-runtime">
         <div className={css.sectionHeading}>
           <strong id="chaos-create-runtime">{t('create.runtime')}</strong>
-          <span>{t('create.runtimeHint')}</span>
         </div>
         {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
         {catalogError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>}>{t('create.routeFailed', { error: catalogError })}</ErrorBanner>}
