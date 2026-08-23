@@ -89,7 +89,15 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
       </div>
       {/* Same seat padding as the channel main column — one placement rule, zero visual drift. */}
       <div className={css.composerSeat}>
-        <ChannelComposer t={t} store={store} state={state} channel={thread} disabled={state.connection !== 'live'} hideAsTask />
+        <ChannelComposer
+          t={t}
+          store={store}
+          state={state}
+          channel={thread}
+          parentChannelId={parentChannelId}
+          disabled={state.connection !== 'live'}
+          hideAsTask
+        />
       </div>
     </aside>
   )

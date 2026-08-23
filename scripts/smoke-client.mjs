@@ -106,4 +106,56 @@ assert.deepEqual(namespaces, ['chaos'])
 assert.equal(effects.length, 2)
 assert.ok(effects.includes('dsh-chaos: collab overlay'))
 
-console.log('smoke-client: P0 client loads and registers the settings.section Agents page')
+// Browser "As task" creates an unassigned todo. The model-facing task_create
+// tool has its own create+claim contract and does not use CollabStore.
+{
+  const { CollabStore } = await import('../lib/client/data/store.js')
+  let createCalls = 0
+  let claimCalls = 0
+  const created = {
+    messageId: 'message-1',
+    targetId: 'channel-1',
+    number: '1',
+    status: 'todo',
+    version: '1',
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  }
+  const store = new CollabStore({
+    async taskCreate(messageId) {
+      createCalls += 1
+      assert.equal(messageId, created.messageId)
+      return created
+    },
+    async taskClaim() {
+      claimCalls += 1
+      throw new Error('local As task must not claim')
+    },
+  })
+  assert.deepEqual(await store.createTask(created.messageId), created)
+  assert.equal(createCalls, 1)
+  assert.equal(claimCalls, 0)
+  assert.deepEqual(store.getSnapshot().tasksByMessage[created.messageId], created)
+}
+
+// A Thread mention picker inherits only its parent Channel's current Agents;
+// an Agent present merely in the global directory must not appear.
+{
+  const { resolveMentionAgents } = await import('../lib/client/features/channels/mention-candidates.js')
+  const user = { id: 'user-1', kind: 'user', handle: 'owner', displayName: 'Owner', createdAtMs: 1 }
+  const member = { id: 'agent-1', kind: 'agent', handle: 'member', displayName: 'Member', createdAtMs: 1 }
+  const outsider = { id: 'agent-2', kind: 'agent', handle: 'outsider', displayName: 'Outsider', createdAtMs: 1 }
+  const actors = [user, member, outsider]
+  const membersByChannel = { 'channel-1': [user, member] }
+  assert.deepEqual(
+    resolveMentionAgents(actors, membersByChannel, 'thread-1', 'channel-1').map(actor => actor.id),
+    [member.id],
+  )
+  assert.deepEqual(resolveMentionAgents(actors, {}, 'thread-1', 'channel-1'), [])
+  assert.deepEqual(
+    resolveMentionAgents(actors, membersByChannel, 'channel-1').map(actor => actor.id),
+    [member.id],
+  )
+}
+
+console.log('smoke-client: client loads, registers settings, and preserves task/mention scope contracts')

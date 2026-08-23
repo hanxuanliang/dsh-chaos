@@ -17,6 +17,7 @@ import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import css from './ChannelComposer.module.css'
 import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
+import { resolveMentionAgents } from './mention-candidates.ts'
 
 export interface ChannelComposerProps {
   t: ChaosTranslate
@@ -30,6 +31,8 @@ export interface ChannelComposerProps {
    * thread reply can never be one.
    */
   hideAsTask?: boolean
+  /** Thread composers inherit mention candidates from their parent Channel. */
+  parentChannelId?: string
   disabled: boolean
 }
 
@@ -66,7 +69,7 @@ type SendFailure = { kind: 'send'; asTask: boolean } | { kind: 'task'; messageId
 /** Plan-B token: '@' after a non-token char (CJK/whitespace/punctuation terminate), slug chars only to the caret. */
 const MENTION_TOKEN = /(^|[^A-Za-z0-9_@-])@([A-Za-z0-9_-]*)$/
 
-export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask = false }: ChannelComposerProps): JSX.Element {
+export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask = false, parentChannelId }: ChannelComposerProps): JSX.Element {
   const [text, setText] = useState(() => readDraft(channel.id))
   const [asTask, setAsTask] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -76,10 +79,10 @@ export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask
   const attemptRef = useRef<{ text: string; requestId: string } | null>(null)
   const draftChannelRef = useRef(channel.id)
 
-  const mentionAgents = useMemo(() => {
-    const members = state.membersByChannel[channel.id] ?? state.actors
-    return members.filter(actor => actor.kind === 'agent')
-  }, [state.membersByChannel, state.actors, channel.id])
+  const mentionAgents = useMemo(
+    () => resolveMentionAgents(state.actors, state.membersByChannel, channel.id, parentChannelId),
+    [state.membersByChannel, state.actors, channel.id, parentChannelId],
+  )
 
   // Switching channels restores that channel's draft and resets As-Task and
   // any stale attempt, exactly like plocal's target switch.

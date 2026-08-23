@@ -380,6 +380,8 @@ try {
   const anchored = await call('task.create', { messageId: tail.value.messages[0].id })
   assert.equal(anchored.ok, true)
   assert.equal(anchored.value.anchorText, 'tail message 1')
+  assert.equal(anchored.value.status, 'todo')
+  assert.equal(anchored.value.assigneeId, undefined)
   const tasks = await call('tasks', { targetId: created.value.id })
   assert.equal(tasks.ok, true)
   assert.equal(tasks.value.length, 1)
