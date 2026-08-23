@@ -1,8 +1,17 @@
 /** Deterministic fallback identity for actors without a custom local avatar. */
 export interface AvatarSeed {
   background: string
+  accent: string
+  pattern: readonly string[]
   initial: string
 }
+
+const AGENT_PATTERNS = [
+  ['00011000', '00122100', '01222210', '01222210', '01222210', '12222221', '11111111', '00011000'],
+  ['00111100', '01222210', '12122121', '12222221', '11222211', '01222210', '01111110', '00100100'],
+  ['00011000', '01122110', '12222221', '12122121', '12222221', '01122110', '00111100', '01100110'],
+  ['01100110', '12211221', '12222221', '11222211', '01222210', '01211210', '01111110', '00100100'],
+] as const
 
 function djb2(value: string): number {
   let hash = 5381
@@ -14,9 +23,10 @@ function djb2(value: string): number {
 
 export function avatarSeed(handle: string, displayName: string): AvatarSeed {
   const stableKey = handle.trim() || displayName.trim() || '?'
+  const hash = djb2(stableKey)
   // Multiplying by the golden angle keeps sequential handles such as test-1
   // and test-2 visually separated instead of landing on adjacent hues.
-  const hue = Math.round((djb2(stableKey) * 137.508) % 360)
+  const hue = Math.round((hash * 137.508) % 360)
   const label = displayName.trim() || handle.trim() || '?'
   const words = label.split(/[\s_-]+/u).filter(Boolean)
   const glyphs = Array.from(label)
@@ -27,5 +37,10 @@ export function avatarSeed(handle: string, displayName: string): AvatarSeed {
       : `${glyphs[0] ?? '?'}${glyphs.at(-1) ?? '?'}`
   // Content-derived identity color, not theme chrome. Stable identities keep
   // their hue while all surrounding UI colors continue to use host tokens.
-  return { background: `hsl(${String(hue)} 48% 38%)`, initial }
+  return {
+    background: `hsl(${String(hue)} 62% 62%)`,
+    accent: `hsl(${String((hue + 137) % 360)} 78% 66%)`,
+    pattern: AGENT_PATTERNS[hash % AGENT_PATTERNS.length] ?? AGENT_PATTERNS[0],
+    initial,
+  }
 }

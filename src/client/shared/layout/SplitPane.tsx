@@ -12,16 +12,18 @@ const safeStorage = {
   },
 }
 
+type PaneSize = number | string
+
 export function SplitPane({ id, leading, trailing, fixedSide = 'leading', leadingDefault = 320, leadingMin = 280, leadingMax = 480, trailingDefault = 360, trailingMin = 420, trailingMax, separatorLabel, className }: {
   id: string
   leading: ReactNode
   trailing: ReactNode
-  leadingDefault?: number | undefined
-  leadingMin?: number | undefined
-  leadingMax?: number | undefined
-  trailingDefault?: number | undefined
-  trailingMin?: number | undefined
-  trailingMax?: number | undefined
+  leadingDefault?: PaneSize | undefined
+  leadingMin?: PaneSize | undefined
+  leadingMax?: PaneSize | undefined
+  trailingDefault?: PaneSize | undefined
+  trailingMin?: PaneSize | undefined
+  trailingMax?: PaneSize | undefined
   fixedSide?: 'leading' | 'trailing' | undefined
   separatorLabel: string
   className?: string | undefined

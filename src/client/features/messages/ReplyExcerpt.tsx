@@ -8,14 +8,15 @@
 import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
 import css from './ReplyExcerpt.module.css'
 
-export function ReplyExcerpt({ senderName, excerpt, withAvatar = false }: {
+export function ReplyExcerpt({ senderName, senderKind, excerpt, withAvatar = false }: {
   senderName: string
+  senderKind?: 'user' | 'agent' | undefined
   excerpt: string
   withAvatar?: boolean | undefined
 }) {
   return (
     <span className={css.root} data-with-avatar={withAvatar ? 'true' : undefined}>
-      {withAvatar && <AvatarChip handle={senderName} displayName={senderName} />}
+      {withAvatar && <AvatarChip kind={senderKind} handle={senderName} displayName={senderName} />}
       <span className={css.text}>{senderName}: {excerpt}</span>
     </span>
   )

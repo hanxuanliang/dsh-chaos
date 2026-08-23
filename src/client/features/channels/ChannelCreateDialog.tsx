@@ -118,7 +118,7 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
                     disabled={submitting}
                     onChange={() => { toggle(agent.id) }}
                   />
-                  <AvatarChip seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
+                  <AvatarChip kind="agent" seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
                   <span className={css.memberName}>{agent.displayName}</span>
                   <span className={css.memberHandle}>@{agent.handle}</span>
                 </label>

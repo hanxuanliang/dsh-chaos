@@ -33,7 +33,7 @@ export function RootCard({ t, rootMessage, rootAuthor, onJump, seed, mentionName
   const inner = (
     <>
       <span className={css.rootHead}>
-        <AvatarChip seed={seed} avatarUrl={rootAuthor?.avatarDataUrl} aria-hidden="true" />
+        <AvatarChip kind={rootAuthor?.kind} seed={seed} avatarUrl={rootAuthor?.avatarDataUrl} aria-hidden="true" />
         <span className={css.rootAuthor}>{rootAuthor?.displayName ?? rootMessage.authorId}</span>
       </span>
       <div className={css.rootText}>

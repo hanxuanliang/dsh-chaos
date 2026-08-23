@@ -34,7 +34,7 @@ export function ActivityCard({ item, t, timeLabel, selected, busy, thread, summa
           </span>
           <span className={css.summaryLine}>
             {item.latestReply !== undefined
-              ? <ReplyExcerpt senderName={item.latestReply.senderName} excerpt={item.latestReply.excerpt} />
+              ? <ReplyExcerpt senderName={item.latestReply.senderName} senderKind={item.latestReply.senderKind} excerpt={item.latestReply.excerpt} />
               : <span />}
             <span className={css.time}>{timeLabel}</span>
           </span>

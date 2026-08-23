@@ -261,7 +261,7 @@ export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask
                   }}
                   onClick={() => { pickMention(agent) }}
                 >
-                  <AvatarChip seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
+                  <AvatarChip kind="agent" seed={seed} avatarUrl={agent.avatarDataUrl} aria-hidden="true" />
                   <span className={css.memberName}>{agent.displayName}</span>
                   <span className={css.memberHandle}>@{agent.handle}</span>
                 </button>

@@ -29,7 +29,7 @@ export function ThreadPreview({ t, thread, summary, actorsById, onOpen, variant 
       {variant === 'avatar' && (
         <span className={css.previewAvatars} aria-hidden="true">
           {summary.recentReplierIds.map(id => (
-            <AvatarChip key={id} handle={actorsById.get(id)?.handle ?? id} displayName={actorsById.get(id)?.displayName ?? id} avatarUrl={actorsById.get(id)?.avatarDataUrl} size="xxsmall" title={actorsById.get(id)?.displayName ?? id} />
+            <AvatarChip key={id} kind={actorsById.get(id)?.kind} handle={actorsById.get(id)?.handle ?? id} displayName={actorsById.get(id)?.displayName ?? id} avatarUrl={actorsById.get(id)?.avatarDataUrl} size="xxsmall" title={actorsById.get(id)?.displayName ?? id} />
           ))}
         </span>
       )}
@@ -94,7 +94,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   const displayName = author?.displayName ?? message.authorId
   return (
     <div className={css.row} data-message-id={message.id}>
-      <AvatarChip handle={handle} displayName={displayName} avatarUrl={author?.avatarDataUrl} size="lg" />
+      <AvatarChip kind={author?.kind} handle={handle} displayName={displayName} avatarUrl={author?.avatarDataUrl} size="lg" />
       <div className={css.main}>
         <div className={css.head}>
           <span className={css.name}>{displayName}</span>
