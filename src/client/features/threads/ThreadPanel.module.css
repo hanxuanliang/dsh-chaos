@@ -11,7 +11,7 @@
 .threadPanel .threadHead {
   display: flex;
   flex: none;
-  height: 40px;
+  height: var(--chaos-channel-head-height, 48px);
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);

@@ -3,6 +3,7 @@
   display: grid;
   flex: 1;
   min-height: 0;
+  align-items: start;
   grid-auto-columns: minmax(300px, 348px);
   grid-auto-flow: column;
   gap: 12px;
@@ -12,9 +13,10 @@
 }
 
 .column {
-  align-self: stretch;
+  align-self: start;
   display: flex;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
@@ -74,7 +76,7 @@
 
 .cards {
   display: flex;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   flex-direction: column;
   gap: 8px;

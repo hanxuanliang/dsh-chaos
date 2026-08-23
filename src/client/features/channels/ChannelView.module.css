@@ -3,6 +3,7 @@
 /* --- channel header + tabs (spec §1.2) --- */
 
 .channel {
+  --chaos-channel-head-height: 48px;
   display: flex;
   min-height: 0;
   flex: 1;
@@ -15,10 +16,11 @@
  * idiom, pilot toolbar hit-area discipline. */
 .channel .channelHead {
   display: flex;
+  height: var(--chaos-channel-head-height);
   flex: none;
   align-items: center;
   gap: 8px;
-  padding: 10px 10px 9px 16px;
+  padding: 0 10px 0 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 

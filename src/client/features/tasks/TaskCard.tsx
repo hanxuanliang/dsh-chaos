@@ -43,7 +43,7 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
       {excerpt !== '' && <span className={css.cardExcerpt}>{excerpt}</span>}
       <span className={css.cardFooter}>
         <span className={css.cardAssignee}>
-          {assignee !== undefined && <AvatarChip handle={assignee.handle} displayName={assignee.displayName} avatarUrl={assignee.avatarDataUrl} />}
+          {assignee !== undefined && <AvatarChip kind="agent" handle={assignee.handle} displayName={assignee.displayName} avatarUrl={assignee.avatarDataUrl} />}
           <span>{assignee === undefined ? unassignedLabel : `@${assignee.handle}`}</span>
         </span>
         <span className={css.cardSource} title={sourceLabel} aria-hidden="true">

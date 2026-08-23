@@ -238,10 +238,10 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
             leading={mainPane}
             trailing={threadPane}
             fixedSide="trailing"
-            leadingMin={320}
+            leadingMin={220}
             trailingDefault={360}
             trailingMin={300}
-            trailingMax={520}
+            trailingMax="66.667%"
             separatorLabel={t('thread.resize')}
           />
         )}

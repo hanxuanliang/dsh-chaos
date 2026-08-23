@@ -54,6 +54,7 @@ export function AgentAvatarEditor({ client, profile, onUpdated, onError, t }: {
         onClick={() => { inputRef.current?.click() }}
       >
         <AvatarChip
+          kind="agent"
           handle={profile.actor.handle}
           displayName={profile.actor.displayName}
           avatarUrl={profile.actor.avatarDataUrl}
