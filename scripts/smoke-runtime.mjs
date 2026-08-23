@@ -20,6 +20,11 @@ class FakeCollab {
 
   async bindRuntime(agentId, sessionId, provider, model, preset) {
     assert.equal(this.published, true, 'binding must follow DSH publication')
+    assert.equal(
+      permissionPresetCalls.some(call => call.sessionId === sessionId),
+      true,
+      'Full permission must be pinned before binding publication',
+    )
     const previous = this.bindings.get(agentId)
     const binding = {
       agentId,
@@ -271,6 +276,7 @@ const registry = {
   },
 }
 const mountedPresets = []
+const permissionPresetCalls = []
 const presets = {
   async resolve(id) {
     if (id === 'default') throw new Error('unknown legacy sentinel')
@@ -281,9 +287,15 @@ const presets = {
     return { id }
   },
 }
+const permissions = {
+  set(session, preset) {
+    assert.equal(preset, 'danger-full-access')
+    permissionPresetCalls.push({ sessionId: fakeAgent.id, session, preset })
+  },
+}
 const warningErrors = []
 const warnings = { warn: (message, error) => warningErrors.push({ message, error }) }
-const runtimes = new RuntimeManager(registry, presets, collab, warnings)
+const runtimes = new RuntimeManager(registry, presets, permissions, collab, warnings)
 const binding = await runtimes.create({
   agentId: 'agent-1',
   workspacePath: workspacePath('agent-1'),
@@ -295,6 +307,7 @@ const binding = await runtimes.create({
 assert.equal(createdOptions.meta.agentPreset, 'standard')
 assert.equal(binding.preset, 'standard')
 assert.deepEqual(mountedPresets, ['standard'])
+assert.deepEqual(permissionPresetCalls.map(call => call.sessionId), ['session-1'])
 assert.equal(runtimes.resolve(binding), fakeAgent)
 const identitySection = promptSections.get('chaos:collaboration-identity')
 assert(identitySection)
@@ -537,6 +550,10 @@ const resumed = await runtimes.resume('agent-1')
 assert.equal(resumed.preset, 'code')
 assert.equal(runtimes.resolve(resumed), fakeAgent)
 assert.deepEqual(mountedPresets, ['standard', 'code', 'code', 'cordis', 'standard', 'code'])
+assert.deepEqual(
+  permissionPresetCalls.map(call => call.sessionId),
+  ['session-1', 'session-2', 'session-agent-2', 'session-3a'],
+)
 assert.deepEqual(sessionEvents, [])
 await runtimes.close()
 assert.equal(disposed, 6)
