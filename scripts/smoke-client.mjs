@@ -158,4 +158,59 @@ assert.ok(effects.includes('dsh-chaos: collab overlay'))
   )
 }
 
-console.log('smoke-client: client loads, registers settings, and preserves task/mention scope contracts')
+// Channel lifecycle store writes use the latest optimistic version and keep
+// the active/archived rail projection honest without waiting for SSE.
+{
+  const { CollabStore } = await import('../lib/client/data/store.js')
+  const base = {
+    id: 'channel-lifecycle',
+    kind: 'channel',
+    name: 'lifecycle',
+    description: 'Initial purpose',
+    lifecycle: 'active',
+    version: '1',
+    createdBy: 'user-1',
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  }
+  const calls = []
+  const store = new CollabStore({
+    async channelCreate(name, description) {
+      calls.push(['create', name, description])
+      return base
+    },
+    async channelUpdate(targetId, name, description, version) {
+      calls.push(['update', targetId, name, description, version])
+      return { ...base, name, description, version: '2', updatedAtMs: 2 }
+    },
+    async channelArchive(targetId, version) {
+      calls.push(['archive', targetId, version])
+      return { ...base, version: '3', lifecycle: 'archived', archivedAtMs: 3, updatedAtMs: 3 }
+    },
+    async channelRestore(targetId, version) {
+      calls.push(['restore', targetId, version])
+      return { ...base, version: '4', updatedAtMs: 4 }
+    },
+    async channelDelete(targetId, version) {
+      calls.push(['delete', targetId, version])
+      return { ...base, version: '5', lifecycle: 'deleted', deletedAtMs: 5, updatedAtMs: 5 }
+    },
+  })
+  await store.createChannel(base.name, base.description)
+  await store.updateChannel(base.id, 'renamed', 'Updated purpose', '1')
+  await store.archiveChannel(base.id)
+  assert.equal(store.getSnapshot().channels[0].lifecycle, 'archived')
+  await store.restoreChannel(base.id)
+  assert.equal(store.getSnapshot().channels[0].lifecycle, 'active')
+  await store.deleteChannel(base.id)
+  assert.equal(store.getSnapshot().channels.length, 0)
+  assert.deepEqual(calls, [
+    ['create', 'lifecycle', 'Initial purpose'],
+    ['update', 'channel-lifecycle', 'renamed', 'Updated purpose', '1'],
+    ['archive', 'channel-lifecycle', '2'],
+    ['restore', 'channel-lifecycle', '3'],
+    ['delete', 'channel-lifecycle', '4'],
+  ])
+}
+
+console.log('smoke-client: client loads and preserves task, mention, and Channel lifecycle contracts')

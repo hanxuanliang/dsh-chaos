@@ -83,7 +83,10 @@ try {
       wire += decoder.decode(chunk.value, { stream: true })
     }
   })()
-  const created = await call('channel.create', { name: 'transport-channel' })
+  const created = await call('channel.create', {
+    name: 'transport-channel',
+    description: 'Transport collaboration',
+  })
   assert.equal(created.body.result.value.ok, true)
   await readUntilChange
   assert.match(wire, /event: change/)

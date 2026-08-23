@@ -8,12 +8,12 @@ pub use model::ThreadSummary;
 
 use crate::actor::ActorId;
 use crate::changefeed::ChangeStore;
-use crate::membership::{Membership, MembershipStore};
+use crate::membership::MembershipStore;
 use crate::message::store::MessageStore;
-use crate::target::{TargetRoute, TargetStore};
+use crate::target::{AccessGrant, TargetStore};
 use crate::{
-    Actor, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, new_id,
-    now_ms,
+    ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, TargetLifecycle,
+    new_id, now_ms,
 };
 
 use model::{FollowOutcome, RootMessageIds, ThreadAccess, ThreadSubscription};
@@ -27,20 +27,17 @@ impl CollabCore {
         let actor_id = ActorId::parse(actor_id)?;
         let now = now_ms()?;
         self.write(async |connection| {
-            let actor = Actor::require(connection, &actor_id).await?;
             let (parent_target_id, root_author_id) = MessageStore::new(connection)
                 .target_and_author(root_message_id)
                 .await?;
-            if TargetRoute::require(connection, &parent_target_id)
-                .await?
-                .kind
-                == TargetKind::Thread
-            {
+            let grant =
+                AccessGrant::require_writable(connection, &parent_target_id, actor_id.as_str())
+                    .await?;
+            if grant.route.kind == TargetKind::Thread {
                 return Err(CollabError::InvalidArgument(
                     "Threads cannot be nested under Thread messages".into(),
                 ));
             }
-            Membership::require(connection, &parent_target_id, &actor).await?;
 
             let store = ThreadStore::new(connection);
             if let Some(target) = store.find_by_root(root_message_id).await? {
@@ -52,10 +49,16 @@ impl CollabCore {
                 id: thread_id.as_str().to_owned(),
                 kind: TargetKind::Thread,
                 name: format!("thread:{root_message_id}"),
+                description: String::new(),
+                lifecycle: TargetLifecycle::Active,
+                version: 1,
                 parent_target_id: Some(parent_target_id.clone()),
                 root_message_id: Some(root_message_id.to_owned()),
                 created_by: actor_id.as_str().to_owned(),
                 created_at_ms: now,
+                updated_at_ms: now,
+                archived_at_ms: None,
+                deleted_at_ms: None,
             };
             TargetStore::new(connection).insert(&target).await?;
             store.ensure_following(&thread_id, &actor_id, now).await?;

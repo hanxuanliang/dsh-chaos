@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState, type JSX } from 'react'
-import { IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconQuestionOutline14, IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTarget } from '../../../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
@@ -14,7 +14,7 @@ import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from '../tasks/ChannelTasksBoard.tsx'
 import { ThreadPanel } from '../threads/ThreadPanel.tsx'
 import css from './ChannelView.module.css'
-import { Tabs } from '../../shared/ui/index.ts'
+import { IconButton, Tabs } from '../../shared/ui/index.ts'
 import { ResponsiveDrilldown, SplitPane } from '../../shared/layout/index.ts'
 
 export interface ChannelViewProps {
@@ -73,6 +73,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
   const members = state.membersByChannel[channel.id]
   const openTasks = Object.values(state.tasksByMessage)
     .filter(task => task.targetId === channel.id && task.status !== 'done').length
+  const readOnly = channel.lifecycle === 'archived'
   const composerDisabled = state.connection !== 'live'
 
   // 头部元在 messages 模式落进主列 mainCol (与 thread 水平; rc 2026-08-20), 在
@@ -84,6 +85,11 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         <span className={css.channelHash} aria-hidden="true">#</span>
         {channel.name}
       </h3>
+      <IconButton
+        className={css.channelInfo}
+        label={channel.description}
+        icon={<IconQuestionOutline14 size={14} />}
+      />
       <Tabs<'messages' | 'tasks'>
         value={tab}
         onValueChange={setTab}
@@ -137,6 +143,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             state={state}
             channelId={channel.id}
             focusMessageId={focusedTaskMessageId}
+            readOnly={readOnly}
             onFocusHandled={() => { setFocusedTaskMessageId(undefined) }}
             onOpenMessage={(messageId) => { setTab('messages'); setJumpMessageId(messageId) }}
           />
@@ -147,6 +154,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
           store={store}
           state={state}
           channelId={channel.id}
+          readOnly={readOnly}
           onClose={() => { setMembersOpen(false) }}
         />
       )}
@@ -178,6 +186,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
   onRootJump(messageId: string): void
   composerDisabled: boolean
 }): JSX.Element {
+  const readOnly = channel.lifecycle === 'archived'
   const mainPane = (
     <div className={css.channelMainCol}>
         {channelHead}
@@ -186,12 +195,13 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
           store={store}
           state={state}
           channelId={channel.id}
+          readOnly={readOnly}
           activeLocale={activeLocale}
           onOpenTasks={onOpenTasks}
           onOpenThread={onOpenThread}
         />
         {/* The composer hangs on the same centered 780px column as the stream. */}
-        <div className={css.composerSeat}>
+        {!readOnly && <div className={css.composerSeat}>
           <ChannelComposer
             t={t}
             store={store}
@@ -199,7 +209,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
             channel={channel}
             disabled={composerDisabled}
           />
-        </div>
+        </div>}
     </div>
   )
   if (thread === undefined) return <div className={css.channelMainRow}>{mainPane}</div>
@@ -214,6 +224,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
       activeLocale={activeLocale}
       onRootJump={onRootJump}
       onClose={onCloseThread}
+      readOnly={readOnly}
     />
   )
   const mobileThreadPane = (
@@ -227,6 +238,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
       onRootJump={onRootJump}
       onClose={onCloseThread}
       back
+      readOnly={readOnly}
     />
   )
   return (

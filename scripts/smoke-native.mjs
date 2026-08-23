@@ -48,13 +48,15 @@ try {
     core.updateAgentProfile(alpha.id, 'Stale Alpha', alphaProfile.charter, alphaProfile.version),
     /agent_profile_version_conflict/,
   )
-  const channel = await core.createChannel('design', owner.id)
+  const channel = await core.createChannel('design', 'Design collaboration', owner.id)
   await core.addMember(channel.id, alpha.id, owner.id)
   await core.addMember(channel.id, beta.id, owner.id)
   const identity = await core.identityContext(alpha.id, channel.id)
   assert.equal(identity.agent.actor.displayName, 'Alpha Reviewer')
   assert.equal(identity.agent.actor.avatarDataUrl, avatar)
   assert.equal(identity.target.name, 'design')
+  assert.equal(identity.target.description, 'Design collaboration')
+  assert.equal(identity.target.lifecycle, 'active')
   assert.equal(identity.members.find(member => member.actor.id === owner.id).role, 'owner')
   assert.equal(identity.members.find(member => member.actor.id === beta.id).actor.handle, 'beta')
   assert.equal(identity.members.find(member => member.actor.id === alpha.id).actor.avatarDataUrl, avatar)
@@ -180,6 +182,28 @@ try {
   assert(changes.some(change => change.kind === 'agent_profile_changed'))
   assert(changes.some(change => change.kind === 'task_updated'))
   assert(changes.some(change => change.kind === 'activity_done_changed'))
+  const managed = await core.createChannel('managed', 'Initial purpose', owner.id)
+  const updated = await core.updateChannel(
+    managed.id,
+    owner.id,
+    'managed-renamed',
+    'Updated purpose',
+    managed.version,
+  )
+  assert.equal(updated.description, 'Updated purpose')
+  const archived = await core.archiveChannel(updated.id, owner.id, updated.version)
+  assert.equal(archived.lifecycle, 'archived')
+  await assert.rejects(core.sendMessage({
+    targetId: archived.id,
+    authorId: owner.id,
+    clientRequestId: 'archived-native-write',
+    text: 'must fail',
+  }), /target_not_writable/)
+  const restored = await core.restoreChannel(archived.id, owner.id, archived.version)
+  assert.equal(restored.lifecycle, 'active')
+  const deletedChannel = await core.deleteChannel(restored.id, owner.id, restored.version)
+  assert.equal(deletedChannel.lifecycle, 'deleted')
+  assert(!(await core.snapshot(owner.id)).targets.some(target => target.id === managed.id))
   const retentionFloor = await core.pruneChangesBefore(Date.now() + 1)
   assert.equal((await core.snapshot(owner.id)).cursor, retentionFloor)
   await assert.rejects(

@@ -34,6 +34,7 @@ export interface MessageStreamProps {
   channelId: string
   activeLocale(): string
   onOpenTasks(messageId: string): void
+  readOnly?: boolean | undefined
   /** One-shot jump target (task anchor link → land + flash the row). */
   jumpMessageId?: string | undefined
   onJumpHandled?: (() => void) | undefined
@@ -115,7 +116,7 @@ function buildDayGroups(messages: NativeMessage[], t: ChaosTranslate, activeLoca
   return groups
 }
 
-export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, jumpMessageId, onJumpHandled, onOpenThread }: MessageStreamProps): JSX.Element {
+export function MessageStream({ t, store, state, channelId, activeLocale, onOpenTasks, readOnly = false, jumpMessageId, onJumpHandled, onOpenThread }: MessageStreamProps): JSX.Element {
   const messages = state.messagesByChannel[channelId]
   const total = state.totalByChannel[channelId]
   const actorsById = useMemo(() => {
@@ -319,7 +320,9 @@ export function MessageStream({ t, store, state, channelId, activeLocale, onOpen
                     timeText={timeLabel(message.createdAtMs)}
                     fullTimeTitle={fullTimeTitle(message.createdAtMs, activeLocale)}
                     onOpenTasks={onOpenTasks}
-                    onOpenThread={onOpenThread === undefined ? undefined : () => { onOpenThread(message.id) }}
+                    onOpenThread={onOpenThread === undefined || (readOnly && !threadsByRoot.has(message.id))
+                      ? undefined
+                      : () => { onOpenThread(message.id) }}
                   />
                 )
               })}

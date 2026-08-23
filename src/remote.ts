@@ -20,6 +20,7 @@ import type {
   NativeRuntimeBinding,
   NativeSendResult,
   NativeTarget,
+  NativeTargetMember,
   NativeThreadSummary,
   NativeTask,
 } from './native.ts'
@@ -30,6 +31,7 @@ export const COLLAB_EVENTS_PATH = '/dsh-chaos/events'
 export interface CollabRemoteApi {
   listActors(actorId: string): Promise<NativeActor[]>
   listTargetMembers(actorId: string, targetId: string): Promise<NativeActor[]>
+  listTargetMemberships(actorId: string, targetId: string): Promise<NativeTargetMember[]>
   snapshot(actorId: string): Promise<NativeCollabSnapshot>
   listChanges(actorId: string, afterSeq: string, limit: number): Promise<NativeChangeEvent[]>
   readMessages(actorId: string, targetId: string, afterSeq: string, limit: number): Promise<NativeMessage[]>
@@ -80,7 +82,17 @@ export interface CollabRemoteApi {
   ): Promise<CreatedAgent>
   deleteAgent(agentId: string): Promise<void>
   listRuntimeBindings(): Promise<NativeRuntimeBinding[]>
-  createChannel(name: string, creatorId: string): Promise<NativeTarget>
+  createChannel(name: string, description: string, creatorId: string): Promise<NativeTarget>
+  updateChannel(
+    targetId: string,
+    actorId: string,
+    name: string,
+    description: string,
+    expectedVersion: string,
+  ): Promise<NativeTarget>
+  archiveChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
+  restoreChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
+  deleteChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
   threadSummaries(actorId: string, rootMessageIds: string[]): Promise<NativeThreadSummary[]>
@@ -232,6 +244,8 @@ async function dispatchRemote(
       return await api.listActors(actorId)
     case 'target.members':
       return await api.listTargetMembers(actorId, requiredString(input, 'targetId'))
+    case 'target.memberships':
+      return await api.listTargetMemberships(actorId, requiredString(input, 'targetId'))
     case 'changes':
       return await api.listChanges(
         actorId,
@@ -334,7 +348,37 @@ async function dispatchRemote(
     case 'runtime.bindings':
       return await api.listRuntimeBindings()
     case 'channel.create':
-      return await api.createChannel(requiredString(input, 'name'), actorId)
+      return await api.createChannel(
+        requiredString(input, 'name'),
+        requiredString(input, 'description'),
+        actorId,
+      )
+    case 'channel.update':
+      return await api.updateChannel(
+        requiredString(input, 'targetId'),
+        actorId,
+        requiredString(input, 'name'),
+        requiredString(input, 'description'),
+        decimalString(input, 'expectedVersion'),
+      )
+    case 'channel.archive':
+      return await api.archiveChannel(
+        requiredString(input, 'targetId'),
+        actorId,
+        decimalString(input, 'expectedVersion'),
+      )
+    case 'channel.restore':
+      return await api.restoreChannel(
+        requiredString(input, 'targetId'),
+        actorId,
+        decimalString(input, 'expectedVersion'),
+      )
+    case 'channel.delete':
+      return await api.deleteChannel(
+        requiredString(input, 'targetId'),
+        actorId,
+        decimalString(input, 'expectedVersion'),
+      )
     case 'direct.create':
       return await api.createDirect(actorId, requiredString(input, 'peerId'))
     case 'thread.create':

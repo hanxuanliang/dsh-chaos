@@ -37,7 +37,7 @@ pub use membership::{AgentMembership, IdentityContext, MembershipRole, TargetMem
 pub use message::{Message, MessageTail, SendMessageRequest, SendMessageResult};
 pub use profile::{AgentCharter, AgentLifecycle, AgentProfile};
 pub use runtime::RuntimeBinding;
-pub use target::{Target, TargetKind};
+pub use target::{Target, TargetKind, TargetLifecycle};
 pub use task::{Task, TaskStatus};
 pub use thread::ThreadSummary;
 

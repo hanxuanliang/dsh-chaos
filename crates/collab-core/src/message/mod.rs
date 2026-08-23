@@ -38,9 +38,10 @@ impl CollabCore {
 
         let now = now_ms()?;
         self.write(async |connection| {
-            let route = AccessGrant::require(connection, &request.target_id, &request.author_id)
-                .await?
-                .route;
+            let route =
+                AccessGrant::require_writable(connection, &request.target_id, &request.author_id)
+                    .await?
+                    .route;
             let store = MessageStore::new(connection);
 
             if let Some(message) = store

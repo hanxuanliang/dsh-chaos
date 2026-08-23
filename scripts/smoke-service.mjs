@@ -46,7 +46,7 @@ try {
   const fiber = await ctx.plugin(CollabService, { path: join(root, 'state.db') })
   const owner = await ctx.collab.createUser('owner', 'Owner')
   const alpha = await ctx.collab.createAgent('alpha', 'Alpha', join(root, 'alpha'))
-  const channel = await ctx.collab.createChannel('design', owner.id)
+  const channel = await ctx.collab.createChannel('design', 'Design collaboration', owner.id)
   await ctx.collab.addMember(channel.id, alpha.id, owner.id)
   const binding = await ctx.collab.createRuntime({
     agentId: alpha.id,
@@ -71,6 +71,7 @@ try {
   })
   assert.equal(checked.messages.length, 1)
   assert.equal(checked.contexts[0].target.name, 'design')
+  assert.equal(checked.contexts[0].target.description, 'Design collaboration')
   assert.equal(checked.contexts[0].members.find(member => member.actor.id === alpha.id).actor.handle, 'alpha')
   const execution = {
     callId: 'service-tool-call',

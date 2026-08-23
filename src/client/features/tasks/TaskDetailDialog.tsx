@@ -6,9 +6,11 @@ import css from './TaskBoard.module.css'
 import type { ChaosTranslate } from '../../locales.ts'
 import type { TaskStatus } from './task-model.ts'
 import { TaskStatusDropdown } from './TaskStatusDropdown.tsx'
+import { TaskStatusButton } from './TaskStatusButton.tsx'
+import { TASK_LANE_LABEL_KEY } from './task-model.ts'
 import { ErrorBanner } from '../../shared/ui/ErrorBanner.tsx'
 
-export function TaskDetailDialog({ task, title, description, assigneeLabel, createdByLabel, selfActor, agents, error, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
+export function TaskDetailDialog({ task, title, description, assigneeLabel, createdByLabel, selfActor, agents, error, readOnly = false, t, onMove, onClaim, onUnclaim, onOpenAnchor, onClose }: {
   task: NativeTask
   title: string
   description: string
@@ -17,6 +19,7 @@ export function TaskDetailDialog({ task, title, description, assigneeLabel, crea
   selfActor: NativeActor | undefined
   agents: NativeActor[]
   error: string | undefined
+  readOnly?: boolean | undefined
   t: ChaosTranslate
   onMove(target: TaskStatus): void
   onClaim(actorId?: string): void
@@ -45,11 +48,15 @@ export function TaskDetailDialog({ task, title, description, assigneeLabel, crea
       <dl className={css.taskDetailMeta}>
         <div className={css.taskDetailRow}>
           <dt>{t('tasks.status')}</dt>
-          <dd><TaskStatusDropdown task={task} t={t} onMove={onMove} /></dd>
+          <dd>{readOnly
+            ? <TaskStatusButton status={task.status} label={t(TASK_LANE_LABEL_KEY[task.status])} disabled />
+            : <TaskStatusDropdown task={task} t={t} onMove={onMove} />}</dd>
         </div>
         <div className={css.taskDetailRow}>
           <dt>{t('tasks.assignee')}</dt>
-          <dd><AssigneePopover task={task} selfActor={selfActor} agents={agents} assigneeLabel={assigneeLabel} t={t} onClaim={onClaim} onUnclaim={onUnclaim} /></dd>
+          <dd>{readOnly
+            ? <span>{assigneeLabel ?? t('tasks.unassigned')}</span>
+            : <AssigneePopover task={task} selfActor={selfActor} agents={agents} assigneeLabel={assigneeLabel} t={t} onClaim={onClaim} onUnclaim={onUnclaim} />}</dd>
         </div>
         <div className={css.taskDetailRow}><dt>{t('tasks.sourceAuthor')}</dt><dd>{createdByLabel}</dd></div>
         <div className={css.taskDetailRow}><dt>{t('tasks.created')}</dt><dd>{new Date(task.createdAtMs).toLocaleString()}</dd></div>

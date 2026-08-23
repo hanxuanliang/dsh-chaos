@@ -135,23 +135,41 @@ impl<'connection> DeliveryStore<'connection> {
                  JOIN (
                    SELECT d.recipient_id AS agent_id, MAX(d.message_seq) AS pending_seq
                    FROM deliveries d
-                   JOIN v_target_access access
-                     ON access.target_id = d.target_id
-                    AND access.actor_id = d.recipient_id
                    WHERE d.model_seen_at_ms IS NULL
+                     AND (
+                       EXISTS (
+                         SELECT 1 FROM v_target_access access
+                         WHERE access.target_id = d.target_id
+                           AND access.actor_id = d.recipient_id
+                       )
+                       OR EXISTS (
+                         SELECT 1 FROM targets target
+                         WHERE target.id = d.target_id
+                           AND target.deleted_at_ms IS NOT NULL
+                       )
+                     )
                    GROUP BY d.recipient_id
                  ) pending ON pending.agent_id = rb.agent_id
                  WHERE pending.pending_seq > wake.notified_seq
                     OR wake.notified_generation <> rb.generation
                     OR EXISTS (
                       SELECT 1 FROM deliveries d
-                      JOIN v_target_access access
-                        ON access.target_id = d.target_id
-                       AND access.actor_id = d.recipient_id
                       WHERE d.recipient_id = rb.agent_id
                         AND d.model_seen_at_ms IS NULL
                         AND (d.notified_at_ms IS NULL
                           OR d.notified_generation <> rb.generation)
+                        AND (
+                          EXISTS (
+                            SELECT 1 FROM v_target_access access
+                            WHERE access.target_id = d.target_id
+                              AND access.actor_id = d.recipient_id
+                          )
+                          OR EXISTS (
+                            SELECT 1 FROM targets target
+                            WHERE target.id = d.target_id
+                              AND target.deleted_at_ms IS NOT NULL
+                          )
+                        )
                     )
                  ORDER BY pending.pending_seq, rb.agent_id
                  LIMIT ?1",
@@ -205,9 +223,17 @@ impl<'connection> DeliveryStore<'connection> {
                    AND message_seq <= ?2
                    AND model_seen_at_ms IS NULL
                    AND EXISTS (
-                     SELECT 1 FROM v_target_access access
-                     WHERE access.target_id = deliveries.target_id
-                       AND access.actor_id = deliveries.recipient_id
+                     SELECT 1
+                     FROM targets target
+                     WHERE target.id = deliveries.target_id
+                       AND (
+                         target.deleted_at_ms IS NOT NULL
+                         OR EXISTS (
+                           SELECT 1 FROM v_target_access access
+                           WHERE access.target_id = deliveries.target_id
+                             AND access.actor_id = deliveries.recipient_id
+                         )
+                       )
                    )",
                 (agent_id, pending_seq, now, generation),
             )
@@ -243,10 +269,20 @@ impl<'connection> DeliveryStore<'connection> {
                         m.client_request_id, m.body_json, m.created_at_ms
                  FROM deliveries d
                  JOIN messages m ON m.id = d.message_id
-                 JOIN v_target_access access
-                   ON access.target_id = m.target_id AND access.actor_id = ?1
                  WHERE d.recipient_id = ?1
                    AND d.model_seen_at_ms IS NULL
+                   AND (
+                     EXISTS (
+                       SELECT 1 FROM v_target_access access
+                       WHERE access.target_id = m.target_id
+                         AND access.actor_id = ?1
+                     )
+                     OR EXISTS (
+                       SELECT 1 FROM targets target
+                       WHERE target.id = m.target_id
+                         AND target.deleted_at_ms IS NOT NULL
+                     )
+                   )
                  ORDER BY m.seq
                  LIMIT ?2",
                 (agent_id, i64::from(limit)),

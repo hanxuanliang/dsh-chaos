@@ -21,7 +21,7 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             let target_id = MessageStore::new(connection).target_of(message_id).await?;
-            let grant = AccessGrant::require(connection, &target_id, actor_id).await?;
+            let grant = AccessGrant::require_writable(connection, &target_id, actor_id).await?;
             if grant.route.kind == TargetKind::Thread {
                 return Err(CollabError::InvalidArgument(
                     "Thread replies cannot become Tasks".into(),

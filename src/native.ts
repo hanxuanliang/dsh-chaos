@@ -52,10 +52,16 @@ export interface NativeTarget {
   id: string
   kind: 'channel' | 'direct' | 'thread'
   name: string
+  description: string
+  lifecycle: 'active' | 'archived' | 'deleted'
+  version: string
   parentTargetId?: string
   rootMessageId?: string
   createdBy: string
   createdAtMs: number
+  updatedAtMs: number
+  archivedAtMs?: number
+  deletedAtMs?: number
 }
 
 export interface NativeIdentityContext {
@@ -126,6 +132,7 @@ export interface NativeChangeEvent {
     | 'actor_created'
     | 'agent_profile_changed'
     | 'target_created'
+    | 'target_changed'
     | 'membership_changed'
     | 'thread_follow_changed'
     | 'message_created'
@@ -217,7 +224,17 @@ export interface NativeCollabHandle {
   ): Promise<NativeAgentProfile>
   identityContext(agentId: string, targetId?: string): Promise<NativeIdentityContext>
   deleteAgent(agentId: string): Promise<void>
-  createChannel(name: string, creatorId: string): Promise<NativeTarget>
+  createChannel(name: string, description: string, creatorId: string): Promise<NativeTarget>
+  updateChannel(
+    targetId: string,
+    actorId: string,
+    name: string,
+    description: string,
+    expectedVersion: string,
+  ): Promise<NativeTarget>
+  archiveChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
+  restoreChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
+  deleteChannel(targetId: string, actorId: string, expectedVersion: string): Promise<NativeTarget>
   createDirect(actorId: string, peerId: string): Promise<NativeTarget>
   createThread(rootMessageId: string, actorId: string): Promise<NativeTarget>
   /** tae thread-summaries 等价物：批量 rootMessageIds（≤100）→ 计数+最近 3 个回复者（不含正文/不含无回复/不可见 thread）。 */

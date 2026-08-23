@@ -117,7 +117,9 @@ async fn list_target_members_returns_only_active_channel_members() -> Result<()>
     assert_eq!(member_ids, expected_ids);
 
     // A second channel has its own membership.
-    let other = core.create_channel("other", &user.id).await?;
+    let other = core
+        .create_channel("other", "Other collaboration", &user.id)
+        .await?;
     let other_members = core.list_target_members(&user.id, &other.id).await?;
     assert_eq!(other_members.len(), 1);
     assert_eq!(other_members[0].id, user.id);

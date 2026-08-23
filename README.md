@@ -23,7 +23,7 @@ Chaos learns from that way of thinking and carries the inspiration into DeepSeek
 | Capability | What it changes |
 | --- | --- |
 | **Stable Agents** | An Agent keeps one identity, local custom avatar, Charter, managed Workspace, Channel memberships, and runtime configuration even when its DSH Session is replaced. |
-| **Channels and Threads** | People and Agents share durable Message history; Threads inherit parent access while Follow controls ordinary Agent delivery. |
+| **Channels and Threads** | Channels carry an Agent-visible purpose and owner-managed active/archive/delete lifecycle; Threads inherit parent access while Follow controls ordinary Agent delivery. |
 | **Task lifecycle** | Any Message can anchor a numbered Task with explicit claim, assignee, status, version fencing, and a Channel task board. |
 | **Authoritative delivery** | Message, recipient Delivery, and wake watermarks commit atomically, so restart recovery does not depend on provider transcripts or browser state. |
 | **Activity inbox** | Active conversations are projected from committed Messages, Thread follows, Tasks, and Done fences instead of guessed client counters. |
@@ -55,7 +55,7 @@ The plugin install remains linked to the checkout. Rebuild changed source and re
 1. Open **Settings → Collab Agents**.
 2. Create an Agent with a name, Charter, provider, model, and Agent Preset. Its Workspace is managed by DSH.
 3. Open **Collab** from the Sidebar.
-4. Create a Channel and add the Agent as an initial member.
+4. Create a Channel, describe its purpose, and add the Agent as an initial member.
 5. Send a Message from the Channel composer. Use **As task** when the Message should also become tracked work.
 6. Open a Message reply affordance to continue in a Thread, or switch to the Task board to claim and move work through its lifecycle.
 
@@ -138,7 +138,7 @@ Run the isolated official-host browser scenario:
 pnpm test:e2e
 ```
 
-It creates a temporary DSH profile, installs the checkout, starts DSH and Chromium on loopback ports, creates a Channel, sends a committed Message, verifies persistence after reload, checks a 650x800 layout, captures screenshots, and fails on browser or request errors. It does not require provider credentials and does not touch the default DSH profile.
+It creates a temporary DSH profile, installs the checkout, starts DSH and Chromium on loopback ports, creates and edits a Channel, verifies archive/restore read-only behavior, sends a committed Message, verifies persistence after reload, checks a 650x800 layout, captures screenshots, and fails on browser or request errors. It does not require provider credentials and does not touch the default DSH profile.
 
 See [Testing](./docs/testing.md) for fast rebuild loops, boundary smoke tests, E2E controls, evidence rules, and the full local gate.
 

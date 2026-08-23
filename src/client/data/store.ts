@@ -20,6 +20,7 @@ import type {
   NativeMessage,
   NativeRuntimeBinding,
   NativeTarget,
+  NativeTargetMember,
   NativeTask,
   NativeThreadSummary,
   NativeActivityInboxItem,
@@ -57,6 +58,8 @@ export interface CollabStoreSnapshot {
   headDoneByChannel: Record<string, boolean>
   unreadByChannel: Record<string, number>
   membersByChannel: Record<string, NativeActor[]>
+  /** Role-bearing Channel roster used for management authorization and labels. */
+  membershipsByChannel: Record<string, NativeTargetMember[]>
   /** messageId → Task, for the TaskChip under message rows. */
   tasksByMessage: Record<string, NativeTask>
   /** agentId → runtime binding (only model provenance available; may be absent). */
@@ -157,6 +160,7 @@ export class CollabStore {
     headDoneByChannel: {},
     unreadByChannel: {},
     membersByChannel: {},
+    membershipsByChannel: {},
     tasksByMessage: {},
     bindingsByAgent: {},
     connection: 'live',
@@ -250,9 +254,12 @@ export class CollabStore {
       const active = this.snapshot.activeChannelId
       if (active !== undefined && channels.some(channel => channel.id === active)) {
         await this.activateChannel(active, true)
-      } else if (channels[0] !== undefined) {
-        this.set({ activeChannelId: channels[0].id })
-        await this.activateChannel(channels[0].id, true)
+      } else {
+        const first = channels.find(channel => channel.lifecycle === 'active') ?? channels[0]
+        if (first !== undefined) {
+          this.set({ activeChannelId: first.id })
+          await this.activateChannel(first.id, true)
+        }
       }
     } catch (reason) {
       if (this.loadGeneration !== generation) return
@@ -318,12 +325,12 @@ export class CollabStore {
     // Thread targets inherit the parent channel's membership — target.members
     // is not defined for them (crates 404 'active target'), so skip the join.
     const isThread = this.snapshot.threads.some(thread => thread.id === targetId)
-    const needMembers = !isThread && (force || this.snapshot.membersByChannel[targetId] === undefined)
+    const needMembers = !isThread && (force || this.snapshot.membershipsByChannel[targetId] === undefined)
     if (needHistory) this.set({ historyLoading: true, historyError: undefined })
     try {
-      const [tail, members] = await Promise.all([
+      const [tail, memberships] = await Promise.all([
         needHistory ? this.client.historyTail(targetId, INITIAL_TAIL) : Promise.resolve(undefined),
-        needMembers ? this.client.targetMembers(targetId) : Promise.resolve(undefined),
+        needMembers ? this.client.targetMemberships(targetId) : Promise.resolve(undefined),
       ])
       if (this.loadGeneration !== generation) return
       const patch: Partial<CollabStoreSnapshot> = {}
@@ -339,8 +346,15 @@ export class CollabStore {
         }
         if (this.snapshot.activeChannelId === targetId) patch.historyLoading = false
       }
-      if (members !== undefined) {
-        patch.membersByChannel = { ...this.snapshot.membersByChannel, [targetId]: members }
+      if (memberships !== undefined) {
+        patch.membershipsByChannel = {
+          ...this.snapshot.membershipsByChannel,
+          [targetId]: memberships,
+        }
+        patch.membersByChannel = {
+          ...this.snapshot.membersByChannel,
+          [targetId]: memberships.map(membership => membership.actor),
+        }
       }
       if (tail !== undefined && this.snapshot.activeChannelId === targetId) {
         writeMarker(targetId, total ?? 0)
@@ -474,8 +488,8 @@ export class CollabStore {
     return thread
   }
 
-  async createChannel(name: string): Promise<NativeTarget> {
-    const target = await this.client.channelCreate(name)
+  async createChannel(name: string, description: string): Promise<NativeTarget> {
+    const target = await this.client.channelCreate(name, description)
     const generation = this.loadGeneration
     if (this.loadGeneration === generation && !this.snapshot.channels.some(channel => channel.id === target.id)) {
       this.set({
@@ -488,16 +502,72 @@ export class CollabStore {
     return target
   }
 
+  async updateChannel(
+    targetId: string,
+    name: string,
+    description: string,
+    expectedVersion: string,
+  ): Promise<NativeTarget> {
+    const target = await this.client.channelUpdate(targetId, name, description, expectedVersion)
+    this.replaceChannel(target)
+    return target
+  }
+
+  async archiveChannel(targetId: string): Promise<NativeTarget> {
+    const current = this.snapshot.channels.find(channel => channel.id === targetId)
+    if (current === undefined) throw new Error(`channel ${targetId} is not loaded`)
+    const target = await this.client.channelArchive(targetId, current.version)
+    this.replaceChannel(target)
+    return target
+  }
+
+  async restoreChannel(targetId: string): Promise<NativeTarget> {
+    const current = this.snapshot.channels.find(channel => channel.id === targetId)
+    if (current === undefined) throw new Error(`channel ${targetId} is not loaded`)
+    const target = await this.client.channelRestore(targetId, current.version)
+    this.replaceChannel(target)
+    return target
+  }
+
+  async deleteChannel(targetId: string): Promise<void> {
+    const current = this.snapshot.channels.find(channel => channel.id === targetId)
+    if (current === undefined) throw new Error(`channel ${targetId} is not loaded`)
+    await this.client.channelDelete(targetId, current.version)
+    const channels = this.snapshot.channels.filter(channel => channel.id !== targetId)
+    const nextActive = channels.find(channel => channel.lifecycle === 'active')
+    this.set({
+      channels,
+      threads: this.snapshot.threads.filter(thread => thread.parentTargetId !== targetId),
+      activeChannelId: nextActive?.id,
+      removedNotice: false,
+    })
+    if (nextActive !== undefined) await this.activateChannel(nextActive.id, false)
+  }
+
+  private replaceChannel(target: NativeTarget): void {
+    this.set({
+      channels: this.snapshot.channels.map(channel => channel.id === target.id ? target : channel),
+    })
+  }
+
   async memberAdd(targetId: string, memberId: string): Promise<void> {
     await this.client.memberAdd(targetId, memberId)
     // Refetch immediately: dropping the cache key would also disqualify this
     // channel from reloadTargets' member refresh (which only covers already-
     // cached channels), leaving the members dialog showing an empty list.
     const members = { ...this.snapshot.membersByChannel }
+    const memberships = { ...this.snapshot.membershipsByChannel }
     delete members[targetId]
-    this.set({ membersByChannel: members })
-    void this.client.targetMembers(targetId).then((list) => {
-      this.set({ membersByChannel: { ...this.snapshot.membersByChannel, [targetId]: list } })
+    delete memberships[targetId]
+    this.set({ membersByChannel: members, membershipsByChannel: memberships })
+    void this.client.targetMemberships(targetId).then((list) => {
+      this.set({
+        membershipsByChannel: { ...this.snapshot.membershipsByChannel, [targetId]: list },
+        membersByChannel: {
+          ...this.snapshot.membersByChannel,
+          [targetId]: list.map(membership => membership.actor),
+        },
+      })
     }, () => {})
   }
 
@@ -514,6 +584,9 @@ export class CollabStore {
       case 'target_created':
       case 'membership_changed':
         void this.reloadTargets()
+        break
+      case 'target_changed':
+        void this.reloadTargets(true)
         break
       case 'actor_created':
       case 'agent_profile_changed':
@@ -689,7 +762,7 @@ export class CollabStore {
   }
 
   /** target_created / membership_changed: reread the target set and seed new totals. */
-  private async reloadTargets(): Promise<void> {
+  private async reloadTargets(selectActiveFallback = false): Promise<void> {
     const generation = this.loadGeneration
     try {
       const snapshot = await this.client.snapshot()
@@ -718,15 +791,28 @@ export class CollabStore {
         if (this.removedTimer !== undefined) clearTimeout(this.removedTimer)
         this.removedTimer = setTimeout(() => {
           this.removedTimer = undefined
-          this.set({ removedNotice: false, activeChannelId: undefined })
+          const fallback = selectActiveFallback
+            ? this.snapshot.channels.find(channel => channel.lifecycle === 'active')
+            : undefined
+          this.set({ removedNotice: false, activeChannelId: fallback?.id })
+          if (fallback !== undefined) void this.activateChannel(fallback.id, false)
         }, 1000)
       }
       // Refetch active members even when uncached (e.g. right after memberAdd
       // dropped the key) — membership_changed semantics cover this channel.
       if (active !== undefined) {
-        void this.client.targetMembers(active).then((members) => {
+        void this.client.targetMemberships(active).then((memberships) => {
           if (this.loadGeneration !== generation) return
-          this.set({ membersByChannel: { ...this.snapshot.membersByChannel, [active]: members } })
+          this.set({
+            membershipsByChannel: {
+              ...this.snapshot.membershipsByChannel,
+              [active]: memberships,
+            },
+            membersByChannel: {
+              ...this.snapshot.membersByChannel,
+              [active]: memberships.map(membership => membership.actor),
+            },
+          })
         }, () => {})
       }
     } catch (e) {
@@ -760,7 +846,7 @@ export class CollabStore {
       for (const binding of bindings) bindingsByAgent[binding.agentId] = binding
       let active = this.snapshot.activeChannelId
       if (active === undefined || !channels.some(channel => channel.id === active)) {
-        active = channels[0]?.id
+        active = channels.find(channel => channel.lifecycle === 'active')?.id ?? channels[0]?.id
       }
       const patch: Partial<CollabStoreSnapshot> = {
         bootstrapped: true,
@@ -774,6 +860,7 @@ export class CollabStore {
         headCursorByChannel: {},
         headDoneByChannel: {},
         membersByChannel: {},
+        membershipsByChannel: {},
         totalByChannel: totals,
         tasksByMessage: mapByMessage(tasks),
         bindingsByAgent,

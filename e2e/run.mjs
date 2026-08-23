@@ -268,6 +268,20 @@ class CdpPage {
       return document.activeElement === element;
     })()`)
     assert(focused, `could not focus ${selector} through a real pointer click`)
+    await this.send('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown',
+      modifiers: 2,
+      key: 'a',
+      code: 'KeyA',
+      windowsVirtualKeyCode: 65,
+    })
+    await this.send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      modifiers: 2,
+      key: 'a',
+      code: 'KeyA',
+      windowsVirtualKeyCode: 65,
+    })
     await this.send('Input.insertText', { text: value })
     await this.waitForExpression(
       `${selector} value`,
@@ -433,6 +447,7 @@ try {
   })()`)
   await page.screenshot('channel-create-focus.png')
   await page.fill('input[placeholder="e.g. frontend-sync"]', channelName)
+  await page.fill('textarea[placeholder="Describe this channel’s purpose, scope, and collaboration rules."]', 'E2E channel lifecycle validation')
   await page.clickExpression('Create channel', `[...document.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === 'Create channel')`)
   await page.waitForExpression('created channel', `!!document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)})`)
@@ -468,6 +483,37 @@ try {
   await page.waitForExpression('committed Message row', committedMessageExpression)
   await page.waitForExpression('cleared Channel draft', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null && element.value === '')`)
+
+  await page.clickExpression('Channel actions', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
+  await page.waitForExpression('Channel actions menu', `!![...document.querySelectorAll('[role="menuitem"]')]
+    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Edit details')`)
+  await page.clickExpression('Edit channel details', `[...document.querySelectorAll('[role="menuitem"]')]
+    .find(item => item.textContent?.trim() === 'Edit details')`)
+  const editedDescription = 'Updated E2E channel purpose'
+  await page.waitForExpression('Edit Channel dialog', `document.querySelector('#chaos-channel-edit-description')?.offsetParent !== null`)
+  await page.fill('#chaos-channel-edit-description', editedDescription)
+  await page.clickExpression('Save channel details', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Save' && !button.disabled)`)
+  await page.waitForExpression('updated Channel description', `!![...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(editedDescription)})`)
+
+  await page.clickExpression('Channel actions after edit', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
+  await page.clickExpression('Archive channel', `[...document.querySelectorAll('[role="menuitem"]')]
+    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Archive channel')`)
+  await page.waitForExpression('archived read-only Channel', `(() => {
+    const channel = document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)});
+    if (!(channel instanceof HTMLElement) || channel.offsetParent === null) return false;
+    const archived = [...channel.querySelectorAll('*')].some(element => element.textContent?.trim() === 'Archived');
+    const composer = [...channel.querySelectorAll('textarea')].some(element => element.offsetParent !== null);
+    return archived && !composer;
+  })()`)
+  await page.screenshot('channel-archived.png')
+  await page.clickExpression('Restore archived channel', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Restore channel')`)
+  await page.waitForExpression('restored Channel composer', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
+    .some(element => element.offsetParent !== null)`)
   await page.screenshot('wide.png')
 
   await page.reload()
@@ -516,6 +562,8 @@ try {
       'plugin loaded in an isolated official DSH profile',
       'New Channel name uses the shared blue focus field',
       'Channel creation completed through the real UI and RPC path',
+      'Channel Description edit completed through the real UI and RPC path',
+      'Archived Channel stayed readable without a composer and restored successfully',
       'Message send completed through the real UI and RPC path',
       'Channel and Message persisted across a full page reload',
       'Channel remained usable at a 650x800 viewport',
