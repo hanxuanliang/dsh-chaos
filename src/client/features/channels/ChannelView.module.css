@@ -56,6 +56,7 @@
 }
 .channel .channelMainCol {
   display: flex;
+  height: 100%;
   flex: 1;
   min-width: 0;
   min-height: 0;
