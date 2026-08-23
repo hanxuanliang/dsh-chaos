@@ -188,6 +188,7 @@ jobs:
     name: Install ${{ matrix.runner }}
     needs: publish
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -203,6 +204,7 @@ jobs:
       - name: Install published plugin without Rust
         env:
           DSH_HOME: ${{ runner.temp }}/dsh-home
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx --yes @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add @hanxuanliang/dsh-chaos@${{ needs.publish.outputs.version }}
 
   promote:
