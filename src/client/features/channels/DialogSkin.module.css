@@ -41,6 +41,7 @@
 .dialogBody > *:last-child { margin-top: 0; }
 .dialogBody > *:first-child { padding-bottom: 0; }
 .dialogBody *, .dialogBody *::before, .dialogBody *::after { box-sizing: border-box; }
+.dialogBody .formStack { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 
 /* dialogs 接触清两君 avatar 旁 member 名/handle (原 0-2-0 scope 原位重修) */
 .dialogBody .memberName {
