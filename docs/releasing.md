@@ -22,8 +22,8 @@ The npm CLI requires a package to exist before a trusted publisher can be config
 ## Release contract
 
 1. Update the root package version, Cargo workspace version, all four native package versions, lockfiles, README commands, and `release-notes/vX.Y.Z.md` in one reviewed commit.
-2. Run the repository CI and `pnpm release:check` on a clean checkout.
-3. Confirm the release commit is on `main`, then create and push an annotated `vX.Y.Z` tag.
+2. Merge the reviewed release commit to `main`; repository CI runs once on that main push rather than duplicating the same work for branch pushes and pull requests.
+3. After main CI is green, create and push an annotated `vX.Y.Z` tag. A `release/**` branch may be used to run the non-publishing Release workflow before tagging.
 4. The Release workflow builds and checks all four native modules, runs the repository release gates, then publishes the native packages followed by the root package under the `next` dist-tag.
 5. Once all five npm versions are visible from the registry, the same publish job promotes them to `latest` and the release workflow is complete.
 
