@@ -91,6 +91,20 @@ impl CollabCore {
 
             let delivery = crate::delivery::store::DeliveryStore::new(connection);
             let recipients = if route.kind == TargetKind::Thread {
+                let thread_id = ThreadId::parse(&request.target_id)?;
+                let mentioned = delivery
+                    .active_thread_mention_recipients(
+                        route.permission_target_id(&request.target_id),
+                        &request.author_id,
+                        &request.text,
+                    )
+                    .await?;
+                let thread_store = ThreadStore::new(connection);
+                for recipient in mentioned {
+                    thread_store
+                        .ensure_following(&thread_id, &ActorId::parse(&recipient.id)?, now)
+                        .await?;
+                }
                 delivery
                     .active_thread_recipients(
                         &request.target_id,

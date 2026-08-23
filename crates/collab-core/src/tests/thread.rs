@@ -93,6 +93,94 @@ async fn summaries_order_distinct_repliers_by_their_latest_message() -> Result<(
 }
 
 #[tokio::test]
+async fn explicit_thread_mention_restores_follow_and_wakes_agent() -> Result<()> {
+    let World {
+        core,
+        user,
+        beta,
+        channel,
+        ..
+    } = World::create().await?;
+    let root = core
+        .send_message(SendMessageRequest {
+            target_id: channel.id,
+            author_id: user.id.clone(),
+            client_request_id: "mention-root".into(),
+            text: "Open a Thread".into(),
+        })
+        .await?;
+    let thread = core.create_thread(&root.message.id, &user.id).await?;
+    let binding = core
+        .bind_runtime(
+            &beta.id,
+            "mention-beta-session",
+            "openai",
+            "codex",
+            "standard",
+        )
+        .await?;
+    let root_batch = core
+        .check_inbox(&beta.id, binding.generation, &binding.session_id, 10)
+        .await?;
+    core.mark_model_seen(
+        root_batch.id.as_deref().expect("root delivery batch"),
+        &beta.id,
+        binding.generation,
+        &binding.session_id,
+    )
+    .await?;
+
+    assert!(
+        core.snapshot(&beta.id)
+            .await?
+            .followed_thread_ids
+            .is_empty()
+    );
+    let near_match = core
+        .send_message(SendMessageRequest {
+            target_id: thread.id.clone(),
+            author_id: user.id.clone(),
+            client_request_id: "mention-near-match".into(),
+            text: "mail@beta.example and @beta-other are not beta".into(),
+        })
+        .await?;
+    assert!(!near_match.recipient_ids.contains(&beta.id));
+    assert!(
+        core.snapshot(&beta.id)
+            .await?
+            .followed_thread_ids
+            .is_empty()
+    );
+
+    let mentioned = core
+        .send_message(SendMessageRequest {
+            target_id: thread.id.clone(),
+            author_id: user.id.clone(),
+            client_request_id: "mention-exact".into(),
+            text: "@beta please review".into(),
+        })
+        .await?;
+    assert_eq!(mentioned.recipient_ids, vec![beta.id.clone()]);
+    assert_eq!(mentioned.wake_agent_ids, vec![beta.id.clone()]);
+    assert_eq!(
+        core.snapshot(&beta.id).await?.followed_thread_ids,
+        vec![thread.id.clone()]
+    );
+    assert!(
+        core.list_pending_wakes(10)
+            .await?
+            .iter()
+            .any(|wake| wake.binding.agent_id == beta.id)
+    );
+    let batch = core
+        .check_inbox(&beta.id, binding.generation, &binding.session_id, 10)
+        .await?;
+    assert_eq!(batch.messages.len(), 1);
+    assert_eq!(batch.messages[0].message.id, mentioned.message.id);
+    Ok(())
+}
+
+#[tokio::test]
 async fn thread_inherits_parent_access_and_delivers_only_to_followers() -> Result<()> {
     let World {
         core,
