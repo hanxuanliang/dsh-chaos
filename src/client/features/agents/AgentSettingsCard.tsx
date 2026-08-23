@@ -85,8 +85,9 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
     setProfiles(rows => rows.map(row => row.actor.id === updated.actor.id ? updated : row))
   }
   const created = (result: CreatedAgent): void => {
+    // Creation lands on the list (the new Agent is right there); the detail
+    // pane stays wherever the user was before opening the form.
     setProfiles(rows => [...rows.filter(row => row.actor.id !== result.profile.actor.id), result.profile])
-    setSelectedId(result.profile.actor.id)
     setCreateOpen(false)
     setActionError(result.setupError === undefined ? null : t('agents.setupFailed', { error: result.setupError }))
   }

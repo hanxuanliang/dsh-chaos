@@ -27,6 +27,11 @@ export function avatarSeed(handle: string, displayName: string): AvatarSeed {
   // Multiplying by the golden angle keeps sequential handles such as test-1
   // and test-2 visually separated instead of landing on adjacent hues.
   const hue = Math.round((hash * 137.508) % 360)
+  // Saturation and lightness vary per identity too, from independent hash
+  // slices: one fixed pastel recipe made consecutive Agents read as the same
+  // pale wash. Vivid range: strong chroma, mid lightness.
+  const saturation = 68 + (hash >>> 8) % 24
+  const lightness = 46 + (hash >>> 16) % 18
   const label = displayName.trim() || handle.trim() || '?'
   const words = label.split(/[\s_-]+/u).filter(Boolean)
   const glyphs = Array.from(label)
@@ -38,8 +43,8 @@ export function avatarSeed(handle: string, displayName: string): AvatarSeed {
   // Content-derived identity color, not theme chrome. Stable identities keep
   // their hue while all surrounding UI colors continue to use host tokens.
   return {
-    background: `hsl(${String(hue)} 62% 62%)`,
-    accent: `hsl(${String((hue + 137) % 360)} 78% 66%)`,
+    background: `hsl(${String(hue)} ${String(saturation)}% ${String(lightness)}%)`,
+    accent: `hsl(${String((hue + 137) % 360)} 82% 70%)`,
     pattern: AGENT_PATTERNS[hash % AGENT_PATTERNS.length] ?? AGENT_PATTERNS[0],
     initial,
   }
