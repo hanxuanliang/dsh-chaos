@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState, type JSX } from 'react'
-import { IconQuestionOutline14, IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTarget } from '../../../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
@@ -14,7 +14,7 @@ import { ChannelMembersDialog } from './ChannelMembersDialog.tsx'
 import { ChannelTasksBoard } from '../tasks/ChannelTasksBoard.tsx'
 import { ThreadPanel } from '../threads/ThreadPanel.tsx'
 import css from './ChannelView.module.css'
-import { IconButton, Tabs } from '../../shared/ui/index.ts'
+import { Tabs } from '../../shared/ui/index.ts'
 import { ResponsiveDrilldown, SplitPane } from '../../shared/layout/index.ts'
 
 export interface ChannelViewProps {
@@ -85,11 +85,6 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         <span className={css.channelHash} aria-hidden="true">#</span>
         {channel.name}
       </h3>
-      <IconButton
-        className={css.channelInfo}
-        label={channel.description}
-        icon={<IconQuestionOutline14 size={14} />}
-      />
       <Tabs<'messages' | 'tasks'>
         value={tab}
         onValueChange={setTab}

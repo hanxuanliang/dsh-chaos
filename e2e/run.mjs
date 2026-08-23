@@ -495,8 +495,10 @@ try {
   await page.fill('#chaos-channel-edit-description', editedDescription)
   await page.clickExpression('Save channel details', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Save' && !button.disabled)`)
-  await page.waitForExpression('updated Channel description', `!![...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(editedDescription)})`)
+  await page.waitForExpression('closed Edit Channel dialog', `(() => {
+    const description = document.querySelector('#chaos-channel-edit-description');
+    return description === null || description.offsetParent === null;
+  })()`)
 
   await page.clickExpression('Channel actions after edit', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
@@ -510,8 +512,15 @@ try {
     return archived && !composer;
   })()`)
   await page.screenshot('channel-archived.png')
-  await page.clickExpression('Restore archived channel', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Restore channel')`)
+  await page.clickExpression('Archived group', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim().startsWith('Archived'))`)
+  await page.clickExpression('Archived Channel actions', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
+  await page.waitForExpression('Restore archived Channel action', `!![...document.querySelectorAll('[role="menuitem"]')]
+    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Restore channel')`)
+  await page.screenshot('channel-archived-actions.png')
+  await page.clickExpression('Restore archived channel', `[...document.querySelectorAll('[role="menuitem"]')]
+    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Restore channel')`)
   await page.waitForExpression('restored Channel composer', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null)`)
   await page.screenshot('wide.png')
