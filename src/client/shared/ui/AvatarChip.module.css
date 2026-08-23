@@ -10,8 +10,15 @@
   overflow: hidden;
 }
 
+.avatar[data-kind='user'] {
+  color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, var(--dsw-alias-bg-layer-1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
+}
+
 .image { width: 100%; height: 100%; object-fit: cover; }
 .generated { width: 100%; height: 100%; image-rendering: pixelated; shape-rendering: crispEdges; }
+.userIcon { width: 62%; height: 62%; }
 
 .xs { width: 20px; height: 20px; font-size: 11px; line-height: 20px; }
 .md { width: 24px; height: 24px; font-size: 12px; line-height: 24px; }

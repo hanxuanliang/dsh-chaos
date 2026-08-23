@@ -1,4 +1,5 @@
 import type { JSX } from 'react'
+import { IconUserOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { avatarSeed, type AvatarSeed } from '../avatar.ts'
 import css from './AvatarChip.module.css'
 
@@ -29,9 +30,16 @@ export function AvatarChip({ handle, displayName, avatarUrl, seed, kind = 'user'
     </svg>
   )
   return (
-    <span className={`${css.avatar} ${size === 'xs' ? css.xs : size === 'md' ? css.md : size === 'lg' ? css.lg : size === 'xl' ? css.xl : css.xxsmall}`} style={{ background: s.background }} title={title} data-avatar-chip aria-hidden="true">
+    <span
+      className={`${css.avatar} ${size === 'xs' ? css.xs : size === 'md' ? css.md : size === 'lg' ? css.lg : size === 'xl' ? css.xl : css.xxsmall}`}
+      style={kind === 'agent' ? { background: s.background } : undefined}
+      title={title}
+      data-avatar-chip
+      data-kind={kind}
+      aria-hidden="true"
+    >
       {avatarUrl === undefined
-        ? kind === 'agent' ? generated : s.initial
+        ? kind === 'agent' ? generated : <IconUserOutline16 className={css.userIcon} />
         : <img className={css.image} src={avatarUrl} alt="" draggable={false} />}
     </span>
   )
