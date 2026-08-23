@@ -63,11 +63,8 @@
 }
 .dialogBody .field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .dialogBody .labelText { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 18px; }
-.dialogBody .req { margin-left: 2px; color: var(--dsw-alias-state-error-primary); font-style: normal; }
 .dialogBody .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
 .dialogBody .error { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
-.dialogBody .input { display: block; }
-.dialogBody .input input { width: 100%; }
 
 .dialogBody .memberPick {
   display: flex;
