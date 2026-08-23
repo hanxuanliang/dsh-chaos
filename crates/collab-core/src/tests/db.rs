@@ -12,7 +12,9 @@ async fn local_turso_file_reopens_with_agent_identity_intact() -> Result<()> {
     }
 
     let reopened = CollabCore::open(&path).await?;
-    let channel = reopened.create_channel("after-restart", &owner_id).await?;
+    let channel = reopened
+        .create_channel("after-restart", "Restart test", &owner_id)
+        .await?;
     assert_eq!(channel.created_by, owner_id);
 
     #[cfg(unix)]

@@ -11,7 +11,7 @@ use crate::changefeed::ChangeStore;
 use crate::db::{ExecuteOne, FromRow, QueryRows};
 use crate::delivery::store::DeliveryStore;
 use crate::profile::store::ProfileStore;
-use crate::target::{AccessGrant, TargetRoute, TargetStore};
+use crate::target::{AccessGrant, TargetLifecycle, TargetRoute, TargetStore};
 use crate::{
     AgentProfile, ChangeKind, CollabCore, CollabError, NonBlank, Result, Target, TargetKind, now_ms,
 };
@@ -141,10 +141,15 @@ struct AgentMembershipRow {
     target_id: String,
     kind_text: String,
     name: String,
+    description: String,
+    version: i64,
     parent_target_id: Option<String>,
     root_message_id: Option<String>,
     created_by: String,
     created_at_ms: i64,
+    updated_at_ms: i64,
+    archived_at_ms: Option<i64>,
+    deleted_at_ms: Option<i64>,
     role_text: String,
     joined_at_ms: i64,
 }
@@ -155,12 +160,17 @@ impl FromRow for AgentMembershipRow {
             target_id: row.get(0)?,
             kind_text: row.get(1)?,
             name: row.get(2)?,
-            parent_target_id: row.get(3)?,
-            root_message_id: row.get(4)?,
-            created_by: row.get(5)?,
-            created_at_ms: row.get(6)?,
-            role_text: row.get(7)?,
-            joined_at_ms: row.get(8)?,
+            description: row.get(3)?,
+            version: row.get(4)?,
+            parent_target_id: row.get(5)?,
+            root_message_id: row.get(6)?,
+            created_by: row.get(7)?,
+            created_at_ms: row.get(8)?,
+            updated_at_ms: row.get(9)?,
+            archived_at_ms: row.get(10)?,
+            deleted_at_ms: row.get(11)?,
+            role_text: row.get(12)?,
+            joined_at_ms: row.get(13)?,
         })
     }
 }
@@ -171,10 +181,15 @@ impl AgentMembershipRow {
             target_id,
             kind_text,
             name,
+            description,
+            version,
             parent_target_id,
             root_message_id,
             created_by,
             created_at_ms,
+            updated_at_ms,
+            archived_at_ms,
+            deleted_at_ms,
             role_text,
             joined_at_ms,
         } = self;
@@ -183,10 +198,22 @@ impl AgentMembershipRow {
                 id: target_id.clone(),
                 kind: TargetKind::parse(&target_id, &kind_text)?,
                 name,
+                description,
+                lifecycle: if deleted_at_ms.is_some() {
+                    TargetLifecycle::Deleted
+                } else if archived_at_ms.is_some() {
+                    TargetLifecycle::Archived
+                } else {
+                    TargetLifecycle::Active
+                },
+                version,
                 parent_target_id,
                 root_message_id,
                 created_by,
                 created_at_ms,
+                updated_at_ms,
+                archived_at_ms,
+                deleted_at_ms,
             },
             role: MembershipRole::parse(&target_id, agent_id, &role_text)?,
             joined_at_ms,
@@ -195,8 +222,7 @@ impl AgentMembershipRow {
 }
 
 /// Role-bearing presence proof that one Actor is an active member of one
-/// target. Obtained exclusively through [`Membership::require`] and
-/// [`Membership::require_owner`].
+/// target. Obtained through active or historical authorization paths.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Membership {
     role: MembershipRole,
@@ -226,40 +252,31 @@ impl Membership {
         })
     }
 
-    /// Certify that `actor_id` is the active owner of `target_id`.
-    pub(crate) async fn require_owner(
+    /// Certify a historical association after a Channel has been soft-deleted.
+    pub(crate) async fn require_historical(
         connection: &Connection,
         target_id: &str,
-        actor_id: &str,
+        actor: &Actor,
     ) -> Result<Self> {
-        let role = connection
+        let RoleRow(role_text) = connection
             .query_row::<RoleRow>(
                 "SELECT role FROM memberships
-                 WHERE target_id = ?1 AND actor_id = ?2 AND left_at_ms IS NULL",
-                (target_id, actor_id),
+                 WHERE target_id = ?1 AND actor_id = ?2",
+                (target_id, actor.id.as_str()),
             )
             .await?
-            .map(|RoleRow(role_text)| MembershipRole::parse(target_id, actor_id, &role_text))
-            .transpose()?;
-        let Some(role) = role else {
-            return Err(Self::manage_denied(target_id, actor_id));
-        };
-        if !matches!(role, MembershipRole::Owner) {
-            return Err(Self::manage_denied(target_id, actor_id));
-        }
-        Ok(Self { role })
+            .ok_or_else(|| CollabError::PermissionDenied {
+                actor_id: actor.id.clone(),
+                action: "read historical",
+                target_id: target_id.to_owned(),
+            })?;
+        Ok(Self {
+            role: MembershipRole::parse(target_id, &actor.id, &role_text)?,
+        })
     }
 
     pub(crate) const fn role(self) -> MembershipRole {
         self.role
-    }
-
-    fn manage_denied(target_id: &str, actor_id: &str) -> CollabError {
-        CollabError::PermissionDenied {
-            actor_id: actor_id.to_owned(),
-            action: "manage",
-            target_id: target_id.to_owned(),
-        }
     }
 }
 
@@ -269,12 +286,13 @@ impl CollabCore {
         let now = now_ms()?;
         self.write(async |connection| {
             let actor = Actor::require(connection, &ActorId::parse(actor_id)?).await?;
-            if TargetRoute::require(connection, target_id).await?.kind != TargetKind::Channel {
+            let grant = AccessGrant::require_writable(connection, target_id, added_by).await?;
+            if grant.route.kind != TargetKind::Channel {
                 return Err(CollabError::InvalidArgument(
                     "add_member only supports Channel targets".into(),
                 ));
             }
-            Membership::require_owner(connection, target_id, added_by).await?;
+            grant.require_owner(target_id)?;
             MembershipStore::new(connection)
                 .upsert_member(target_id, actor_id, now)
                 .await?;
@@ -465,6 +483,17 @@ impl<'connection> MembershipStore<'connection> {
             .await
     }
 
+    pub(crate) async fn end_all_active(&self, target_id: &str, now: i64) -> Result<()> {
+        self.connection
+            .execute(
+                "UPDATE memberships SET left_at_ms = ?2
+                 WHERE target_id = ?1 AND left_at_ms IS NULL",
+                (target_id, now),
+            )
+            .await?;
+        Ok(())
+    }
+
     pub(crate) async fn target_change_recipients(
         &self,
         target_id: &str,
@@ -501,9 +530,10 @@ impl<'connection> MembershipStore<'connection> {
         let rows = self
             .connection
             .query_rows::<AgentMembershipRow>(
-                "SELECT target.id, target.kind, target.name, target.parent_target_id,
-                        target.root_message_id, target.created_by, target.created_at_ms,
-                        agent_membership.role, agent_membership.joined_at_ms
+                "SELECT target.id, target.kind, target.name, target.description, target.version,
+                        target.parent_target_id, target.root_message_id, target.created_by,
+                        target.created_at_ms, target.updated_at_ms, target.archived_at_ms,
+                        target.deleted_at_ms, agent_membership.role, agent_membership.joined_at_ms
                  FROM memberships agent_membership
                  JOIN targets target ON target.id = agent_membership.target_id
                  JOIN memberships viewer_membership
@@ -512,7 +542,7 @@ impl<'connection> MembershipStore<'connection> {
                   AND viewer_membership.left_at_ms IS NULL
                  WHERE agent_membership.actor_id = ?2
                    AND agent_membership.left_at_ms IS NULL
-                   AND target.archived_at_ms IS NULL
+                   AND target.deleted_at_ms IS NULL
                    AND target.kind IN ('channel', 'direct')
                  ORDER BY target.kind, target.name, target.id",
                 (actor_id, agent_id),

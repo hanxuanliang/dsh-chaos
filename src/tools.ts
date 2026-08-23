@@ -42,10 +42,16 @@ const TARGET_SCHEMA = {
     id: { type: 'string', required: true },
     kind: { type: 'string', required: true, enum: ['channel', 'direct', 'thread'] },
     name: { type: 'string', required: true },
+    description: { type: 'string', required: true },
+    lifecycle: { type: 'string', required: true, enum: ['active', 'archived', 'deleted'] },
+    version: { type: 'string', required: true },
     parentTargetId: { type: 'string' },
     rootMessageId: { type: 'string' },
     createdBy: { type: 'string', required: true },
     createdAtMs: { type: 'number', required: true },
+    updatedAtMs: { type: 'number', required: true },
+    archivedAtMs: { type: 'number' },
+    deletedAtMs: { type: 'number' },
   },
 } as const
 

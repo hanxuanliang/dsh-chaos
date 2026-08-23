@@ -175,6 +175,25 @@ impl<'connection> ThreadStore<'connection> {
         Ok(())
     }
 
+    pub(crate) async fn end_follows_for_parent(
+        &self,
+        parent_target_id: &str,
+        now: i64,
+    ) -> Result<()> {
+        self.connection
+            .execute(
+                "UPDATE thread_follows
+                 SET unfollowed_at_ms = ?2
+                 WHERE unfollowed_at_ms IS NULL
+                   AND thread_target_id IN (
+                     SELECT id FROM targets WHERE parent_target_id = ?1 AND kind = 'thread'
+                   )",
+                (parent_target_id, now),
+            )
+            .await?;
+        Ok(())
+    }
+
     /// Return the active Thread rooted at one Message, when it exists.
     pub(crate) async fn find_by_root(&self, root_message_id: &str) -> Result<Option<Target>> {
         let Some(TargetIdRow(target_id)) = self

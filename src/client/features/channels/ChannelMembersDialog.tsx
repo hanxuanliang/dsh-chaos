@@ -9,7 +9,7 @@
  */
 import { useMemo, useState, type JSX } from 'react'
 import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { NativeActor } from '../../../native.ts'
+import type { NativeTargetMember } from '../../../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import { avatarSeed } from '../../shared/avatar.ts'
@@ -21,6 +21,7 @@ export interface ChannelMembersDialogProps {
   store: CollabStore
   state: CollabStoreSnapshot
   channelId: string
+  readOnly?: boolean | undefined
   onClose(): void
 }
 
@@ -28,33 +29,35 @@ function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
 
-function MemberRow({ actor }: { actor: NativeActor }): JSX.Element {
+function MemberRow({ member, ownerLabel }: { member: NativeTargetMember; ownerLabel: string }): JSX.Element {
+  const { actor } = member
   const seed = avatarSeed(actor.handle, actor.displayName)
   return (
     <div className={css.memberRow}>
       <AvatarChip kind={actor.kind} seed={seed} avatarUrl={actor.avatarDataUrl} aria-hidden="true" />
       <span className={css.memberName}>{actor.displayName}</span>
       <span className={css.memberHandle}>@{actor.handle}</span>
-      {actor.kind === 'agent' && <span className={css.memberBadge}>AGENT</span>}
+      {member.role === 'owner' && <span className={css.memberBadge}>{ownerLabel}</span>}
+      {member.role !== 'owner' && actor.kind === 'agent' && <span className={css.memberBadge}>AGENT</span>}
     </div>
   )
 }
 
-export function ChannelMembersDialog({ t, store, state, channelId, onClose }: ChannelMembersDialogProps): JSX.Element {
+export function ChannelMembersDialog({ t, store, state, channelId, readOnly = false, onClose }: ChannelMembersDialogProps): JSX.Element {
   const [stage, setStage] = useState<'list' | 'add'>('list')
   const [addingId, setAddingId] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const members: NativeActor[] = useMemo(
-    () => state.membersByChannel[channelId] ?? [],
-    [state.membersByChannel, channelId],
+  const memberships = useMemo(
+    () => state.membershipsByChannel[channelId] ?? [],
+    [state.membershipsByChannel, channelId],
   )
-  const humans = members.filter(member => member.kind === 'user')
-  const agents = members.filter(member => member.kind === 'agent')
+  const humans = memberships.filter(member => member.actor.kind === 'user')
+  const agents = memberships.filter(member => member.actor.kind === 'agent')
   const available = useMemo(() => {
-    const inside = new Set(members.map(member => member.id))
+    const inside = new Set(memberships.map(member => member.actor.id))
     return state.actors.filter(actor => actor.kind === 'agent' && !inside.has(actor.id))
-  }, [state.actors, members])
+  }, [state.actors, memberships])
   const anyAgentAtAll = state.actors.some(actor => actor.kind === 'agent')
 
   const add = (actorId: string): void => {
@@ -76,29 +79,29 @@ export function ChannelMembersDialog({ t, store, state, channelId, onClose }: Ch
     <Modal
       open
       onClose={() => { if (addingId === null) onClose() }}
-      title={t('members.title', { count: members.length })}
+      title={t('members.title', { count: memberships.length })}
       closeLabel={t('members.close')}
       contentClassName={css.dialogBody as string}
-      footer={stage === 'list'
+      footer={stage === 'list' && !readOnly
         ? (
           <Button variant="primary" size="sm" className={css.dialogWideButton as string} onClick={() => { setStage('add') }}>
             {t('members.add')}
           </Button>
         )
-        : (
+        : stage === 'add' ? (
           <Button variant="outline" onClick={() => { setStage('list'); setFailure(null) }}>
             {t('members.back')}
           </Button>
-        )}
+        ) : undefined}
     >
       {stage === 'list' && (
         <>
-          {members.length === 0 && <p className={css.hint}>{t('members.emptyMembers')}</p>}
+          {memberships.length === 0 && <p className={css.hint}>{t('members.emptyMembers')}</p>}
           {humans.length > 0 && (
             <section>
               <p className={css.dlgGroupLabel}>{t('members.humans')}</p>
               <div className={css.dlgMemberList}>
-                {humans.map(member => <MemberRow key={member.id} actor={member} />)}
+                {humans.map(member => <MemberRow key={member.actor.id} member={member} ownerLabel={t('members.owner')} />)}
               </div>
             </section>
           )}
@@ -106,7 +109,7 @@ export function ChannelMembersDialog({ t, store, state, channelId, onClose }: Ch
             <section>
               <p className={css.dlgGroupLabel}>{t('members.agents')}</p>
               <div className={css.dlgMemberList}>
-                {agents.map(member => <MemberRow key={member.id} actor={member} />)}
+                {agents.map(member => <MemberRow key={member.actor.id} member={member} ownerLabel={t('members.owner')} />)}
               </div>
             </section>
           )}

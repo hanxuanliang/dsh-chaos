@@ -12,7 +12,9 @@ async fn snapshot_and_change_cursor_are_authorization_filtered() -> Result<()> {
         .create_agent("cursor-alpha", "Alpha", "/tmp/cursor-alpha")
         .await?;
     let outsider = core.ensure_user("cursor-outsider", "Outsider").await?;
-    let channel = core.create_channel("cursor-channel", &owner.id).await?;
+    let channel = core
+        .create_channel("cursor-channel", "Cursor tests", &owner.id)
+        .await?;
     core.add_member(&channel.id, &owner.id, &owner.id).await?;
     core.add_member(&channel.id, &alpha.id, &owner.id).await?;
 

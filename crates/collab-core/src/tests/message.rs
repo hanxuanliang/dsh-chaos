@@ -125,7 +125,9 @@ async fn exact_target_reads_recheck_current_membership() -> Result<()> {
         Err(CollabError::PermissionDenied { .. })
     ));
 
-    let other = core.create_channel("other", &user.id).await?;
+    let other = core
+        .create_channel("other", "Other collaboration", &user.id)
+        .await?;
     core.add_member(&other.id, &alpha.id, &user.id).await?;
     assert!(matches!(
         core.read_message(&alpha.id, &other.id, &sent.message.id)
@@ -168,7 +170,9 @@ async fn read_messages_tail_returns_exact_count_and_true_tail() -> Result<()> {
     assert_eq!(full.count, 5);
     assert_eq!(full.messages, sent);
     // An empty target reports zero with no messages.
-    let empty = core.create_channel("tail-empty", &user.id).await?;
+    let empty = core
+        .create_channel("tail-empty", "Empty tail", &user.id)
+        .await?;
     core.add_member(&empty.id, &alpha.id, &user.id).await?;
     let empty_tail = core.read_messages_tail(&alpha.id, &empty.id, 10).await?;
     assert_eq!(empty_tail.count, 0);
@@ -195,7 +199,9 @@ async fn read_messages_tail_holds_one_snapshot_under_concurrent_writes() -> Resu
     let path = directory.path().join("tail-snapshot.db");
     let reader = CollabCore::open(&path).await?;
     let user = reader.create_user("owner", "Owner").await?;
-    let channel = reader.create_channel("busy", &user.id).await?;
+    let channel = reader
+        .create_channel("busy", "Concurrent reads", &user.id)
+        .await?;
     let writer = CollabCore::open(&path).await?;
 
     let writer_user = writer.ensure_user("owner", "Owner").await?;

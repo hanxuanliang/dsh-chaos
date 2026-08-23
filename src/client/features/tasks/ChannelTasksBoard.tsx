@@ -33,13 +33,14 @@ import { AssigneeFilter } from './AssigneeFilter.tsx'
 import { TaskDetailDialog } from './TaskDetailDialog.tsx'
 import { TASK_LANES, TASK_LANE_LABEL_KEY, TASK_TRANSITIONS, formatTaskTime, splitTaskAnchor, type TaskStatus } from './task-model.ts'
 
-export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, onFocusHandled, onOpenMessage }: {
+export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, readOnly = false, onFocusHandled, onOpenMessage }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   channelId: string
   /** One-shot request from a message Task chip: reveal and focus its card. */
   focusMessageId: string | undefined
+  readOnly?: boolean | undefined
   onFocusHandled: () => void
   /** Close modal + switch to messages + scroll-flash the anchor row. */
   onOpenMessage: (messageId: string) => void
@@ -129,6 +130,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
   }
 
   const move = (task: NativeTask, target: TaskStatus): void => {
+    if (readOnly) return
     setMoveError(undefined)
     // todo(unassigned) → in_progress routes through claim so the move
     // attaches an assignee (spec §3.1); everything else is a direct update.
@@ -159,7 +161,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
         {TASK_LANES.map((lane) => {
           const laneTasks = tasks.filter(task => task.status === lane)
           const draggingTask = draggingTaskId === undefined ? undefined : tasks.find(t => t.messageId === draggingTaskId)
-          const laneAcceptsDrag = draggingTask !== undefined && draggingTask.status !== lane
+          const laneAcceptsDrag = !readOnly && draggingTask !== undefined && draggingTask.status !== lane
             && TASK_TRANSITIONS[draggingTask.status].includes(lane)
           return (
             <KanbanLane
@@ -199,7 +201,8 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
                     unassignedLabel={t('tasks.unassigned')}
                     timeLabel={formatTaskTime(task.updatedAtMs, t)}
                     sourceLabel={t('tasks.anchorGo')}
-                    dragging={draggingTaskId === task.messageId}
+                    dragging={!readOnly && draggingTaskId === task.messageId}
+                    draggable={!readOnly}
                     highlighted={highlightedMessageId === task.messageId}
                     onDragStart={() => { setDraggingTaskId(task.messageId) }}
                     onDragEnd={() => { setDraggingTaskId(undefined); setDragOverLane(undefined) }}
@@ -223,6 +226,7 @@ export function ChannelTasksBoard({ t, store, state, channelId, focusMessageId, 
             selfActor={state.actors.find(a => a.id === state.selfId)}
             agents={members}
             error={moveError}
+            readOnly={readOnly}
             t={t}
             onMove={(target) => { move(selected, target) }}
             onClaim={(actorId) => { setMoveError(undefined); store.claimTask(selected.messageId, actorId).catch(surfaceError) }}

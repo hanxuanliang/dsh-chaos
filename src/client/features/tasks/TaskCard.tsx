@@ -14,11 +14,12 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
   timeLabel: string
   sourceLabel: string
   dragging: boolean
+  draggable?: boolean | undefined
   highlighted: boolean
   onDragStart: () => void
   onDragEnd: () => void
   onOpen: () => void
-}>(function TaskCard({ task, title, excerpt, assignee, unassignedLabel, timeLabel, sourceLabel, dragging, highlighted, onDragStart, onDragEnd, onOpen }, ref) {
+}>(function TaskCard({ task, title, excerpt, assignee, unassignedLabel, timeLabel, sourceLabel, dragging, draggable = true, highlighted, onDragStart, onDragEnd, onOpen }, ref) {
   return (
     <button
       ref={ref}
@@ -30,7 +31,7 @@ export const TaskCard = forwardRef<HTMLButtonElement, {
       data-dragging={dragging ? 'true' : undefined}
       data-highlighted={highlighted ? 'true' : undefined}
       aria-haspopup="dialog"
-      draggable
+      draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onOpen}

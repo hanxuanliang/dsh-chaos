@@ -15,6 +15,7 @@ import type {
   NativeRuntimeBinding,
   NativeSendResult,
   NativeTarget,
+  NativeTargetMember,
   NativeTask,
   NativeThreadSummary,
   NativeActivityInboxPage,
@@ -75,8 +76,33 @@ export class ChaosClient {
     return this.call('target.members', { targetId })
   }
 
-  channelCreate(name: string): Promise<NativeTarget> {
-    return this.call('channel.create', { name })
+  targetMemberships(targetId: string): Promise<NativeTargetMember[]> {
+    return this.call('target.memberships', { targetId })
+  }
+
+  channelCreate(name: string, description: string): Promise<NativeTarget> {
+    return this.call('channel.create', { name, description })
+  }
+
+  channelUpdate(
+    targetId: string,
+    name: string,
+    description: string,
+    expectedVersion: string,
+  ): Promise<NativeTarget> {
+    return this.call('channel.update', { targetId, name, description, expectedVersion })
+  }
+
+  channelArchive(targetId: string, expectedVersion: string): Promise<NativeTarget> {
+    return this.call('channel.archive', { targetId, expectedVersion })
+  }
+
+  channelRestore(targetId: string, expectedVersion: string): Promise<NativeTarget> {
+    return this.call('channel.restore', { targetId, expectedVersion })
+  }
+
+  channelDelete(targetId: string, expectedVersion: string): Promise<NativeTarget> {
+    return this.call('channel.delete', { targetId, expectedVersion })
   }
 
   memberAdd(targetId: string, memberId: string): Promise<null> {

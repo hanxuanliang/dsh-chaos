@@ -306,8 +306,44 @@ export class CollabService extends Service {
     this.publishChange()
   }
 
-  async createChannel(name: string, creatorId: string) {
-    const target = await this.requireHandle().createChannel(name, creatorId)
+  async createChannel(name: string, description: string, creatorId: string) {
+    const target = await this.requireHandle().createChannel(name, description, creatorId)
+    this.publishChange()
+    return target
+  }
+
+  async updateChannel(
+    targetId: string,
+    actorId: string,
+    name: string,
+    description: string,
+    expectedVersion: string,
+  ) {
+    const target = await this.requireHandle().updateChannel(
+      targetId,
+      actorId,
+      name,
+      description,
+      expectedVersion,
+    )
+    this.publishChange()
+    return target
+  }
+
+  async archiveChannel(targetId: string, actorId: string, expectedVersion: string) {
+    const target = await this.requireHandle().archiveChannel(targetId, actorId, expectedVersion)
+    this.publishChange()
+    return target
+  }
+
+  async restoreChannel(targetId: string, actorId: string, expectedVersion: string) {
+    const target = await this.requireHandle().restoreChannel(targetId, actorId, expectedVersion)
+    this.publishChange()
+    return target
+  }
+
+  async deleteChannel(targetId: string, actorId: string, expectedVersion: string) {
+    const target = await this.requireHandle().deleteChannel(targetId, actorId, expectedVersion)
     this.publishChange()
     return target
   }

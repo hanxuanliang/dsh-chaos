@@ -157,7 +157,7 @@ impl LoadedTask {
             .find_by_message(message_id)
             .await?
             .ok_or_else(|| Self::not_found(message_id))?;
-        let grant = AccessGrant::require(connection, &task.target_id, actor_id).await?;
+        let grant = AccessGrant::require_writable(connection, &task.target_id, actor_id).await?;
         Ok(Self { task, grant })
     }
 

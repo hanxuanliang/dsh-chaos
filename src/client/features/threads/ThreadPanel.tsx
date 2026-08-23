@@ -31,7 +31,7 @@ import css from './ThreadPanel.module.css'
 import { RootCard } from './RootCard.tsx'
 import { IconButton } from '../../shared/ui/index.ts'
 
-export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose, back = false }: {
+export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose, back = false, readOnly = false }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
@@ -42,6 +42,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
   onRootJump: (messageId: string) => void
   onClose: () => void
   back?: boolean | undefined
+  readOnly?: boolean | undefined
 }): JSX.Element {
   const rootMessage: NativeMessage | undefined = thread.rootMessageId === undefined
     ? undefined
@@ -88,7 +89,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
         />
       </div>
       {/* Same seat padding as the channel main column — one placement rule, zero visual drift. */}
-      <div className={css.composerSeat}>
+      {!readOnly && <div className={css.composerSeat}>
         <ChannelComposer
           t={t}
           store={store}
@@ -98,7 +99,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
           disabled={state.connection !== 'live'}
           hideAsTask
         />
-      </div>
+      </div>}
     </aside>
   )
 }

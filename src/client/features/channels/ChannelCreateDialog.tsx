@@ -28,15 +28,17 @@ function errorText(reason: unknown): string {
 
 export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateDialogProps): JSX.Element {
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
   const agents = useMemo(() => state.actors.filter(actor => actor.kind === 'agent'), [state.actors])
   const trimmed = name.replace(/^#+/, '').trim()
+  const trimmedDescription = description.trim()
   const duplicate = trimmed !== ''
     && state.channels.some(channel => channel.name.trim().toLowerCase() === trimmed.toLowerCase())
-  const canSubmit = trimmed !== '' && !duplicate && !submitting
+  const canSubmit = trimmed !== '' && trimmedDescription !== '' && !duplicate && !submitting
 
   const toggle = (memberId: string): void => {
     setSelected((previous) => {
@@ -54,7 +56,7 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
     setFailure(null)
     void (async (): Promise<void> => {
       try {
-        const target = await store.createChannel(trimmed)
+        const target = await store.createChannel(trimmed, trimmedDescription)
         for (const memberId of selected) await store.memberAdd(target.id, memberId)
         store.setActiveChannel(target.id)
         onClose()
@@ -100,6 +102,21 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
           autoFocus
           spellCheck={false}
           disabled={submitting}
+        />
+      </Field>
+
+      <Field
+        label={t('channelCreate.description')}
+        required
+        hint={t('channelCreate.descriptionHint', { count: description.length })}
+      >
+        <textarea
+          id="chaos-channel-create-description"
+          value={description}
+          maxLength={280}
+          placeholder={t('channelCreate.descriptionPlaceholder')}
+          disabled={submitting}
+          onChange={(event) => { setDescription(event.target.value); setFailure(null) }}
         />
       </Field>
 

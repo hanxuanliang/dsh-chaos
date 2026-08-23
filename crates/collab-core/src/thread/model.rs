@@ -3,7 +3,7 @@ use turso::Connection;
 
 use crate::actor::ActorId;
 use crate::membership::Membership;
-use crate::target::TargetRoute;
+use crate::target::{TargetLifecycle, TargetRoute};
 use crate::{Actor, CollabError, Result, TargetKind};
 
 /// Stable Thread target identifier, non-blank by construction.
@@ -155,6 +155,12 @@ impl ThreadRoute {
             return Err(CollabError::InvalidArgument(
                 "expected a Thread target".into(),
             ));
+        }
+        if route.lifecycle != TargetLifecycle::Active {
+            return Err(CollabError::TargetNotWritable {
+                target_id: thread_id.as_str().to_owned(),
+                lifecycle: route.lifecycle.as_str().to_owned(),
+            });
         }
         Ok(Self {
             permission_target_id: route.permission_target_id(thread_id.as_str()).to_owned(),

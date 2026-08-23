@@ -339,6 +339,7 @@ try {
 
   const created = await call('channel.create', {
     name: 'remote-channel',
+    description: 'Remote collaboration',
     creatorId: 'forged-actor',
   })
   assert.equal(created.ok, true)
@@ -371,6 +372,9 @@ try {
   assert.equal(members.ok, true)
   assert.equal(members.value.length, 1)
   assert.equal(members.value[0].id, firstSnapshot.value.actor.id)
+  const memberRoles = await call('target.memberships', { targetId: created.value.id })
+  assert.equal(memberRoles.ok, true)
+  assert.equal(memberRoles.value[0].role, 'owner')
   const otherUser = await call('actors', {})
   assert.equal(otherUser.ok, true)
   const badMembers = await call('target.members', { targetId: 'missing-target' })
@@ -417,7 +421,10 @@ try {
 
   // agent.delete: the Agent leaves the actor directory and loses its binding,
   // while its history messages keep pointing at the retained actors row.
-  const historyChannel = await call('channel.create', { name: 'delete-history' })
+  const historyChannel = await call('channel.create', {
+    name: 'delete-history',
+    description: 'Deletion history',
+  })
   assert.equal(historyChannel.ok, true)
   const added = await call('member.add', {
     targetId: historyChannel.value.id,
@@ -502,6 +509,55 @@ try {
   assert.equal(deleteMissing.ok, false)
   assert.equal(deleteMissing.error.code, 'not_found')
 
+  const managed = await call('channel.create', {
+    name: 'managed-channel',
+    description: 'Initial description',
+  })
+  assert.equal(managed.ok, true)
+  assert.equal(managed.value.description, 'Initial description')
+  assert.equal(managed.value.lifecycle, 'active')
+  const updatedChannel = await call('channel.update', {
+    targetId: managed.value.id,
+    name: 'renamed-channel',
+    description: 'Updated description',
+    expectedVersion: managed.value.version,
+  })
+  assert.equal(updatedChannel.ok, true)
+  assert.equal(updatedChannel.value.name, 'renamed-channel')
+  assert.equal(updatedChannel.value.description, 'Updated description')
+  const staleChannel = await call('channel.archive', {
+    targetId: managed.value.id,
+    expectedVersion: managed.value.version,
+  })
+  assert.equal(staleChannel.ok, false)
+  assert.equal(staleChannel.error.code, 'target_version_conflict')
+  const archivedChannel = await call('channel.archive', {
+    targetId: managed.value.id,
+    expectedVersion: updatedChannel.value.version,
+  })
+  assert.equal(archivedChannel.ok, true)
+  assert.equal(archivedChannel.value.lifecycle, 'archived')
+  const archivedWrite = await call('message.send', {
+    targetId: managed.value.id,
+    requestId: 'archived-write',
+    text: 'must fail',
+  })
+  assert.equal(archivedWrite.ok, false)
+  assert.equal(archivedWrite.error.code, 'target_not_writable')
+  const restoredChannel = await call('channel.restore', {
+    targetId: managed.value.id,
+    expectedVersion: archivedChannel.value.version,
+  })
+  assert.equal(restoredChannel.ok, true)
+  assert.equal(restoredChannel.value.lifecycle, 'active')
+  const deletedChannel = await call('channel.delete', {
+    targetId: managed.value.id,
+    expectedVersion: restoredChannel.value.version,
+  })
+  assert.equal(deletedChannel.ok, true)
+  assert.equal(deletedChannel.value.lifecycle, 'deleted')
+  assert(!(await call('snapshot', {})).value.targets.some(target => target.id === managed.value.id))
+
   const response = new MockResponse()
   const request = {
     method: 'GET',
@@ -515,7 +571,10 @@ try {
   }
   const stream = sseRoute.handler(request, response)
   await until(() => response.chunks.join('').includes(': connected'), 'SSE open')
-  const second = await call('channel.create', { name: 'after-reconnect' })
+  const second = await call('channel.create', {
+    name: 'after-reconnect',
+    description: 'Reconnect validation',
+  })
   assert.equal(second.ok, true)
   await until(
     () => response.chunks.join('').includes(`"entityId":"${second.value.id}"`),

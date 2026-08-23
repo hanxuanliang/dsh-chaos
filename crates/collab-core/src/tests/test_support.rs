@@ -22,7 +22,9 @@ impl World {
         let user = core.create_user("owner", "Owner").await?;
         let alpha = core.create_agent("alpha", "Alpha", "/tmp/alpha").await?;
         let beta = core.create_agent("beta", "Beta", "/tmp/beta").await?;
-        let channel = core.create_channel("design", &user.id).await?;
+        let channel = core
+            .create_channel("design", "Design collaboration", &user.id)
+            .await?;
         core.add_member(&channel.id, &alpha.id, &user.id).await?;
         core.add_member(&channel.id, &beta.id, &user.id).await?;
         Ok(Self {

@@ -14,7 +14,9 @@ async fn activity_inbox_projects_done_revive_direct_and_task_metadata() -> Resul
         channel,
         ..
     } = World::create().await?;
-    let task_channel = core.create_channel("tasks", &user.id).await?;
+    let task_channel = core
+        .create_channel("tasks", "Task coordination", &user.id)
+        .await?;
     core.add_member(&task_channel.id, &alpha.id, &user.id)
         .await?;
     let task_message = core
@@ -247,7 +249,7 @@ async fn activity_inbox_cursor_pages_without_duplicates_or_skips() -> Result<()>
     let mut expected = Vec::new();
     for index in 0..5 {
         let channel = core
-            .create_channel(&format!("page-{index}"), &user.id)
+            .create_channel(&format!("page-{index}"), "Paged activity", &user.id)
             .await?;
         core.send_message(SendMessageRequest {
             target_id: channel.id.clone(),
@@ -306,7 +308,9 @@ async fn inbox_filters_all_unread_and_mark_all_done() -> Result<()> {
     let World {
         core, user, alpha, ..
     } = World::create().await?;
-    let channel = core.create_channel("f-all", &user.id).await?;
+    let channel = core
+        .create_channel("f-all", "Activity filters", &user.id)
+        .await?;
     for index in 0..3 {
         core.send_message(SendMessageRequest {
             target_id: channel.id.clone(),

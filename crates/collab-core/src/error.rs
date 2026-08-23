@@ -39,6 +39,19 @@ pub enum CollabError {
         actual: i64,
     },
     #[error(
+        "target '{target_id}' version conflict: expected '{expected}', current version is '{actual}'"
+    )]
+    TargetVersionConflict {
+        target_id: String,
+        expected: i64,
+        actual: i64,
+    },
+    #[error("target '{target_id}' is '{lifecycle}' and cannot be modified")]
+    TargetNotWritable {
+        target_id: String,
+        lifecycle: String,
+    },
+    #[error(
         "change cursor '{after_seq}' is outside retained range '{minimum_cursor}'..='{maximum_cursor}'"
     )]
     ChangeCursorOutOfRange {
@@ -71,6 +84,8 @@ impl CollabError {
             Self::TaskTransitionDenied { .. } => "task_transition_denied",
             Self::TaskVersionConflict { .. } => "task_version_conflict",
             Self::AgentProfileVersionConflict { .. } => "agent_profile_version_conflict",
+            Self::TargetVersionConflict { .. } => "target_version_conflict",
+            Self::TargetNotWritable { .. } => "target_not_writable",
             Self::ChangeCursorOutOfRange { .. } => "change_cursor_resync_required",
             Self::RuntimeGenerationMismatch { .. } => "runtime_generation_mismatch",
             Self::SchemaVersionMismatch { .. } => "schema_version_mismatch",
