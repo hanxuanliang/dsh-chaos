@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Modal, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary, CreatedAgent } from '../../../agent-settings-types.ts'
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
-import { PanelHeader, Toolbar } from '../../shared/layout/index.ts'
-import { ErrorBanner, Field, Tabs, TextInput } from '../../shared/ui/index.ts'
+import { PanelHeader } from '../../shared/layout/index.ts'
+import { ErrorBanner } from '../../shared/ui/index.ts'
 import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
 import { hasAgentHandle, initialAgentHandle } from './agent-handle.ts'
+import { PillSelect } from './PillSelect.tsx'
 import css from './AgentCreateDialog.module.css'
 
 interface AgentCreateCommonProps {
@@ -31,9 +32,12 @@ export interface AgentCreateDialogProps extends AgentCreateCommonProps {
   onClose(): void
 }
 
-type CreateTab = 'identity' | 'runtime'
-
-/** Shared Circle-style, tabbed Agent creation form used inline and in the Channel modal. */
+/**
+ * Circle-style single-screen creation: a borderless identity block first,
+ * one row of pill metadata selectors, then a footer bar carrying the derived
+ * handle preview and the primary action. One screen beats two tabs at five
+ * fields — everything is visible at once, so no step can hide a gap.
+ */
 export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
   const {
     connection,
@@ -49,7 +53,6 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
     variant,
   } = props
   const client = useMemo(() => new ChaosClient(connection), [connection])
-  const [tab, setTab] = useState<CreateTab>('identity')
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [presetId, setPresetId] = useState('')
@@ -93,7 +96,7 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
   const handle = initialAgentHandle(displayName)
   const handleExists = hasAgentHandle(handle, existingHandles)
   const identityReady = handle !== '' && !handleExists && description.trim() !== ''
-  const runtimeReady = provider !== '' && model !== '' && presetId !== '' && !catalogLoading && catalogError === null
+  const runtimeReady = provider !== '' && model !== '' && presetId !== ''
   const canSubmit = identityReady && runtimeReady && !submitting
 
   const submit = (): void => {
@@ -115,72 +118,127 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
     })
   }
 
-  const tabs = <Tabs<CreateTab>
-    className={variant === 'dialog' ? css.formTabs : css.inlineTabs}
-    value={tab}
-    onValueChange={setTab}
-    label={t('create.tabs')}
-    align={variant === 'dialog' ? 'stretch' : 'lead'}
-    items={[
-      { id: 'identity', label: t('create.identity'), tabId: 'chaos-create-tab-identity', panelId: 'chaos-create-panel-identity' },
-      { id: 'runtime', label: t('create.runtime'), tabId: 'chaos-create-tab-runtime', panelId: 'chaos-create-panel-runtime' },
-    ]}
-  />
-  const panel = tab === 'identity'
-    ? (
-        <section id="chaos-create-panel-identity" role="tabpanel" aria-labelledby="chaos-create-tab-identity" className={css.panel}>
-          <Field label={t('create.name')} required error={handleExists ? t('create.nameExists') : undefined}>
-            <TextInput id="chaos-agent-create-name" value={displayName}
-              onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
-              placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
-          </Field>
-          <Field label={t('create.charter')} required help={t('create.charterHint')} meta={`${String(description.length)}/800`}>
-            <textarea id="chaos-agent-create-charter" className={css.textarea} value={description}
-              onChange={event => { setDescription(event.target.value); setFailure(null) }} maxLength={800}
-              placeholder={t('create.charterPlaceholder')} disabled={submitting} />
-          </Field>
-        </section>
-      )
-    : (
-        <section id="chaos-create-panel-runtime" role="tabpanel" aria-labelledby="chaos-create-tab-runtime" className={css.panel}>
-          {catalogLoading && <p className={css.hint} role="status">{t('create.routeLoading')}</p>}
-          {catalogError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>}>{t('create.routeFailed', { error: catalogError })}</ErrorBanner>}
-          <Field label={t('create.provider')} required>
-            <select value={provider} data-placeholder={provider === '' ? 'true' : undefined} disabled={submitting || catalogLoading}
-              onChange={event => { setProvider(event.target.value); setModel(''); setFailure(null) }}>
-              <option value="" disabled>{t('create.providerPlaceholder')}</option>
-              {catalog?.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-            </select>
-          </Field>
-          <Field label={t('create.model')} required>
-            <select value={model} data-placeholder={model === '' ? 'true' : undefined} disabled={submitting || provider === '' || models.length === 0}
-              onChange={event => { setModel(event.target.value); setFailure(null) }}>
-              <option value="" disabled>{models.length === 0 ? t('create.modelNone') : t('create.modelPick')}</option>
-              {models.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </Field>
-          {presetsLoading && <p className={css.hint} role="status">{t('create.presetLoading')}</p>}
-          {presetsError !== null && <ErrorBanner action={<Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button>}>{t('create.presetFailed', { error: presetsError })}</ErrorBanner>}
-          <Field label={t('create.preset')} required>
-            <select value={presetId} data-placeholder={presetId === '' ? 'true' : undefined} disabled={submitting || presetsLoading}
-              onChange={event => { setPresetId(event.target.value); setFailure(null) }}>
-              <option value="" disabled>{t('create.presetPlaceholder')}</option>
-              {presets?.map(item => <option key={item.id} value={item.id} disabled={item.broken !== undefined}>
-                {item.name?.trim() || item.id}{item.broken === undefined ? '' : ` - ${item.broken}`}
-              </option>)}
-            </select>
-          </Field>
-        </section>
-      )
-  const actions = (
-      <footer className={css.actions}>
-        <Button variant="outline" disabled={submitting} onClick={onCancel}>{t('create.cancel')}</Button>
-        {tab === 'identity'
-          ? <Button variant="primary" disabled={!identityReady || submitting} onClick={() => { setTab('runtime') }}>{t('create.next')}</Button>
-          : <Button variant="primary" disabled={!canSubmit} onClick={submit}>{submitting ? t('create.submitting') : t('create.submit')}</Button>}
-      </footer>
+  const identity = (
+    <div className={css.identity}>
+      <div className={css.titleRow}>
+        <input
+          id="chaos-agent-create-name"
+          className={css.titleInput}
+          value={displayName}
+          onChange={event => { setDisplayName(event.target.value); setFailure(null) }}
+          maxLength={64}
+          placeholder={t('create.namePlaceholder')}
+          autoComplete="off"
+          autoFocus
+          disabled={submitting}
+          aria-invalid={handleExists || undefined}
+        />
+      </div>
+      <textarea
+        id="chaos-agent-create-charter"
+        className={css.textarea}
+        value={description}
+        onChange={event => { setDescription(event.target.value); setFailure(null) }}
+        maxLength={800}
+        placeholder={t('create.charterPlaceholder')}
+        disabled={submitting}
+        aria-label={t('create.charter')}
+      />
+      <div className={css.identityMeta}>
+        {handleExists
+          ? <span className={css.handleError} role="alert">{t('create.nameExists')}</span>
+          : <>
+              <span className={css.identityHint}>{t('create.charterHint')}</span>
+              <span className={css.count}>{String(description.length)}/800</span>
+            </>}
+      </div>
+    </div>
   )
-  const content = <>{panel}{failure !== null && <ErrorBanner>{t('create.failed', { error: failure })}</ErrorBanner>}{actions}</>
+
+  const routeFailed = catalogError !== null
+  const routeEntries: MenuEntry[] = catalog?.groups.map(group => ({ id: group.id, label: group.name })) ?? []
+  const modelEntries: MenuEntry[] = models.map(item => ({ id: item.id, label: item.name }))
+  const presetEntries: MenuEntry[] = presets?.map(item => ({
+    id: item.id,
+    label: item.name?.trim() || item.id,
+    disabled: item.broken !== undefined,
+  })) ?? []
+  const providerGroup = catalog?.groups.find(group => group.id === provider)
+  const modelItem = models.find(item => item.id === model)
+  const presetItem = presets?.find(item => item.id === presetId)
+
+  const metadata = (
+    <div className={css.metadata}>
+      {catalogLoading && <span className={css.hint} role="status">{t('create.routeLoading')}</span>}
+      {routeFailed && (
+        <ErrorBanner action={<Button variant="ghost" size="sm" onClick={loadCatalog}>{t('create.routeRetry')}</Button>}>
+          {t('create.routeFailed', { error: catalogError })}
+        </ErrorBanner>
+      )}
+      <div className={css.pillRow}>
+        <PillSelect
+          label={t('create.provider')}
+          placeholder={t('create.providerPlaceholder')}
+          value={providerGroup?.name ?? provider}
+          entries={routeEntries}
+          selectedId={provider}
+          disabled={submitting || catalogLoading || routeFailed}
+          onSelect={id => { setProvider(id); setModel(''); setFailure(null) }}
+        />
+        <PillSelect
+          label={t('create.model')}
+          placeholder={models.length === 0 ? t('create.modelNone') : t('create.modelPick')}
+          value={modelItem?.name ?? model}
+          entries={modelEntries}
+          selectedId={model}
+          disabled={submitting || provider === '' || models.length === 0}
+          onSelect={id => { setModel(id); setFailure(null) }}
+        />
+        <PillSelect
+          label={t('create.preset')}
+          placeholder={t('create.presetPlaceholder')}
+          value={presetItem?.name ?? presetId}
+          entries={presetEntries}
+          selectedId={presetId}
+          disabled={submitting || presetsLoading}
+          onSelect={id => { setPresetId(id); setFailure(null) }}
+        />
+      </div>
+      {presetsLoading && <span className={css.hint} role="status">{t('create.presetLoading')}</span>}
+      {presetsError !== null && (
+        <ErrorBanner action={<Button variant="ghost" size="sm" onClick={onPresetsRetry}>{t('create.presetRetry')}</Button>}>
+          {t('create.presetFailed', { error: presetsError })}
+        </ErrorBanner>
+      )}
+    </div>
+  )
+
+  const actions = (
+    <footer className={css.actions}>
+      <div className={css.actionsLeading}>
+        {handle !== '' && !handleExists && (
+          <span className={css.handlePreview} data-handle={handle}>
+            {t('create.handlePreview', { handle })}
+          </span>
+        )}
+      </div>
+      <div className={css.actionsTrailing}>
+        <Button variant="outline" disabled={submitting} onClick={onCancel}>{t('create.cancel')}</Button>
+        <Button variant="primary" disabled={!canSubmit} onClick={submit}>
+          {submitting ? t('create.submitting') : t('create.submit')}
+        </Button>
+      </div>
+    </footer>
+  )
+
+  const content = (
+    <>
+      {identity}
+      {metadata}
+      {failure !== null && <ErrorBanner>{t('create.failed', { error: failure })}</ErrorBanner>}
+      {actions}
+    </>
+  )
 
   if (variant === 'inline') {
     return (
@@ -192,7 +250,6 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
           backLabel={t('create.cancel')}
           onBack={onCancel}
         />
-        <Toolbar className={css.inlineToolbar} start={tabs} label={t('create.tabs')} />
         <div className={css.inlineSections}>{content}</div>
       </div>
     )
@@ -200,13 +257,12 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
 
   return (
     <div className={css.form} data-variant={variant}>
-      {tabs}
       {content}
     </div>
   )
 }
 
-/** Channel flow wrapper: the same tabbed form in a single host Modal. */
+/** Channel flow wrapper: the same single-screen form in a host Modal. */
 export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
   const { onClose, onCreated, t, ...formProps } = props
   const [submitting, setSubmitting] = useState(false)
