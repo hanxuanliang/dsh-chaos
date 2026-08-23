@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { DeliveryBridge, RuntimeManager } from '../lib/index.js'
 
+const workspaceRoot = await mkdtemp(join(tmpdir(), 'dsh-chaos-runtime-'))
+const workspacePath = agentId => join(workspaceRoot, agentId)
+
+try {
 class FakeCollab {
   bindings = new Map()
   pending = []
@@ -81,7 +88,7 @@ class FakeCollab {
           displayName: 'Alpha',
           createdAtMs: 1,
         },
-        workspacePath: '/tmp/dsh-chaos-agent-1',
+        workspacePath: workspacePath(agentId),
         lifecycle: 'active',
         charter: {
           schemaVersion: 1,
@@ -220,6 +227,7 @@ class FakeCollab {
 }
 
 const tools = new Map()
+const promptSections = new Map()
 const notices = []
 const steers = []
 const sessionEvents = []
@@ -227,6 +235,16 @@ let disposed = 0
 let createdOptions
 let failNextCreate = false
 const collab = new FakeCollab()
+const agentContext = () => ({
+  on: () => {},
+  systemPrompt: {
+    section: definition => {
+      promptSections.set(definition.name, definition)
+      return () => { promptSections.delete(definition.name) }
+    },
+  },
+  tools: { register: definition => { tools.set(definition.name, definition) } },
+})
 const fakeAgent = {
   id: 'session-1',
   status: 'idle',
@@ -241,19 +259,13 @@ const registry = {
       failNextCreate = false
       throw new Error('injected create failure')
     }
-    await options.setup({
-      on: () => {},
-      tools: { register: definition => { tools.set(definition.name, definition) } },
-    })
+    await options.setup(agentContext())
     collab.published = true
     fakeAgent.id = String(options.sessionId)
     return { agent: fakeAgent, dispose: async () => { disposed += 1 } }
   },
   async resume(options) {
-    await options.setup({
-      on: () => {},
-      tools: { register: definition => { tools.set(definition.name, definition) } },
-    })
+    await options.setup(agentContext())
     fakeAgent.id = String(options.resumeSessionId)
     return { agent: fakeAgent, dispose: async () => { disposed += 1 } }
   },
@@ -274,16 +286,44 @@ const warnings = { warn: (message, error) => warningErrors.push({ message, error
 const runtimes = new RuntimeManager(registry, presets, collab, warnings)
 const binding = await runtimes.create({
   agentId: 'agent-1',
-  workspacePath: '/tmp/dsh-chaos-agent-1',
+  workspacePath: workspacePath('agent-1'),
   provider: 'openai',
   model: 'codex',
-  preset: 'default',
+  preset: 'standard',
   sessionId: 'session-1',
 })
 assert.equal(createdOptions.meta.agentPreset, 'standard')
 assert.equal(binding.preset, 'standard')
 assert.deepEqual(mountedPresets, ['standard'])
 assert.equal(runtimes.resolve(binding), fakeAgent)
+const identitySection = promptSections.get('chaos:collaboration-identity')
+assert(identitySection)
+assert.match(identitySection.text(), /You are Alpha \(@alpha\)/)
+assert.match(identitySection.text(), /Own implementation/)
+assert.match(identitySection.text(), /Keep MEMORY\.md as the recovery entry point/)
+const agentsSeed = await readFile(join(workspacePath('agent-1'), 'AGENTS.md'), 'utf8')
+const memorySeed = await readFile(join(workspacePath('agent-1'), 'MEMORY.md'), 'utf8')
+assert.match(agentsSeed, /layout is intentionally unspecified/)
+assert.match(memorySeed, /# Alpha/)
+assert.match(memorySeed, /## Active Context/)
+assert.equal(
+  (await readdir(workspacePath('agent-1'))).some(name => name.startsWith('.chaos-seed-')),
+  false,
+)
+runtimes.updateIdentityProjection({
+  ...(await collab.identityContext('agent-1')).agent,
+  actor: {
+    ...(await collab.identityContext('agent-1')).agent.actor,
+    displayName: 'Alpha Reviewer',
+  },
+  charter: {
+    ...(await collab.identityContext('agent-1')).agent.charter,
+    summary: 'Review implementation',
+  },
+  version: '2',
+})
+assert.match(identitySection.text(), /You are Alpha Reviewer \(@alpha\)/)
+assert.match(identitySection.text(), /Review implementation/)
 assert.deepEqual([...tools.keys()].sort(), [
   'identity_context',
   'message_check',
@@ -377,39 +417,69 @@ collab.pending = [{ binding, pendingSeq: '10' }]
 await bridge.scanOnce()
 assert.equal(steers.length, 1)
 
+await writeFile(join(workspacePath('agent-1'), 'AGENTS.md'), '# Agent-owned instructions\n')
+await writeFile(join(workspacePath('agent-1'), 'MEMORY.md'), '# Agent-owned memory\n')
 const reset = await runtimes.reset({
   agentId: 'agent-1',
-  workspacePath: '/tmp/dsh-chaos-agent-1',
+  workspacePath: workspacePath('agent-1'),
   provider: 'openai',
   model: 'codex',
-  preset: 'default',
+  preset: 'code',
   sessionId: 'session-2',
 }, binding.generation)
 assert.equal(reset.generation, '2')
 assert.equal(runtimes.resolve(binding), undefined)
 assert.equal(disposed, 1)
+assert.equal(
+  await readFile(join(workspacePath('agent-1'), 'AGENTS.md'), 'utf8'),
+  '# Agent-owned instructions\n',
+)
+assert.equal(await readFile(join(workspacePath('agent-1'), 'MEMORY.md'), 'utf8'), '# Agent-owned memory\n')
 
 failNextCreate = true
 await assert.rejects(
   runtimes.reset({
     agentId: 'agent-1',
-    workspacePath: '/tmp/dsh-chaos-agent-1',
+    workspacePath: workspacePath('agent-1'),
     provider: 'openai',
     model: 'broken',
-    preset: 'default',
+    preset: 'standard',
     sessionId: 'session-broken',
   }, reset.generation),
   /injected create failure/,
 )
 assert.equal(runtimes.resolve(reset), fakeAgent, 'failed replacement must recover the previous Session')
+assert.equal(await readFile(join(workspacePath('agent-1'), 'MEMORY.md'), 'utf8'), '# Agent-owned memory\n')
 
 await assert.rejects(
   runtimes.reset({
     agentId: 'agent-1',
-    workspacePath: '/tmp/dsh-chaos-agent-1',
+    workspacePath: workspacePath('agent-1'),
+    provider: 'openai',
+    model: 'codex',
+    preset: 'minimal',
+  }, reset.generation),
+  /preset must be one of: standard, code, cordis/,
+)
+
+await assert.rejects(
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: workspacePath('agent-2'),
+    provider: 'openai',
+    model: 'codex',
+    preset: 'standard',
+  }, reset.generation),
+  /workspacePath must match the durable Agent Profile/,
+)
+
+await assert.rejects(
+  runtimes.reset({
+    agentId: 'agent-1',
+    workspacePath: workspacePath('agent-1'),
     provider: 'openai',
     model: 'stale',
-    preset: 'default',
+    preset: 'standard',
     sessionId: 'session-stale',
   }, binding.generation),
   /runtime_generation_mismatch/,
@@ -417,20 +487,20 @@ await assert.rejects(
 
 const initial = await runtimes.reset({
   agentId: 'agent-2',
-  workspacePath: '/tmp/dsh-chaos-agent-2',
+  workspacePath: workspacePath('agent-2'),
   provider: 'openai',
   model: 'codex',
-  preset: 'default',
+  preset: 'cordis',
   sessionId: 'session-agent-2',
 })
 assert.equal(initial.generation, '1')
 await assert.rejects(
   runtimes.reset({
     agentId: 'agent-2',
-    workspacePath: '/tmp/dsh-chaos-agent-2',
+    workspacePath: workspacePath('agent-2'),
     provider: 'openai',
     model: 'codex',
-    preset: 'default',
+    preset: 'cordis',
   }),
   /runtime_generation_mismatch/,
 )
@@ -439,18 +509,18 @@ await runtimes.stop('agent-2')
 const concurrent = await Promise.allSettled([
   runtimes.reset({
     agentId: 'agent-1',
-    workspacePath: '/tmp/dsh-chaos-agent-1',
+    workspacePath: workspacePath('agent-1'),
     provider: 'openai',
     model: 'codex-next',
-    preset: 'default',
+    preset: 'standard',
     sessionId: 'session-3a',
   }, reset.generation),
   runtimes.reset({
     agentId: 'agent-1',
-    workspacePath: '/tmp/dsh-chaos-agent-1',
+    workspacePath: workspacePath('agent-1'),
     provider: 'openai',
     model: 'codex-other',
-    preset: 'default',
+    preset: 'standard',
     sessionId: 'session-3b',
   }, reset.generation),
 ])
@@ -462,13 +532,16 @@ assert.match(concurrent.find(result => result.status === 'rejected').reason.mess
 
 await runtimes.stop('agent-1')
 assert.equal(disposed, 5)
-collab.bindings.set('agent-1', { ...replaced, preset: 'default' })
+collab.bindings.set('agent-1', { ...replaced, preset: 'code' })
 const resumed = await runtimes.resume('agent-1')
-assert.equal(resumed.preset, 'standard')
+assert.equal(resumed.preset, 'code')
 assert.equal(runtimes.resolve(resumed), fakeAgent)
-assert.deepEqual(mountedPresets, ['standard', 'standard', 'standard', 'standard', 'standard', 'standard'])
-assert.deepEqual(sessionEvents, [{ type: 'agent-preset/selected', data: { agentPreset: 'standard' } }])
+assert.deepEqual(mountedPresets, ['standard', 'code', 'code', 'cordis', 'standard', 'code'])
+assert.deepEqual(sessionEvents, [])
 await runtimes.close()
 assert.equal(disposed, 6)
 assert.deepEqual(warningErrors, [])
 console.log('runtime/delivery/tools smoke ok')
+} finally {
+  await rm(workspaceRoot, { recursive: true, force: true })
+}
