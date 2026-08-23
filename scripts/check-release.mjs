@@ -27,9 +27,11 @@ function run(command, args) {
 
 const manifest = readJson('package.json')
 const expectedVersion = manifest.version
+const releaseTag = process.env.RELEASE_TAG ||
+  (process.env.GITHUB_REF_TYPE === 'tag' ? process.env.GITHUB_REF_NAME : undefined)
 const status = run('git', ['status', '--porcelain=v1', '--untracked-files=all'])
 if (status !== '') failures.push('Git worktree must be clean before release')
-if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${expectedVersion}`) {
+if (releaseTag !== undefined && releaseTag !== `v${expectedVersion}`) {
   failures.push(`release tag must be v${expectedVersion}`)
 }
 if (manifest.name !== '@hanxuanliang/dsh-chaos') failures.push('root package name is not @hanxuanliang/dsh-chaos')

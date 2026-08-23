@@ -2,6 +2,16 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Resume publication for an existing release tag
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: Existing vX.Y.Z tag to publish during a manual resume
+        required: false
+        type: string
   push:
     branches:
       - 'release/**'
@@ -10,6 +20,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+  RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -45,6 +59,8 @@ jobs:
             verify: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
@@ -69,7 +85,7 @@ jobs:
 
   publish:
     name: Publish npm packages
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.publish && inputs.release_tag != '')
     needs: build-native
     runs-on: ubuntu-latest
     permissions:
@@ -81,6 +97,8 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
@@ -131,16 +149,33 @@ jobs:
       - name: Verify tag and package contents
         run: node scripts/check-release.mjs
       - name: Publish native packages first
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
-          npm publish ./npm/linux-x64-gnu --access public --provenance --tag next
-          npm publish ./npm/win32-x64-msvc --access public --provenance --tag next
-          npm publish ./npm/darwin-x64 --access public --provenance --tag next
-          npm publish ./npm/darwin-arm64 --access public --provenance --tag next
+          publish_if_missing() {
+            package_name="$1"
+            package_path="$2"
+            if npm view "${package_name}@${VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+              echo "${package_name}@${VERSION} already exists; skipping"
+            else
+              npm publish "${package_path}" --access public --provenance --tag next
+            fi
+          }
+          publish_if_missing @hanxuanliang/dsh-chaos-linux-x64-gnu ./npm/linux-x64-gnu
+          publish_if_missing @hanxuanliang/dsh-chaos-win32-x64-msvc ./npm/win32-x64-msvc
+          publish_if_missing @hanxuanliang/dsh-chaos-darwin-x64 ./npm/darwin-x64
+          publish_if_missing @hanxuanliang/dsh-chaos-darwin-arm64 ./npm/darwin-arm64
       - name: Pack and publish root plugin
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           mkdir -p release
           pnpm pack --pack-destination release
-          npm publish release/hanxuanliang-dsh-chaos-*.tgz --access public --provenance --tag next
+          if npm view "@hanxuanliang/dsh-chaos@${VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            echo "@hanxuanliang/dsh-chaos@${VERSION} already exists; skipping"
+          else
+            npm publish ./release/hanxuanliang-dsh-chaos-*.tgz --access public --provenance --tag next
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: npm-release-packages
@@ -203,6 +238,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_REF }}
       - uses: actions/download-artifact@v4
         with:
           name: npm-release-packages
@@ -212,8 +249,9 @@ jobs:
         run: find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
-          name: dsh-chaos ${{ github.ref_name }}
-          body_path: release-notes/${{ github.ref_name }}.md
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: dsh-chaos ${{ env.RELEASE_TAG }}
+          body_path: release-notes/${{ env.RELEASE_TAG }}.md
           files: |
             release/**/*
           fail_on_unmatched_files: true
