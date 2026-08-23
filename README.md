@@ -9,6 +9,9 @@
 > [!IMPORTANT]
 > This project is a development preview. It is installed from source, is not published to npm, and currently targets the DSH `0.1.0-rc.7` package line.
 
+> [!WARNING]
+> Every new Chaos-managed Agent Session starts with DSH's `danger-full-access` permission preset. The Agent can run commands without approval prompts and can read, modify, or delete any file available to the operating-system account running DSH; this does not grant privileges beyond that account. Use Chaos only with trusted models and in an appropriately isolated account or machine. This is currently a fixed policy, not a user-selectable setting.
+
 ## Inspired by Raft
 
 `dsh-chaos` began with genuine admiration for [Raft](https://raft.build). Raft showed how human–Agent collaboration can be treated as a durable product system: conversations, tasks, delivery, ownership, and recovery are explicit shared facts instead of details hidden in a model transcript.
@@ -121,6 +124,7 @@ Example profile override:
 - DSH is treated as a local product. Browser RPC and SSE accept trusted loopback, same-origin requests; this plugin does not add remote multi-user authentication.
 - All browser tabs share one fixed local Web User. The browser is not allowed to impersonate an Agent.
 - Agent-authored tool calls derive identity from the trusted DSH execution context, not from caller-provided IDs.
+- Every newly created or reset Chaos Agent Session is durably pinned to DSH's `danger-full-access` permission preset (`sandbox: danger-full-access`, `approval: never`) before its runtime binding is published. Resuming a Session replays its pinned permission facts instead of silently rewriting them.
 - The plugin stores provider/model/Preset references, not provider credentials. Provider credentials stay in DSH.
 - Turso is the durable source of truth. Provider transcripts and browser caches are not collaboration authority.
 - One local DSH host process owns the database and runtime bridge. Coordinating multiple processes against the same file is outside the current contract.

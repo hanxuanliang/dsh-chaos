@@ -20,7 +20,11 @@ import type {
 } from './agent-settings-types.ts'
 import { DeliveryBridge } from './delivery.ts'
 import { installCollabRemote } from './remote.ts'
-import { RuntimeManager, type CreateRuntimeInput } from './runtime.ts'
+import {
+  RuntimeManager,
+  type CreateRuntimeInput,
+  type PermissionPresetWriter,
+} from './runtime.ts'
 import { loadNativeModule, type NativeCollabHandle, type NativeRuntimeBinding } from './native.ts'
 import { isSupportedAgentPreset, requireSupportedAgentPreset } from './preset-policy.ts'
 
@@ -116,7 +120,7 @@ declare module '@deepseek-ai/cordis' {
 /** Host-side stable collab service. DSH runtime wiring consumes this service;
  * only this class may call the native handle. */
 export class CollabService extends Service {
-  static inject = ['agentLoop', 'agentPresets', 'agents', 'tools', 'llm']
+  static inject = ['agentLoop', 'agentPresets', 'agents', 'permissionPresets', 'tools', 'llm']
   static Config: z<Config> = Config
 
   private handle: NativeCollabHandle | undefined
@@ -181,7 +185,13 @@ export class CollabService extends Service {
     }
     retentionTimer = setInterval(pruneExpiredChanges, CHANGE_PRUNE_INTERVAL_MS)
     retentionTimer.unref()
-    const runtimes = new RuntimeManager(this.ctx.agents, this.ctx.agentPresets, this, warnings)
+    const runtimes = new RuntimeManager(
+      this.ctx.agents,
+      this.ctx.agentPresets,
+      (this.ctx as Context & { permissionPresets: PermissionPresetWriter }).permissionPresets,
+      this,
+      warnings,
+    )
     this.runtimes = runtimes
 
     if (this.config.remoteEnabled ?? true) {

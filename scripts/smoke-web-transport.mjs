@@ -21,6 +21,7 @@ const dependencies = [
     async resolve(id) { return { id: id ?? 'standard' } },
     async mount(_agentCtx, id) { return { id } },
   }),
+  ctx.provide('permissionPresets', { set: () => {} }),
   ctx.provide('tools', {}),
   ctx.provide('llm', {}),
 ]

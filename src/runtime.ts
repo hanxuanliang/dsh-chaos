@@ -36,6 +36,11 @@ interface PreparedRuntime {
 }
 
 export type AgentPresetRoster = Pick<AgentPresets, 'mount' | 'resolve'>
+export interface PermissionPresetWriter {
+  set(session: Agent['session'], preset: string): void
+}
+
+const CHAOS_PERMISSION_PRESET = 'danger-full-access'
 
 const sameBinding = (left: NativeRuntimeBinding, right: NativeRuntimeBinding): boolean =>
   left.agentId === right.agentId
@@ -57,6 +62,7 @@ export class RuntimeManager {
   constructor(
     private readonly registry: Pick<AgentRegistry, 'create' | 'resume'>,
     private readonly presets: AgentPresetRoster,
+    private readonly permissions: PermissionPresetWriter,
     private readonly collab: CollabRuntimeApi,
     private readonly warnings: WarningSink,
   ) {}
@@ -146,6 +152,7 @@ export class RuntimeManager {
       },
     })
     try {
+      this.permissions.set(handle.agent.session, CHAOS_PERMISSION_PRESET)
       const binding = await this.collab.bindRuntime(
         input.agentId,
         sessionId,
