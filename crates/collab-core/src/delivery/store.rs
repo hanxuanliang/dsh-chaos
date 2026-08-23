@@ -66,6 +66,47 @@ struct InboxBatchRow {
     generation: i64,
 }
 
+/// One active parent member that may be addressed explicitly from a Thread.
+struct MentionRecipient {
+    id: String,
+    kind: String,
+    handle: String,
+}
+
+impl FromRow for MentionRecipient {
+    fn from_row(row: &Row) -> Result<Self> {
+        Ok(Self {
+            id: row.get(0)?,
+            kind: row.get(1)?,
+            handle: row.get(2)?,
+        })
+    }
+}
+
+fn is_mention_prefix(character: char) -> bool {
+    !character.is_ascii_alphanumeric() && character != '_' && character != '@'
+}
+
+fn is_handle_character(character: char) -> bool {
+    character.is_alphanumeric() || character == '_' || character == '-'
+}
+
+/// Match one exact `@handle` token without accepting emails or handle prefixes.
+fn mentions_handle(text: &str, handle: &str) -> bool {
+    let needle = format!("@{handle}");
+    text.match_indices(&needle).any(|(start, matched)| {
+        let prefix_matches = text[..start]
+            .chars()
+            .next_back()
+            .is_none_or(is_mention_prefix);
+        let suffix_matches = text[start + matched.len()..]
+            .chars()
+            .next()
+            .is_none_or(|character| !is_handle_character(character));
+        prefix_matches && suffix_matches
+    })
+}
+
 impl FromRow for InboxBatchRow {
     fn from_row(row: &Row) -> Result<Self> {
         Ok(Self {
@@ -371,6 +412,39 @@ impl DeliveryStore<'_> {
             .await
     }
 
+    /// Active parent members explicitly addressed by an exact `@handle` token.
+    pub(crate) async fn active_thread_mention_recipients(
+        &self,
+        permission_target_id: &str,
+        author_id: &str,
+        text: &str,
+    ) -> Result<Vec<Recipient>> {
+        if !text.contains('@') {
+            return Ok(Vec::new());
+        }
+        let candidates = self
+            .connection
+            .query_rows::<MentionRecipient>(
+                "SELECT a.id, a.kind, a.handle
+                 FROM memberships m
+                 JOIN actors a ON a.id = m.actor_id
+                 WHERE m.target_id = ?1
+                   AND m.left_at_ms IS NULL
+                   AND a.id <> ?2
+                 ORDER BY a.id",
+                (permission_target_id, author_id),
+            )
+            .await?;
+        Ok(candidates
+            .into_iter()
+            .filter(|candidate| mentions_handle(text, &candidate.handle))
+            .map(|candidate| Recipient {
+                id: candidate.id,
+                kind: candidate.kind,
+            })
+            .collect())
+    }
+
     /// Commit the recipient snapshot: one Delivery per recipient and a
     /// level-triggered wake watermark per Agent, returning both id lists.
     pub(crate) async fn record_deliveries(
@@ -442,5 +516,20 @@ impl DeliveryStore<'_> {
             recipient_ids.push(recipient.id);
         }
         Ok((recipient_ids, wake_agent_ids))
+    }
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::mentions_handle;
+
+    #[test]
+    fn exact_mentions_respect_token_boundaries() {
+        assert!(mentions_handle("@alpha please review", "alpha"));
+        assert!(mentions_handle("请看一下，@alpha。", "alpha"));
+        assert!(!mentions_handle("mail@alpha.example", "alpha"));
+        assert!(!mentions_handle("@alpha-two", "alpha"));
+        assert!(!mentions_handle("@alpha中文", "alpha"));
+        assert!(!mentions_handle("@@alpha", "alpha"));
     }
 }

@@ -422,6 +422,50 @@ try {
   const memberships = await call('agent.memberships', { agentId: paired.value.profile.actor.id })
   assert.equal(memberships.ok, true)
   assert(memberships.value.some(item => item.target.id === historyChannel.value.id && item.role === 'member'))
+  const mentionRoot = await call('message.send', {
+    targetId: historyChannel.value.id,
+    requestId: 'mention-root',
+    text: 'Open a mention Thread',
+  })
+  assert.equal(mentionRoot.ok, true)
+  const mentionThread = await call('thread.create', { rootMessageId: mentionRoot.value.message.id })
+  assert.equal(mentionThread.ok, true)
+  const rootInbox = await ctx.collab.checkInbox(
+    paired.value.profile.actor.id,
+    replaced.value.generation,
+    replaced.value.sessionId,
+    10,
+  )
+  assert.equal(rootInbox.messages.length, 1)
+  await ctx.collab.markModelSeen(
+    rootInbox.id,
+    paired.value.profile.actor.id,
+    replaced.value.generation,
+    replaced.value.sessionId,
+  )
+  assert.equal(
+    (await ctx.collab.snapshot(paired.value.profile.actor.id)).followedThreadIds.length,
+    0,
+  )
+  const mentioned = await call('message.send', {
+    targetId: mentionThread.value.id,
+    requestId: 'mention-agent-without-follow',
+    text: '@paired-agent please review',
+  })
+  assert.equal(mentioned.ok, true)
+  assert.deepEqual(mentioned.value.wakeAgentIds, [paired.value.profile.actor.id])
+  const mentionInbox = await ctx.collab.checkInbox(
+    paired.value.profile.actor.id,
+    replaced.value.generation,
+    replaced.value.sessionId,
+    10,
+  )
+  assert.equal(mentionInbox.messages.length, 1)
+  assert.equal(mentionInbox.messages[0].message.id, mentioned.value.message.id)
+  assert.deepEqual(
+    (await ctx.collab.snapshot(paired.value.profile.actor.id)).followedThreadIds,
+    [mentionThread.value.id],
+  )
   const pairedNote = await ctx.collab.sendMessage({
     targetId: historyChannel.value.id,
     authorId: paired.value.profile.actor.id,
