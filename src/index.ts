@@ -76,7 +76,6 @@ export const name = 'dsh-chaos'
 
 const CHANGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000
 const CHANGE_PRUNE_INTERVAL_MS = 60 * 60 * 1_000
-const AGENT_HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
 
 export interface Config {
   path?: string
@@ -247,18 +246,16 @@ export class CollabService extends Service {
   /** Create durable identity first; runtime failure remains visible as an unconfigured Profile. */
   async createConfiguredAgent(
     displayName: string,
-    handle: string,
     description: string,
     provider: string,
     model: string,
     presetId: string,
   ): Promise<CreatedAgent> {
     displayName = displayName.trim()
-    handle = handle.trim()
+    // The immutable collaboration handle is the Agent's initial name. Profile
+    // edits may later change displayName, but never rewrite this identity key.
+    const handle = displayName
     description = description.trim()
-    if (!AGENT_HANDLE.test(handle)) {
-      throw new Error('[invalid_argument] handle must be 1..40 lowercase letters, numbers, or interior hyphens')
-    }
     const preset = await this.ctx.agentPresets.resolve(requireSupportedAgentPreset(presetId))
     if (preset.broken !== undefined) throw new Error(`[invalid_argument] ${preset.broken}`)
     const template = join(dshHome(), 'agents', '{id}')

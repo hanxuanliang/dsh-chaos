@@ -3,12 +3,12 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import { Button, IconPlusOutline16, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary, AgentProfile, CreatedAgent } from '../../../agent-settings-types.ts'
 import { ChaosClient } from '../../data/api.ts'
-import { AgentCreateDialog } from './AgentCreateDialog.tsx'
+import { AgentCreateForm } from './AgentCreateDialog.tsx'
 import type { ChaosTranslate } from '../../locales.ts'
 import { AgentDetail } from './AgentDetail.tsx'
 import { AgentList } from './AgentList.tsx'
 import { ResponsiveDrilldown, SplitPane } from '../../shared/layout/index.ts'
-import { EmptyState, ErrorBanner, SkeletonList } from '../../shared/ui/index.ts'
+import { EmptyState, ErrorBanner, IconButton, SkeletonList } from '../../shared/ui/index.ts'
 import css from './AgentSettingsCard.module.css'
 
 export interface AgentSettingsCardProps {
@@ -87,6 +87,7 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
   const created = (result: CreatedAgent): void => {
     setProfiles(rows => [...rows.filter(row => row.actor.id !== result.profile.actor.id), result.profile])
     setSelectedId(result.profile.actor.id)
+    setCreateOpen(false)
     setActionError(result.setupError === undefined ? null : t('agents.setupFailed', { error: result.setupError }))
   }
   const confirmDelete = (): void => {
@@ -135,14 +136,21 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
     <section className={css.page} aria-label={t('agents.title')} aria-busy={phase === 'loading' || refreshing}>
       <header className={css.headerRow}>
         <div className={css.titleBlock}><h1>{t('agents.title')}</h1><p>{t('agents.subtitle')}</p></div>
-        <Button variant="outline" size="sm" icon={<IconPlusOutline16 size={16} />} onClick={() => { setCreateOpen(true); setActionError(null) }}>{t('agents.create')}</Button>
+        <IconButton label={t('agents.create')} icon={<IconPlusOutline16 size={14} />} selected={createOpen}
+          disabled={phase !== 'ready'} onClick={() => { setCreateOpen(value => !value); setActionError(null) }} />
       </header>
       {actionError !== null && <ErrorBanner>{actionError}</ErrorBanner>}
       {refreshing && <p className={css.refreshing} role="status">{t('agents.refreshing')}</p>}
       {phase === 'loading' && <SkeletonList className={css.skeleton} rows={4} label={t('agents.loadingAria')} />}
       {phase === 'error' && <EmptyState title={t('agents.loadFailed', { error: loadError ?? '' })} action={<Button variant="outline" size="sm" onClick={() => { load(true) }}>{t('agents.retry')}</Button>} />}
-      {phase === 'ready' && profiles.length === 0 && <EmptyState title={t('agents.empty')} action={<Button variant="outline" size="sm" onClick={() => { setCreateOpen(true) }}>{t('agents.create')}</Button>} />}
-      {phase === 'ready' && profiles.length > 0 && <div className={css.workspace}>
+      {phase === 'ready' && createOpen && <section className={css.createBlock} data-agent-create-inline aria-label={t('create.title')}>
+          <h2>{t('create.title')}</h2>
+          <AgentCreateForm connection={connection} presets={presets} presetsLoading={presetsLoading}
+            presetsError={presetsError} existingHandles={profiles.map(profile => profile.actor.handle)}
+            onPresetsRetry={loadPresets} onCancel={() => { setCreateOpen(false) }} onCreated={created}
+            variant="inline" t={t} />
+        </section>}
+      {phase === 'ready' && !createOpen && profiles.length > 0 && <div className={css.workspace}>
           <ResponsiveDrilldown
             desktop={<SplitPane id="agent-settings" leading={list} trailing={desktopDetail} leadingDefault={280} leadingMin={240} leadingMax={360} trailingMin={420} separatorLabel={t('agents.resize')} />}
             list={list}
@@ -150,9 +158,6 @@ export function AgentSettingsCard({ connection, openPath, navigateChannel, t }: 
             detailOpen={visibleSelected !== undefined}
           />
         </div>}
-      {createOpen && <AgentCreateDialog connection={connection} presets={presets} presetsLoading={presetsLoading}
-        presetsError={presetsError} existingHandles={profiles.map(profile => profile.actor.handle)}
-        onPresetsRetry={loadPresets} onClose={() => { setCreateOpen(false) }} onCreated={created} t={t} />}
       {deleteProfile !== null && <RiskConfirmation open title={t('agents.deleteTitle', { name: deleteProfile.actor.displayName })}
         description={t('agents.deleteDescription')} acknowledgeLabel={t('agents.deleteAcknowledge')} cancelLabel={t('agents.cancel')}
         confirmLabel={deleting ? t('agents.deleting') : t('agents.deleteConfirm')} acknowledged={deleteAcknowledged}

@@ -142,7 +142,6 @@ try {
   assert.deepEqual(presets.value.map(preset => preset.id), ['standard', 'code', 'cordis'])
   const unsupportedCreate = await call('agent.create', {
     displayName: 'Unsupported Agent',
-    handle: 'unsupported-agent',
     description: 'Must not be created',
     provider: 'openai',
     model: 'codex',
@@ -151,14 +150,14 @@ try {
   assert.equal(unsupportedCreate.ok, false)
   assert.equal(unsupportedCreate.error.code, 'invalid_argument')
   const createdAgent = await call('agent.create', {
-    displayName: 'Workspace Agent',
-    handle: 'workspace-agent',
+    displayName: 'grok老马melody',
     description: 'Own workspace verification',
     provider: 'openai',
     model: 'codex',
     presetId: 'code',
   })
   assert.equal(createdAgent.ok, true)
+  assert.equal(createdAgent.value.profile.actor.handle, 'grok老马melody')
   assert.equal(createdAgent.value.profile.binding.preset, 'code')
   const agentId = createdAgent.value.profile.actor.id
   const profile = await call('agent.profile', { agentId })
@@ -168,14 +167,14 @@ try {
   assert.equal(profile.value.workspacePath, join(root, 'agents', agentId))
   const identityPrompt = promptSections.at(-1)
   assert(identityPrompt)
-  assert.match(identityPrompt.text(), /You are Workspace Agent \(@workspace-agent\)/)
+  assert.match(identityPrompt.text(), /You are grok老马melody \(@grok老马melody\)/)
   assert.match(identityPrompt.text(), /Own workspace verification/)
   assert.match(identityPrompt.text(), /message_check/)
   assert.equal(identityPrompt.text().includes(profile.value.workspacePath), true)
   const agentsSeed = await readFile(join(profile.value.workspacePath, 'AGENTS.md'), 'utf8')
   const memorySeed = await readFile(join(profile.value.workspacePath, 'MEMORY.md'), 'utf8')
   assert.match(agentsSeed, /layout is intentionally unspecified/)
-  assert.match(memorySeed, /# Workspace Agent/)
+  assert.match(memorySeed, /# grok老马melody/)
   assert.match(memorySeed, /## Key Knowledge/)
   const profiles = await call('agent.profiles', {})
   assert.equal(profiles.ok, true)
@@ -188,8 +187,9 @@ try {
   })
   assert.equal(updatedProfile.ok, true)
   assert.equal(updatedProfile.value.actor.displayName, 'Workspace Reviewer')
+  assert.equal(updatedProfile.value.actor.handle, 'grok老马melody')
   assert.equal(updatedProfile.value.charter.summary, 'Review workspace behavior')
-  assert.match(identityPrompt.text(), /You are Workspace Reviewer \(@workspace-agent\)/)
+  assert.match(identityPrompt.text(), /You are Workspace Reviewer \(@grok老马melody\)/)
   assert.match(identityPrompt.text(), /Review workspace behavior/)
   const avatar = await call('agent.avatar.update', {
     agentId,
@@ -262,7 +262,6 @@ try {
   // Runtime replacement is generation-fenced; only the exact binding can restart.
   const paired = await call('agent.create', {
     displayName: 'Paired Agent',
-    handle: 'paired-agent',
     description: 'Own pairing checks',
     provider: 'openai',
     model: 'codex',
@@ -315,23 +314,20 @@ try {
   assert.equal(staleRuntime.error.code, 'runtime_generation_mismatch')
   const partial = await call('agent.create', {
     displayName: 'Missing Model',
-    handle: 'missing-model',
     description: 'Invalid request',
     provider: 'openai',
     presetId: 'standard',
   })
   assert.equal(partial.ok, false)
   assert.equal(partial.error.code, 'invalid_argument')
-  const invalidHandle = await call('agent.create', {
-    displayName: 'Invalid Handle',
-    handle: 'Invalid Handle',
-    description: 'Must be rejected',
+  const duplicateHandle = await call('agent.create', {
+    displayName: 'grok老马melody',
+    description: 'Duplicate initial name must be rejected',
     provider: 'openai',
     model: 'codex',
     presetId: 'standard',
   })
-  assert.equal(invalidHandle.ok, false)
-  assert.equal(invalidHandle.error.code, 'invalid_argument')
+  assert.equal(duplicateHandle.ok, false)
 
   const unconfiguredActor = await ctx.collab.createAgent('unconfigured', 'Unconfigured', join(root, 'agents', 'unconfigured'))
   const profilesWithUnconfigured = await call('agent.profiles', {})
@@ -462,7 +458,7 @@ try {
   const mentioned = await call('message.send', {
     targetId: mentionThread.value.id,
     requestId: 'mention-agent-without-follow',
-    text: '@paired-agent please review',
+    text: '@Paired Agent please review',
   })
   assert.equal(mentioned.ok, true)
   assert.deepEqual(mentioned.value.wakeAgentIds, [paired.value.profile.actor.id])

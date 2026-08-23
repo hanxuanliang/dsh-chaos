@@ -66,8 +66,8 @@ interface MentionState {
 
 type SendFailure = { kind: 'send'; asTask: boolean } | { kind: 'task'; messageId: string }
 
-/** Plan-B token: '@' after a non-token char (CJK/whitespace/punctuation terminate), slug chars only to the caret. */
-const MENTION_TOKEN = /(^|[^A-Za-z0-9_@-])@([A-Za-z0-9_-]*)$/
+/** Plan-B query from the nearest boundary through the caret; handles may be full initial names. */
+const MENTION_TOKEN = /(^|[^\p{L}\p{N}_@-])@([^@\n]*)$/u
 
 export function ChannelComposer({ t, store, state, channel, disabled, hideAsTask = false, parentChannelId }: ChannelComposerProps): JSX.Element {
   const [text, setText] = useState(() => readDraft(channel.id))

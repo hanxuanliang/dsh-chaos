@@ -40,8 +40,8 @@ async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
     let owner = core.create_user("owner", "Owner").await?;
     let profile = core
         .create_agent_profile(
-            "reviewer",
-            "Reviewer",
+            "grok老马melody",
+            "grok老马melody",
             "/tmp/reviewer",
             AgentCharter {
                 schema_version: 1,
@@ -71,7 +71,7 @@ async fn agent_profile_normalizes_charter_and_fences_updates() -> Result<()> {
         .await?;
     assert_eq!(updated.version, 2);
     assert_eq!(updated.actor.id, profile.actor.id);
-    assert_eq!(updated.actor.handle, "reviewer");
+    assert_eq!(updated.actor.handle, "grok老马melody");
     assert_eq!(updated.actor.display_name, "Frontend Reviewer");
     assert_eq!(updated.workspace_path, profile.workspace_path);
     assert!(matches!(

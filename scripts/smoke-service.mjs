@@ -123,13 +123,13 @@ try {
 
   const named = await ctx.collab.createConfiguredAgent(
     'Alpha Two',
-    'alpha-two',
     'Own the second lane',
     'openai',
     'codex',
     'standard',
   )
   assert.equal(named.profile.actor.displayName, 'Alpha Two')
+  assert.equal(named.profile.actor.handle, 'Alpha Two')
   assert.equal(named.profile.charter.summary, 'Own the second lane')
   assert.equal(named.setupError, undefined)
   assert.match(named.profile.workspacePath, /\/agents\/[0-9a-f-]{36}$/)

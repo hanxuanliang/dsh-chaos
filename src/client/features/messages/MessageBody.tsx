@@ -13,8 +13,7 @@ import css from './MessageBody.module.css'
 
 const CLAMP_TRIGGER_PX = 344
 const REMARK_PLUGINS = [remarkGfm, remarkBreaks]
-/** '@' at a word boundary: after start or a non-word char (CJK separators allowed). */
-const MENTION = /(^|[^\p{L}\p{N}_@])@([^\s@]+)(?=$|[^\p{L}\p{N}_])/gu
+const MENTION_CHARACTER = /[\p{L}\p{N}_-]/u
 
 interface HastLikeNode {
   type?: string
@@ -33,19 +32,25 @@ function splitMentionText(value: string, names: ReadonlySet<string>): HastLikeNo
   const out: HastLikeNode[] = []
   let last = 0
   let hit = false
-  for (const match of value.matchAll(MENTION)) {
-    const at = match.index
-    const lead = match[1] ?? ''
-    const token = match[2] ?? ''
-    if (!names.has(token.toLowerCase())) continue
-    if (at + lead.length > last) out.push({ type: 'text', value: value.slice(last, at + lead.length) })
+  const lowerValue = value.toLocaleLowerCase()
+  const candidates = [...names].filter(name => name !== '').sort((left, right) => right.length - left.length)
+  for (let at = value.indexOf('@'); at !== -1; at = value.indexOf('@', at + 1)) {
+    const prefix = value.slice(0, at).match(/.$/u)?.[0]
+    if (prefix !== undefined && (prefix === '@' || MENTION_CHARACTER.test(prefix))) continue
+    const token = candidates.find(name => {
+      if (!lowerValue.startsWith(name, at + 1)) return false
+      const suffix = value.slice(at + 1 + name.length).match(/^./u)?.[0]
+      return suffix === undefined || !MENTION_CHARACTER.test(suffix)
+    })
+    if (token === undefined) continue
+    if (at > last) out.push({ type: 'text', value: value.slice(last, at) })
     out.push({
       type: 'element',
       tagName: 'span',
       properties: { className: [css.mention] },
-      children: [{ type: 'text', value: `@${token}` }],
+      children: [{ type: 'text', value: value.slice(at, at + token.length + 1) }],
     })
-    last = at + match[0].length
+    last = at + token.length + 1
     hit = true
   }
   if (!hit) return null
