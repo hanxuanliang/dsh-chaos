@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentPresetSummary, CreatedAgent } from '../../../agent-settings-types.ts'
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
-import { ErrorBanner, Field } from '../../shared/ui/index.ts'
+import { ErrorBanner, Field, TextInput } from '../../shared/ui/index.ts'
 import css from './AgentCreateDialog.module.css'
 
 export interface AgentCreateDialogProps {
@@ -118,7 +118,7 @@ export function AgentCreateDialog(props: AgentCreateDialogProps): JSX.Element {
           <span>{t('create.identityHint')}</span>
         </div>
         <Field label={t('create.name')} required>
-          <Input id="chaos-agent-create-name" className={css.input as string} value={displayName}
+          <TextInput id="chaos-agent-create-name" value={displayName}
             onChange={event => { setDisplayName(event.target.value); setFailure(null) }} maxLength={64}
             placeholder={t('create.namePlaceholder')} autoComplete="off" autoFocus disabled={submitting} />
         </Field>

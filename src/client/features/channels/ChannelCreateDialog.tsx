@@ -7,12 +7,13 @@
  * the filled form in place.
  */
 import { useMemo, useState, type JSX } from 'react'
-import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import { avatarSeed } from '../../shared/avatar.ts'
 import css from './DialogSkin.module.css'
 import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
+import { Field, TextInput } from '../../shared/ui/index.ts'
 
 export interface ChannelCreateDialogProps {
   t: ChaosTranslate
@@ -83,11 +84,14 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
         </>
       )}
     >
-      <label className={css.field} htmlFor="chaos-channel-create-name">
-        <span className={css.labelText}>{t('channelCreate.name')}<em className={css.req} aria-hidden="true">*</em></span>
-        <Input
+      <Field
+        label={t('channelCreate.name')}
+        required
+        hint={duplicate ? undefined : t('channelCreate.nameHint')}
+        error={duplicate ? t('channelCreate.nameExists') : undefined}
+      >
+        <TextInput
           id="chaos-channel-create-name"
-          className={css.input as string}
           value={name}
           onChange={(event) => { setName(event.target.value); setFailure(null) }}
           maxLength={64}
@@ -97,10 +101,7 @@ export function ChannelCreateDialog({ t, store, state, onClose }: ChannelCreateD
           spellCheck={false}
           disabled={submitting}
         />
-        {duplicate
-          ? <small className={css.error} role="alert">{t('channelCreate.nameExists')}</small>
-          : <small className={css.hint}>{t('channelCreate.nameHint')}</small>}
-      </label>
+      </Field>
 
       <div className={css.field}>
         <span className={css.labelText}>{t('channelCreate.members')}</span>

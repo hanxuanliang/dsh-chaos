@@ -415,6 +415,23 @@ try {
   const messageText = `E2E message ${Date.now().toString(36)}`
   await page.clickExpression('New channel', `document.querySelector('button[aria-label="New channel"]')`)
   await page.waitForExpression('New Channel dialog', `document.querySelector('input[placeholder="e.g. frontend-sync"]')?.offsetParent !== null`)
+  await page.clickExpression('New Channel name input', `document.querySelector('input[placeholder="e.g. frontend-sync"]')`)
+  await page.waitForExpression('shared blue-focused Channel input', `(() => {
+    const input = document.querySelector('input[placeholder="e.g. frontend-sync"]');
+    const frame = input?.parentElement;
+    if (!(input instanceof HTMLInputElement)
+      || input.dataset.chaosTextInput !== 'true'
+      || !(frame instanceof HTMLElement)
+      || document.activeElement !== input) return false;
+    const style = getComputedStyle(frame);
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--dsw-alias-state-business-primary)';
+    frame.append(probe);
+    const brand = getComputedStyle(probe).color;
+    probe.remove();
+    return style.borderColor === brand && style.boxShadow !== 'none';
+  })()`)
+  await page.screenshot('channel-create-focus.png')
   await page.fill('input[placeholder="e.g. frontend-sync"]', channelName)
   await page.clickExpression('Create channel', `[...document.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === 'Create channel')`)
@@ -497,6 +514,7 @@ try {
     channelName,
     assertions: [
       'plugin loaded in an isolated official DSH profile',
+      'New Channel name uses the shared blue focus field',
       'Channel creation completed through the real UI and RPC path',
       'Message send completed through the real UI and RPC path',
       'Channel and Message persisted across a full page reload',

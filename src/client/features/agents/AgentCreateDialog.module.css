@@ -41,36 +41,6 @@
 
 .hint { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; overflow-wrap: anywhere; }
 
-.input {
-  display: flex;
-  width: 100%;
-  height: var(--chaos-control-standard);
-  align-items: center;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--chaos-radius-field);
-  padding: 0 10px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-1);
-  box-shadow: none;
-  transition: border-color var(--chaos-motion-fast) ease, box-shadow var(--chaos-motion-fast) ease;
-}
-.input:focus-within {
-  border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 20%, transparent);
-}
-.input input {
-  width: 100%;
-  min-width: 0;
-  height: auto;
-  border: 0;
-  padding: 0;
-  outline: 0;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-}
-
 .textarea { min-height: 92px; }
 
 .routeGrid { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
