@@ -685,10 +685,14 @@ try {
 
   await page.setViewport(1200, 800)
   await page.clickExpression('Settings', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null
-      && (button.textContent?.trim() === 'Settings'
+    .find(button => {
+      if (button.offsetParent === null) return false;
+      const rect = button.getBoundingClientRect();
+      return button.textContent?.trim() === 'Settings'
         || button.getAttribute('aria-label') === 'Settings'
-        || button.getAttribute('title') === 'Settings'))`)
+        || button.getAttribute('title') === 'Settings'
+        || (rect.left < 64 && rect.top > window.innerHeight - 96);
+    })`)
   await page.waitForExpression('Collab Agents settings entry', `!![...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Collab Agents')`)
   await page.clickExpression('Collab Agents settings entry', `[...document.querySelectorAll('button')]
@@ -706,16 +710,37 @@ try {
   await page.clickExpression('inline New Agent', `document.querySelector('section[aria-label="Collab Agents"] button[aria-label="New Agent"]')`)
   await page.waitForExpression('Settings uses inline tabbed Agent creation', `(() => {
     const page = document.querySelector('section[aria-label="Collab Agents"]');
-    const form = page?.querySelector('[data-agent-create-inline]');
+    const block = page?.querySelector('[data-agent-create-inline]');
+    const form = block?.querySelector('[data-variant="inline"]');
     const dialogs = [...document.querySelectorAll('[role="dialog"]')]
       .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
     const tabs = [...form?.querySelectorAll('[role="tab"]') ?? []];
-    return form instanceof HTMLElement && form.offsetParent !== null
+    const header = form?.querySelector('header');
+    const toolbar = form?.querySelector('[role="toolbar"]');
+    const panel = form?.querySelector('[role="tabpanel"]');
+    const tablist = form?.querySelector('[role="tablist"]');
+    const firstInput = form?.querySelector('#chaos-agent-create-name');
+    if (!(block instanceof HTMLElement) || !(form instanceof HTMLElement)
+      || !(header instanceof HTMLElement) || !(toolbar instanceof HTMLElement)
+      || !(panel instanceof HTMLElement) || !(tablist instanceof HTMLElement)
+      || !(firstInput instanceof HTMLInputElement)) return false;
+    const blockRect = block.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    return form.offsetParent !== null
       && dialogs.length === 1
       && tabs.length === 2
       && tabs.some(tab => tab.textContent?.trim() === 'Identity')
       && tabs.some(tab => tab.textContent?.trim() === 'Runtime')
-      && form.textContent?.includes('Handle') === false;
+      && form.textContent?.includes('Handle') === false
+      && header.querySelector('h2')?.textContent?.trim() === 'New Agent'
+      && Math.abs(headerRect.left - blockRect.left) <= 2
+      && Math.abs(headerRect.right - blockRect.right) <= 2
+      && Math.abs(toolbarRect.top - headerRect.bottom) <= 2
+      && firstInput.getBoundingClientRect().top - toolbarRect.bottom >= 24
+      && panelRect.left - blockRect.left >= 12
+      && tablist.getBoundingClientRect().width < blockRect.width * 0.75;
   })()`)
   await page.screenshot('agent-settings-inline.png')
   await page.clickExpression('inline Agent Runtime tab', `(() => {
