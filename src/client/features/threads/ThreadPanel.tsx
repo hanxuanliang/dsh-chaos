@@ -20,7 +20,7 @@
  *   channel messages, and thread replies are not top-level.
  */
 import type { JSX } from 'react'
-import { IconChevronLeftOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronLeftOutline14, IconPanelLeftOutline16, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../../../native.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
@@ -31,7 +31,7 @@ import css from './ThreadPanel.module.css'
 import { RootCard } from './RootCard.tsx'
 import { IconButton } from '../../shared/ui/index.ts'
 
-export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose, back = false, readOnly = false }: {
+export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLocale, onRootJump, onClose, onOpenInChannel, back = false, readOnly = false }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
@@ -41,6 +41,8 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
   /** Root card click: close panel + land the root with the jump flash. */
   onRootJump: (messageId: string) => void
   onClose: () => void
+  /** Host elevates this thread to the full channel workspace (Activity dock). */
+  onOpenInChannel?: (() => void) | undefined
   back?: boolean | undefined
   readOnly?: boolean | undefined
 }): JSX.Element {
@@ -61,12 +63,25 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
     return names
   })()  // names 让 root 卡里的 @提及高亮与主流一致——root 完整渲染也含 markdown。
 
+  const replyCount = thread.rootMessageId === undefined
+    ? undefined
+    : state.threadSummariesByRoot[thread.rootMessageId]?.replyCount
   return (
     <aside className={css.threadPanel} aria-label={t('thread.title')}>
+      {/* 关闭层级化(成文): × 独占模式层; 层级内返回/收拢=左缘方向箭头,
+          与右上 × 分离不再垂直同列。右缘留给 view in channel ↗。 */}
       <header className={css.threadHead}>
-        {back && <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconChevronLeftOutline14 size={14} />} onClick={onClose} />}
+        <IconButton className={css.threadClose} label={t('thread.close')}
+          icon={back ? <IconChevronLeftOutline14 size={14} /> : <IconPanelLeftOutline16 size={16} />}
+          onClick={onClose} />
         <span className={css.threadTitle}>{t('thread.title')}</span>
-        {!back && <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconCloseOutline16 size={16} />} onClick={onClose} />}
+        {replyCount !== undefined && replyCount > 0 && (
+          <span className={css.threadCount}>{t('thread.replies', { count: replyCount })}</span>
+        )}
+        {onOpenInChannel !== undefined && (
+          <IconButton className={css.threadOpen} label={t('thread.viewInChannel')} tooltip
+            icon={<IconRightUpOutline16 size={16} />} onClick={onOpenInChannel} />
+        )}
       </header>
       {thread.rootMessageId !== undefined && (
         <RootCard

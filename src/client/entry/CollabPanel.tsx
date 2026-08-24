@@ -210,6 +210,14 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
             state={state}
             activeLocale={activeLocale}
             onCreateAgent={(channelId) => { beginAgentCreate({ kind: 'channel-members', channelId }) }}
+            onOpenInChannel={(channelId, threadRootId) => {
+              /* 深度提升: 换模式+选频道; thread 走 pendingThreadRoot 一次性入口
+                  (mount 消费 → 开 thread 面板 + root 行 jump-flash 锚定)。 */
+              setPanelView('collab')
+              setMobileChannelsOpen(false)
+              setPendingThreadRoot(threadRootId)
+              store.setActiveChannel(channelId)
+            }}
           />
         </div>
       ) : (

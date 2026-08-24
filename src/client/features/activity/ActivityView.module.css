@@ -21,6 +21,8 @@
 
 .activityError { margin: 0 10px 6px; }
 
+.activityEmpty { flex: 1; justify-content: center; }
+
 .markAllButton {
   width: 28px;
   height: 28px;
@@ -57,10 +59,11 @@
 .activityDetailPane > * { flex: 1; min-height: 0; }
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: 0 !important; }
 
-.desktopClose { display: inline-flex; flex: none; }
+.dockBack { display: inline-flex; flex: none; }
+.dockOpenInChannel { display: inline-flex; flex: none; }
 .mobileDetailHeader { display: none; }
 
 @media (max-width: 700px) {
   .mobileDetailHeader { display: block; }
-  .desktopClose { display: none; }
+  .dockBack, .dockOpenInChannel { display: none; }
 }

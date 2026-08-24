@@ -44,30 +44,32 @@
   min-width: 0;
   align-items: center;
   gap: 5px;
-  padding: 0 4px;
+  padding: 2px 4px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
   cursor: pointer;
 }
+/* 组头语法升级(synapse sidebar-heading 同构): 正常大小写+12px/500,
+ * hover 给一层浅底暗示整条可点(收拢 chevron 只有 12px, 需要可点暗示)。 */
 .rail .railTitle:hover {
   color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 .railChevron {
   display: inline-flex;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   flex: none;
   align-items: center;
   justify-content: center;
   transition: transform var(--chaos-motion-fast) ease;
 }
-.railChevron svg { width: 10px; height: 10px; }
+.railChevron svg { width: 12px; height: 12px; }
 .railChevron[data-open='true'] { transform: rotate(90deg); }
 .rail .railLabel {
   overflow: hidden;
@@ -159,9 +161,14 @@
 .rail .archiveGroup {
   display: flex;
   flex-direction: column;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--dsw-alias-border-l1);
+  margin-top: 12px;
+}
+/* 归档=收纳而非分区: 无分割线, 组头颜色再退一档"沉底"。 */
+.rail .archiveGroup .railTitle {
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 72%, transparent);
+}
+.rail .archiveGroup .railTitle:hover {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 
@@ -188,6 +195,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 未读语法(全局成文): 行左缘 6px 蓝点 + 名字 500 字重, 点开去点去粗。 */
+.rail .railUnreadDot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+}
+.rail .railItem[data-unread] .railName {
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
 
 .rail .railEmpty {
   margin: 0;
@@ -204,11 +224,11 @@
 /* Channel item actions menu (circle flavor): the DSH Menu primitive is
  * compact by default — owner finds the result rigid next to circle's
  * dropdown-menu. While the chaos panel owns the pane, restyle its
- * portal menus: 200px floor, roomier rows, softer hover, 10px radius.
+ * portal menus: 200px floor, roomier rows, softer hover, 8px radius (inline-control grammar).
  * Attribute selector survives CSS-module hashing (mnemon precedent). */
 html[data-dsh-chaos-active] [role='menu'][style*='position: fixed'] {
   min-width: 200px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 html[data-dsh-chaos-active] [role='menu'] [role='menuitem'] {
   min-height: 32px;

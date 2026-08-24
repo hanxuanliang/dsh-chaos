@@ -6,7 +6,8 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 0;
+  /* 长列表禁用每行 hairline(skill §4.9): gap 分隔 + hover 底色已够反馈。 */
+  gap: 2px;
   overflow-y: auto;
   padding: 4px 8px 8px;
 }
@@ -15,16 +16,16 @@
   position: relative;
   display: flex;
   align-items: stretch;
-  min-height: 56px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  /* 48px 行轨道: 与 rail 36px 的密度悬殊收窄, 切换不再松紧跳变。 */
+  min-height: 48px;
   border-radius: var(--chaos-radius-control);
 }
 
 .row:hover { background: var(--dsw-alias-interactive-bg-hover); }
 
+/* 选中态全局成文: 行级选中 = 8% business-primary tint(与 rail 行同一语言)。 */
 .row[data-selected='true'] {
-  border-bottom-color: transparent;
-  background: var(--dsw-alias-interactive-bg-active);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
 }
 
 .rowMain {
@@ -34,7 +35,7 @@
   width: 100%;
   align-items: flex-start;
   gap: 0;
-  padding: 8px 38px 8px 10px;
+  padding: 6px 38px 6px 10px;
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-primary);
@@ -82,8 +83,8 @@
 }
 
 .unreadDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   flex: none;
   border-radius: 50%;
   background: var(--dsw-alias-state-business-primary);

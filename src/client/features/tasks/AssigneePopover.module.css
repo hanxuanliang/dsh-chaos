@@ -45,7 +45,8 @@
   overflow-y: auto;
   padding: 6px 5px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
+  /* menu = 行内控件语法: 8px (容器卡片才吃 surface 10px)。 */
+  border-radius: 8px;
   background: var(--dsw-alias-bg-base);
   box-shadow: var(--dsw-shadow-lv2);
 }

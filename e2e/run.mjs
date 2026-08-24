@@ -655,9 +655,15 @@ try {
     const list = document.querySelector('[data-channel-group-list="archived"]');
     const chevron = button?.querySelector('[data-open="true"]');
     if (!(button instanceof HTMLElement) || !(list instanceof HTMLElement) || !(chevron instanceof HTMLElement)) return false;
+    const style = getComputedStyle(button);
     return button.getAttribute('aria-expanded') === 'true'
       && getComputedStyle(chevron).transform !== 'none'
-      && list.getBoundingClientRect().top - button.getBoundingClientRect().bottom >= 5;
+      && list.getBoundingClientRect().top - button.getBoundingClientRect().bottom >= 5
+      /* 组头语法升级(synapse sidebar-heading): 12px 正常大小写, 无 uppercase+宽字距; 归档组无分割线 */
+      && style.fontSize === '12px'
+      && style.textTransform === 'none'
+      && (style.letterSpacing === 'normal' || parseFloat(style.letterSpacing) < 1)
+      && getComputedStyle(list.closest('section') ?? list).borderTopStyle === 'none';
   })()`)
   await page.clickExpression('Archived Channel actions', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
