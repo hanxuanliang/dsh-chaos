@@ -8,12 +8,13 @@
 .tab[data-active] { color: var(--dsw-alias-label-primary-foreground, white); background: var(--dsw-alias-button-primary-fill); font-weight: 500; }
 .tab:disabled { cursor: not-allowed; opacity: .45; }
 
-/* Underline variant (Linear/circle page-title tabs): transparent track,
- * 14px/600 labels, active = full-strength text + 2px primary underline
- * riding the track's bottom edge. Pairs with a header that has no bottom
- * border so the underline reads as the divider itself. */
+/* Underline variant (dsh-synapse canvas-tabs grammar): no track, no chip —
+ * bare 13px/500 labels spaced 22px apart, active = primary text + 2px
+ * primary underline riding the tab's own bottom edge; hover tints toward
+ * primary. Pairs with a header whose hairline sits at the same edge. */
 .tabs[data-variant='underline'] {
-  gap: 4px;
+  gap: 22px;
+  margin-left: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -21,27 +22,28 @@
 .tabs[data-variant='underline'] .tab {
   position: relative;
   border-radius: 0;
-  padding: 3px 2px 7px;
+  padding: 2px 1px;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 15px;
+  background: transparent;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 21px;
+  line-height: 18px;
 }
 .tabs[data-variant='underline'] .tab:hover:not(:disabled):not([data-active]) {
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-state-business-primary);
   background: transparent;
 }
 .tabs[data-variant='underline'] .tab[data-active] {
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-state-business-primary);
   background: transparent;
-  font-weight: 600;
+  font-weight: 500;
 }
 .tabs[data-variant='underline'] .tab[data-active]::after {
   content: '';
   position: absolute;
-  right: 2px;
+  right: 1px;
   bottom: 0;
-  left: 2px;
+  left: 1px;
   height: 2px;
   border-radius: 1px;
   background: var(--dsw-alias-state-business-primary);
