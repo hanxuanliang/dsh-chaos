@@ -154,3 +154,40 @@
 @media (max-width: 480px) {
   .dialogBody .emptyAction { align-items: flex-start; flex-direction: column; }
 }
+
+/* --- channel edit danger zone ---------------------------------------------- */
+/* 归档从三点菜单移入 dialog(行内悬停图标交互替代菜单): 危险区顶一条 hairline,
+ * 文字钮 + icon, danger 色仅 hover 加深 — 不是满红按钮(克制语法)。 */
+.dialogBody .dangerZone {
+  display: flex;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.dialogBody .archiveLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 4px 2px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dialogBody .archiveLink:hover:not(:disabled) {
+  color: var(--dsw-alias-status-error, #d54242);
+}
+
+.dialogBody .archiveLink:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.dialogBody .archiveLink:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}

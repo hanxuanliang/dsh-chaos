@@ -1,14 +1,10 @@
 import { useId, useState, type JSX } from 'react'
 import {
-  IconArchiveOutline20,
   IconChevronRightOutline14,
   IconEditOutline16,
-  IconEllipsisOutline16,
   IconPlusOutline16,
   IconRefreshOutline16,
   IconTrashOutline16,
-  Menu,
-  type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTarget } from '../../../native.ts'
 import type { CollabStoreSnapshot } from '../../data/store.ts'
@@ -22,19 +18,15 @@ export interface ChannelRailProps {
   onSelect(targetId: string): void
   onCreate(): void
   onEdit(channel: NativeTarget): void
-  onArchive(channel: NativeTarget): void
   onRestore(channel: NativeTarget): void
   onDelete(channel: NativeTarget): void
 }
 
-function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onArchive, onRestore, onDelete, t }: {
+function ChannelRows({ channels, state, onSelect, onEdit, onRestore, onDelete, t }: {
   channels: NativeTarget[]
   state: CollabStoreSnapshot
-  menuId: string | undefined
-  setMenuId(id: string | undefined): void
   onSelect(targetId: string): void
   onEdit(channel: NativeTarget): void
-  onArchive(channel: NativeTarget): void
   onRestore(channel: NativeTarget): void
   onDelete(channel: NativeTarget): void
   t: ChaosTranslate
@@ -46,18 +38,9 @@ function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onA
     const owner = memberships === undefined
       ? channel.createdBy === state.selfId
       : memberships.some(membership => membership.actor.id === state.selfId && membership.role === 'owner')
-    const items: MenuEntry[] = channel.lifecycle === 'archived'
-      ? [
-          { id: 'restore', label: t('channel.restore'), icon: <IconRefreshOutline16 size={16} /> },
-          { type: 'separator', id: 'danger' },
-          { id: 'delete', label: t('channel.delete'), icon: <IconTrashOutline16 size={16} />, danger: true },
-        ]
-      : [
-          { id: 'edit', label: t('channel.edit'), icon: <IconEditOutline16 size={16} /> },
-          { id: 'archive', label: t('channel.archive'), icon: <IconArchiveOutline20 size={16} /> },
-          { type: 'separator', id: 'danger' },
-          { id: 'delete', label: t('channel.delete'), icon: <IconTrashOutline16 size={16} />, danger: true },
-        ]
+    // 行内悬停图标替代下拉菜单(owner 审定: 菜单交互与面板风格不搭,
+    // Linear rail 同款 hover-reveal) — 编辑进 dialog, 归档在 dialog 内
+    // 危险区, 恢复/删除留在行内直达。活动行: 编辑+删除; 归档行: 恢复+删除。
     return (
       <div key={channel.id} role="listitem" className={css.railItem} data-active={active || undefined} data-unread={unread > 0 || undefined}>
         <button
@@ -72,32 +55,18 @@ function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onA
           {unread > 0 && <span className={css.railUnread}>{unread}</span>}
         </button>
         {owner && (
-          <Menu
-            open={menuId === channel.id}
-            anchor={(
-              <IconButton
-                className={css.railMore}
-                label={t('channel.actions', { name: channel.name })}
-                icon={<IconEllipsisOutline16 size={16} />}
-                tooltip={false}
-                aria-haspopup="menu"
-                aria-expanded={menuId === channel.id}
-                onClick={() => { setMenuId(menuId === channel.id ? undefined : channel.id) }}
-              />
-            )}
-            items={items}
-            portal
-            align="end"
-            compact
-            onClose={() => { setMenuId(undefined) }}
-            onSelect={(id) => {
-              setMenuId(undefined)
-              if (id === 'edit') onEdit(channel)
-              else if (id === 'archive') onArchive(channel)
-              else if (id === 'restore') onRestore(channel)
-              else if (id === 'delete') onDelete(channel)
-            }}
-          />
+          <span className={css.railActions}>
+            {channel.lifecycle === 'archived'
+              ? (
+                <IconButton className={css.railAction} label={t('channel.restore')} icon={<IconRefreshOutline16 size={16} />}
+                  onClick={() => { onRestore(channel) }} />
+              )
+              : (
+                <IconButton className={css.railAction} label={t('channel.edit')} icon={<IconEditOutline16 size={16} />}
+                  onClick={() => { onEdit(channel) }} />
+              )}
+            <IconButton className={css.railAction} label={t('channel.delete')} icon={<IconTrashOutline16 size={16} />} onClick={() => { onDelete(channel) }} />
+          </span>
         )}
       </div>
     )
@@ -112,15 +81,14 @@ function GroupChevron({ open }: { open: boolean }): JSX.Element {
   )
 }
 
-export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onArchive, onRestore, onDelete }: ChannelRailProps): JSX.Element {
+export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onRestore, onDelete }: ChannelRailProps): JSX.Element {
   const [activeOpen, setActiveOpen] = useState(true)
   const [archivedOpen, setArchivedOpen] = useState(false)
-  const [menuId, setMenuId] = useState<string | undefined>(undefined)
   const activeListId = useId()
   const archivedListId = useId()
   const activeChannels = state.channels.filter(channel => channel.lifecycle === 'active')
   const archivedChannels = state.channels.filter(channel => channel.lifecycle === 'archived')
-  const rows = { state, menuId, setMenuId, onSelect, onEdit, onArchive, onRestore, onDelete, t }
+  const rows = { state, onSelect, onEdit, onRestore, onDelete, t }
 
   return (
     <nav className={css.rail} aria-label={t('panel.channels')}>

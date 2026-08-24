@@ -1,17 +1,19 @@
-.tabs { display: flex; width: fit-content; flex: none; gap: 2px; margin-left: auto; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-control); padding: 1px; background: var(--dsw-alias-bg-layer-2); }
+/* Base tab reset only — track/shape grammar lives in the variants
+ * (underline | floating | pill). No default segmented look anymore:
+ * in-content groups are pill, the mode layer is floating. */
+.tabs { display: flex; width: fit-content; flex: none; gap: 2px; margin-left: auto; }
 .tabs[data-align='lead'] { margin-left: 0; }
 .tabs[data-align='stretch'] { width: 100%; margin-left: 0; }
-.tab { min-width: 0; border: 0; border-radius: 5px; padding: 3px 8px; color: var(--dsw-alias-label-secondary); background: transparent; font: inherit; font-size: 11px; line-height: 18px; white-space: nowrap; cursor: pointer; transition: color var(--chaos-motion-fast) ease, background-color var(--chaos-motion-fast) ease; }
+.tab { min-width: 0; border: 0; padding: 3px 8px; background: transparent; font: inherit; white-space: nowrap; cursor: pointer; transition: color var(--chaos-motion-fast) ease, background-color var(--chaos-motion-fast) ease; }
 .tabs[data-align='stretch'] .tab { flex: 1; }
-.tab:hover:not(:disabled):not([data-active]) { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .tab:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
-.tab[data-active] { color: var(--dsw-alias-label-primary-foreground, white); background: var(--dsw-alias-button-primary-fill); font-weight: 500; }
 .tab:disabled { cursor: not-allowed; opacity: .45; }
 
 /* Underline variant (dsh-synapse canvas-tabs grammar): no track, no chip —
  * bare 13px/500 labels spaced 22px apart, active = primary text + 2px
  * primary underline riding the tab's own bottom edge; hover tints toward
- * primary. Pairs with a header whose hairline sits at the same edge. */
+ * primary. Pairs with a header whose hairline sits at the same edge.
+ * (Currently unused on surfaces; kept as a documented grammar.) */
 .tabs[data-variant='underline'] {
   gap: 22px;
   margin-left: 0;
@@ -49,10 +51,12 @@
   background: var(--dsw-alias-state-business-primary);
 }
 
-/* Floating variant (dsh-synapse view-switch grammar): a centered pill
- * group hovering over the header's contents — full-round 999px track,
- * 1px border, near-opaque background, 3px inset; 28px buttons at 12px/650
- * with 11px horizontal padding, active = primary-fill + on-fill text. */
+/* Pill grammar is defined jointly with the floating variant below —
+ * one grammar, two placements (inline vs absolute-centered). */
+
+/* Floating variant (dsh-synapse view-switch grammar): the mode-layer pill
+ * group hovering over the header's contents — pill grammar (above) plus
+ * absolute double-centering inside the positioning-layer header. */
 .tabs[data-variant='floating'] {
   position: absolute;
   top: 50%;
@@ -60,6 +64,9 @@
   transform: translate(-50%, -50%);
   z-index: 5;
   margin-left: 0;
+}
+.tabs[data-variant='floating'],
+.tabs[data-variant='pill'] {
   gap: 2px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
@@ -67,7 +74,8 @@
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
 }
-.tabs[data-variant='floating'] .tab {
+.tabs[data-variant='floating'] .tab,
+.tabs[data-variant='pill'] .tab {
   min-height: 28px;
   border-radius: 999px;
   padding: 0 11px;
@@ -77,11 +85,13 @@
   font-weight: 600;
   line-height: 16px;
 }
-.tabs[data-variant='floating'] .tab:hover:not(:disabled):not([data-active]) {
+.tabs[data-variant='floating'] .tab:hover:not(:disabled):not([data-active]),
+.tabs[data-variant='pill'] .tab:hover:not(:disabled):not([data-active]) {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
 }
-.tabs[data-variant='floating'] .tab[data-active] {
+.tabs[data-variant='floating'] .tab[data-active],
+.tabs[data-variant='pill'] .tab[data-active] {
   color: var(--dsw-alias-label-primary-foreground, white);
   background: var(--dsw-alias-button-primary-fill);
   font-weight: 600;

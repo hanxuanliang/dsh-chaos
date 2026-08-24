@@ -34,6 +34,7 @@
 }
 .threadPanel .threadClose {
   flex: none;
+  margin-right: 4px;
 }
 .threadPanel .threadOpen {
   flex: none;

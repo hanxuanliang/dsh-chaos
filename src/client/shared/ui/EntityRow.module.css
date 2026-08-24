@@ -1,5 +1,8 @@
 .row { position: relative; display: flex; min-width: 0; min-height: var(--chaos-row-dense); align-items: stretch; border-radius: var(--chaos-radius-control); color: var(--dsw-alias-label-primary); transition: background-color var(--chaos-motion-fast) ease; }
-.row:hover, .row[data-selected='true'] { background: var(--dsw-alias-interactive-bg-hover); }
+.row:hover { background: var(--dsw-alias-interactive-bg-hover); }
+/* 选中态全局成文: 行级选中 = 8% business-primary tint (与 rail 行/ActivityCard
+ * 同一语言) — 不再是 hover 灰。 */
+.row[data-selected='true'] { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent); }
 .content { display: grid; min-width: 0; flex: 1; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--chaos-space-2); border: 0; border-radius: inherit; padding: 6px 10px; color: inherit; background: transparent; font: inherit; text-align: left; }
 button.content { cursor: pointer; }
 button.content:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: -2px; }

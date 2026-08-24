@@ -113,25 +113,18 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .panel *, .panel *::before, .panel *::after { box-sizing: border-box; }
 :where(.panel) :where(button) { color: inherit; font: inherit; }
 
+/* Header as pure positioning layer (synapse topbar grammar): 44px row,
+ * both the floating tab group and the close button are absolutely anchored
+ * so they share one optical line and never fight the flex flow.
+ * Hairline: every surface head closes with the same 1px rule (mode layer,
+ * channelHead, threadHead, PanelHeader) — one divider grammar everywhere. */
 .header {
+  position: relative;
   display: flex;
   flex: none;
   height: 44px;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
-}
-
-/* Header as pure positioning layer (synapse topbar grammar): 44px row,
- * no border (the body below owns its own edges), both the floating tab
- * group and the close button are absolutely anchored so they share one
- * optical line and never fight the flex flow. */
-.header {
-  position: relative;
-  height: 44px;
-  align-items: center;
-  border-bottom: 0;
   padding: 0 16px;
 }
 .closeButton {

@@ -620,12 +620,9 @@ try {
   await page.waitForExpression('cleared Channel draft', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null && element.value === '')`)
 
-  await page.clickExpression('Channel actions', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
-  await page.waitForExpression('Channel actions menu', `!![...document.querySelectorAll('[role="menuitem"]')]
-    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Edit details')`)
-  await page.clickExpression('Edit channel details', `[...document.querySelectorAll('[role="menuitem"]')]
-    .find(item => item.textContent?.trim() === 'Edit details')`)
+  // 行内悬停图标(替代三点菜单): 编辑=铅笔钮直开 dialog, 归档=dialog 危险区
+  await page.clickExpression('Channel edit icon (inline hover action)', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Edit details')`)
   const editedDescription = 'Updated E2E channel purpose'
   await page.waitForExpression('Edit Channel dialog', `document.querySelector('#chaos-channel-edit-description')?.offsetParent !== null`)
   await page.fill('#chaos-channel-edit-description', editedDescription)
@@ -636,10 +633,11 @@ try {
     return description === null || description.offsetParent === null;
   })()`)
 
-  await page.clickExpression('Channel actions after edit', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
-  await page.clickExpression('Archive channel', `[...document.querySelectorAll('[role="menuitem"]')]
-    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Archive channel')`)
+  await page.clickExpression('Channel edit icon (reopen for archive)', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Edit details')`)
+  await page.waitForExpression('Edit dialog reopened', `document.querySelector('#chaos-channel-edit-description')?.offsetParent !== null`)
+  await page.clickExpression('Archive channel (dialog danger zone)', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Archive channel')`)
   await page.waitForExpression('archived read-only Channel', `(() => {
     const channel = document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)});
     if (!(channel instanceof HTMLElement) || channel.offsetParent === null) return false;
@@ -665,21 +663,40 @@ try {
       && (style.letterSpacing === 'normal' || parseFloat(style.letterSpacing) < 1)
       && getComputedStyle(list.closest('section') ?? list).borderTopStyle === 'none';
   })()`)
-  await page.clickExpression('Archived Channel actions', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === ${JSON.stringify(`Actions for ${channelName}`)})`)
-  await page.waitForExpression('Restore archived Channel action', `!![...document.querySelectorAll('[role="menuitem"]')]
-    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Restore channel')`)
   await page.screenshot('channel-archived-actions.png')
-  await page.clickExpression('Restore archived channel', `[...document.querySelectorAll('[role="menuitem"]')]
-    .find(item => item.offsetParent !== null && item.textContent?.trim() === 'Restore channel')`)
+  await page.clickExpression('Restore archived channel (inline hover icon)', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.getAttribute('aria-label') === 'Restore channel')`)
   await page.waitForExpression('restored Channel composer', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null)`)
-  await page.screenshot('wide.png')
   await page.waitForExpression('composer docked to the bottom (IM logic)', `(() => {
     const composer = document.querySelector(${JSON.stringify(composerSelector)});
     if (!(composer instanceof HTMLElement)) return false;
     const rect = composer.getBoundingClientRect();
     return rect.bottom > 0 && window.innerHeight - rect.bottom < 60;
+  })()`)
+  await page.waitForExpression('messages bottom-fill (short history anchors to the bottom, Slack grammar)', `(() => {
+    const channel = document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)});
+    const composer = document.querySelector(${JSON.stringify(composerSelector)});
+    const rows = [...(channel?.querySelectorAll('[data-message-id]') ?? [])]
+      .filter(row => row instanceof HTMLElement && row.offsetParent !== null);
+    if (!(composer instanceof HTMLElement) || rows.length === 0) return false;
+    const last = rows[rows.length - 1].getBoundingClientRect();
+    return last.bottom > 0 && composer.getBoundingClientRect().top - last.bottom <= 90;
+  })()`)
+  await page.waitForExpression('message/task tabs use the pill grammar (one tab language)', `(() => {
+    const channel = document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)});
+    const group = channel?.querySelector('[role="tablist"]');
+    if (!(group instanceof HTMLElement)) return false;
+    return getComputedStyle(group).borderRadius === '999px'
+      && [...group.querySelectorAll('[role="tab"]')].some(tab => getComputedStyle(tab).minHeight === '28px');
+  })()`)
+  await page.waitForExpression('mode layer closes with the same hairline as content heads', `(() => {
+    const tabs = [...document.querySelectorAll('[role="tablist"]')]
+      .find(group => group instanceof HTMLElement && getComputedStyle(group.parentElement).position === 'relative' && getComputedStyle(group).position === 'absolute');
+    const header = tabs?.closest('header');
+    if (!(header instanceof HTMLElement)) return false;
+    return getComputedStyle(header).borderBottomWidth === '1px'
+      && getComputedStyle(header).borderBottomStyle === 'solid';
   })()`)
 
   await page.reload()

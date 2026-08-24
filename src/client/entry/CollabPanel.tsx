@@ -132,7 +132,6 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
     onSelect={(targetId) => { setPendingThreadRoot(undefined); setMobileChannelsOpen(false); store.setActiveChannel(targetId) }}
     onCreate={beginChannelCreate}
     onEdit={(channel) => { setEditChannel(channel); setChannelActionError(undefined) }}
-    onArchive={(channel) => { runLifecycle(() => store.archiveChannel(channel.id)) }}
     onRestore={(channel) => { runLifecycle(() => store.restoreChannel(channel.id)) }}
     onDelete={(channel) => { setDeleteChannel(channel); setDeleteAcknowledged(false); setChannelActionError(undefined) }}
   />
@@ -271,6 +270,11 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
           store={store}
           state={state}
           channel={editChannel}
+          onArchive={() => {
+            const target = editChannel
+            setEditChannel(undefined)
+            if (target !== undefined) runLifecycle(() => store.archiveChannel(target.id))
+          }}
           onClose={() => { setEditChannel(undefined) }}
         />
       )}
