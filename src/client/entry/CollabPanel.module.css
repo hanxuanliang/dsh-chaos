@@ -116,26 +116,37 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 .header {
   display: flex;
   flex: none;
-  height: 48px;
+  height: 44px;
   align-items: center;
   gap: 8px;
   padding: 0 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
-/* Floating view-switch tabs (synapse grammar): the group is absolutely
- * centered over the header; the header itself anchors it. */
-.header { position: relative; }
+/* Header as pure positioning layer (synapse topbar grammar): 44px row,
+ * no border (the body below owns its own edges), both the floating tab
+ * group and the close button are absolutely anchored so they share one
+ * optical line and never fight the flex flow. */
+.header {
+  position: relative;
+  height: 44px;
+  align-items: center;
+  border-bottom: 0;
+  padding: 0 16px;
+}
+.closeButton {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  z-index: 6;
+}
 
 .title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.closeButton {
-  margin-left: auto;
 }
 
 .body {
