@@ -15,7 +15,7 @@ import type { ChaosTranslate } from '../locales.ts'
 import css from './CollabPanel.module.css'
 import { CHAOS_NAVIGATE_CHANNEL_EVENT } from './navigation.ts'
 import { EmptyState, ErrorBanner, IconButton, SkeletonList, StatusChip, Tabs } from '../shared/ui/index.ts'
-import { ResponsiveDrilldown } from '../shared/layout/index.ts'
+import { ResponsiveDrilldown, SplitPane } from '../shared/layout/index.ts'
 
 export interface CollabPanelProps {
   t: ChaosTranslate
@@ -214,7 +214,18 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
       ) : (
       <div className={css.body}>
         <ResponsiveDrilldown
-          desktop={<>{channelRail}{mainView}</>}
+          desktop={(
+            <SplitPane
+              id="collab-rail"
+              fixedSide="leading"
+              leadingDefault={220}
+              leadingMin={180}
+              leadingMax={360}
+              separatorLabel={t('panel.railSeparator')}
+              leading={channelRail}
+              trailing={mainView}
+            />
+          )}
           list={channelRail}
           detail={mainView}
           detailOpen={showMobileChannel}

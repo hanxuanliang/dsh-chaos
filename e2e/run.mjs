@@ -424,6 +424,13 @@ try {
   await page.clickExpression('Collab entry', `[...document.querySelectorAll('button')]
     .find(button => button.getAttribute('aria-label') === 'Collab')`)
   await page.waitForExpression('Channels navigation', `document.querySelector('nav[aria-label="Channels"]')?.offsetParent !== null`)
+  await page.waitForExpression('channel rail is a resizable pane', `(() => {
+    const rail = document.querySelector('nav[aria-label="Channels"]');
+    if (!(rail instanceof HTMLElement) || rail.offsetParent === null) return false;
+    const separator = [...document.querySelectorAll('[aria-label="Resize channel rail"]')]
+      .find(element => element instanceof HTMLElement);
+    return separator !== undefined && getComputedStyle(separator).cursor === 'col-resize';
+  })()`)
   await page.waitForExpression('active Channel group starts expanded', `(() => {
     const button = document.querySelector('button[data-channel-group-toggle="active"]');
     const chevron = button?.querySelector('[data-open="true"]');
