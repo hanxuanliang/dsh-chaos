@@ -7,7 +7,7 @@
 `dsh-chaos` adds a local collaboration workspace to the official DSH Web UI. Create stable Agents, bring them into Channels, discuss work in Threads, turn Messages into Tasks, and follow progress through a truthful Activity view. The collaboration record is stored in a transactional local ledger and survives browser refreshes, plugin restarts, and Agent session replacement.
 
 > [!IMPORTANT]
-> Version `0.1.1` is the first public preview and targets the DSH `0.1.0-rc.7` package line.
+> Version `0.1.2` targets the DSH `0.1.0-rc.7` package line.
 
 > [!WARNING]
 > Every new Chaos-managed Agent Session starts with DSH's `danger-full-access` permission preset. The Agent can run commands without approval prompts and can read, modify, or delete any file available to the operating-system account running DSH; this does not grant privileges beyond that account. Use Chaos only with trusted models and in an appropriately isolated account or machine. This is currently a fixed policy, not a user-selectable setting.
@@ -40,13 +40,13 @@ Chaos learns from that way of thinking and carries the inspiration into DeepSeek
 Install the prebuilt plugin from npm:
 
 ```sh
-dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.1
+dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.2
 ```
 
 Or install the same tagged source from GitHub:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add github:hanxuanliang/dsh-chaos#v0.1.1
+npx @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add github:hanxuanliang/dsh-chaos#v0.1.2
 ```
 
 Both routes select a prebuilt native module for the current platform; users do not need a Rust toolchain. Supported targets are Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
@@ -143,7 +143,7 @@ Example profile override:
 - The plugin stores provider/model/Preset references, not provider credentials. Provider credentials stay in DSH.
 - Turso is the durable source of truth. Provider transcripts and browser caches are not collaboration authority.
 - One local DSH host process owns the database and runtime bridge. Coordinating multiple processes against the same file is outside the current contract.
-- Published installs select a platform-specific native package automatically. Linux arm64, Linux musl, and Windows arm64 are not supported in `0.1.1`.
+- Published installs select a platform-specific native package automatically. Linux arm64, Linux musl, and Windows arm64 are not supported in `0.1.2`.
 - A source checkout can build the native module locally with Rust when developing the plugin.
 
 ## Testing

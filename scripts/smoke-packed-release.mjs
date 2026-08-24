@@ -26,7 +26,7 @@ try {
   const require = createRequire(join(workdir, 'package.json'))
   const manifestPath = require.resolve('@hanxuanliang/dsh-chaos/package.json')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  if (manifest.version !== '0.1.1') throw new Error(`unexpected packed version ${manifest.version}`)
+  if (manifest.version !== '0.1.2') throw new Error(`unexpected packed version ${manifest.version}`)
   const nativeModuleUrl = pathToFileURL(join(dirname(manifestPath), 'lib', 'native.js')).href
   const { loadNativeModule } = await import(nativeModuleUrl)
   const native = loadNativeModule()

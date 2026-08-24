@@ -56,10 +56,10 @@ See [Testing](./testing.md) for the quick loop and failure criteria.
 Published packages include a prebuilt native module selected for the current operating system and architecture. End users do not need Rust:
 
 ```sh
-dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.1
+dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.2
 ```
 
-The supported `0.1.1` targets are Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
+The supported `0.1.2` targets are Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
 
 ## Tarball install during development
 
@@ -75,7 +75,7 @@ pnpm pack
 Install the resulting file into an isolated Web profile:
 
 ```sh
-dsh plugin --profile web add "$REPO_ROOT/hanxuanliang-dsh-chaos-0.1.1.tgz"
+dsh plugin --profile web add "$REPO_ROOT/hanxuanliang-dsh-chaos-0.1.2.tgz"
 dsh --profile web --dump-config
 dsh web --host 127.0.0.1 --port "$PORT"
 ```

@@ -31,20 +31,20 @@ Installing the published plugin into complete DSH profiles on every operating sy
 
 GitHub Releases are also independent from npm publication. The immutable Git tag remains the source-install target; create a GitHub Release separately only when downloadable release assets or a rendered release-notes page are needed.
 
-Never reuse a native artifact across operating systems, CPU architectures, or incompatible Linux C libraries. Version `0.1.1` supports Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
+Never reuse a native artifact across operating systems, CPU architectures, or incompatible Linux C libraries. Version `0.1.2` supports Linux x64 with glibc, Windows x64, macOS x64, and macOS arm64.
 
 ## User installation
 
 From npm:
 
 ```sh
-dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.1
+dsh plugin --profile web add @hanxuanliang/dsh-chaos@0.1.2
 ```
 
 From the immutable GitHub tag:
 
 ```sh
-npx @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add github:hanxuanliang/dsh-chaos#v0.1.1
+npx @deepseek-ai/dsh@0.1.0-rc.7 plugin --profile web add github:hanxuanliang/dsh-chaos#v0.1.2
 ```
 
 Do not document an unpinned GitHub branch as a release install target.

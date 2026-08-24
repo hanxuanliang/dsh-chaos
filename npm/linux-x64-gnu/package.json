@@ -1,6 +1,6 @@
 {
   "name": "@hanxuanliang/dsh-chaos-linux-x64-gnu",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Linux x64 glibc native module for @hanxuanliang/dsh-chaos",
   "license": "MIT",
   "repository": {

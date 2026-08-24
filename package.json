@@ -1,6 +1,6 @@
 {
   "name": "@hanxuanliang/dsh-chaos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Peer multi-Agent collaboration for DeepSeek Harness",
   "type": "module",
   "license": "MIT",
@@ -141,9 +141,9 @@
     "remark-gfm": "^4.0.1"
   },
   "optionalDependencies": {
-    "@hanxuanliang/dsh-chaos-darwin-arm64": "workspace:0.1.1",
-    "@hanxuanliang/dsh-chaos-darwin-x64": "workspace:0.1.1",
-    "@hanxuanliang/dsh-chaos-linux-x64-gnu": "workspace:0.1.1",
-    "@hanxuanliang/dsh-chaos-win32-x64-msvc": "workspace:0.1.1"
+    "@hanxuanliang/dsh-chaos-darwin-arm64": "workspace:0.1.2",
+    "@hanxuanliang/dsh-chaos-darwin-x64": "workspace:0.1.2",
+    "@hanxuanliang/dsh-chaos-linux-x64-gnu": "workspace:0.1.2",
+    "@hanxuanliang/dsh-chaos-win32-x64-msvc": "workspace:0.1.2"
   }
 }

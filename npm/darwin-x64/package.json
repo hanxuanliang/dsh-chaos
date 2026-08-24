@@ -1,6 +1,6 @@
 {
   "name": "@hanxuanliang/dsh-chaos-darwin-x64",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "macOS x64 native module for @hanxuanliang/dsh-chaos",
   "license": "MIT",
   "repository": {
