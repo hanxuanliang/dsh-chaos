@@ -94,13 +94,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* composerSeat: IM 逻辑 —— composer 永远贴底，消息流占满剩余空间。
- * 与 chatCol 同宽同轴（780px 居中列）保持视觉一线。 */
+/* composerSeat: IM 逻辑 —— composer 永远贴底，消息流占满剩余空间，
+ * 整个 channel 区铺满右侧面板（IM 不留侧边大空白）。 */
 .channel .composerSeat {
   flex: none;
   width: 100%;
-  max-width: 796px;
   box-sizing: border-box;
-  margin: 0 auto;
   padding: 0 16px 12px;
 }
