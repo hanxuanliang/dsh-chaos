@@ -2,7 +2,7 @@
 
 .rail {
   display: flex;
-  width: 220px;
+  width: 100%;
   flex: none;
   flex-direction: column;
   gap: 4px;
