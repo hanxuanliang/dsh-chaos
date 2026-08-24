@@ -94,11 +94,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* composerSeat: 迁渡失踪补回 + pilot figma Input_Bottom 侧 clearance=16/底 8
- * (--dsh-composer-side-clearance); 原为 px-2 侧可餱可餱。 */
+/* composerSeat: IM 逻辑 —— composer 永远贴底，消息流占满剩余空间。
+ * 与 chatCol 同宽同轴（780px 居中列）保持视觉一线。 */
 .channel .composerSeat {
   flex: none;
   width: 100%;
+  max-width: 796px;
   box-sizing: border-box;
+  margin: 0 auto;
   padding: 0 16px 12px;
 }

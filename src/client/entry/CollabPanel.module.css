@@ -138,6 +138,10 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   display: flex;
   min-height: 0;
   flex: 1;
+  /* Percent-height chain anchor: SplitPane Group uses height:100%, which
+   * resolves against auto height as auto — pin an explicit track so the
+   * panel tree (and the composer docked at its bottom) always fills. */
+  height: 0;
 }
 .mobileChannelsButton { display: none; flex: none; }
 .main {

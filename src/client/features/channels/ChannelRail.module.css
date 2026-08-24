@@ -7,7 +7,6 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px 8px;
-  border-right: 1px solid var(--dsw-alias-border-l1);
 }
 
 
@@ -199,5 +198,5 @@
 }
 
 @media (max-width: 700px) {
-  .rail { width: 100%; border-right: 0; }
+  .rail { width: 100%; }
 }

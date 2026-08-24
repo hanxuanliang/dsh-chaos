@@ -642,6 +642,12 @@ try {
   await page.waitForExpression('restored Channel composer', `[...document.querySelectorAll(${JSON.stringify(composerSelector)})]
     .some(element => element.offsetParent !== null)`)
   await page.screenshot('wide.png')
+  await page.waitForExpression('composer docked to the bottom (IM logic)', `(() => {
+    const composer = document.querySelector(${JSON.stringify(composerSelector)});
+    if (!(composer instanceof HTMLElement)) return false;
+    const rect = composer.getBoundingClientRect();
+    return rect.bottom > 0 && window.innerHeight - rect.bottom < 60;
+  })()`)
 
   await page.reload()
   await dismissOnboarding(page)

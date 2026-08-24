@@ -141,8 +141,10 @@
 /* chatCol/listPush: mega 移交 (= 快流列内栏, 8 侧 + 24 底 pad + listPush 弹性底) */
 .streamWrap .chatCol {
   display: flex;
-  min-height: 100%;
   width: 100%;
+  max-width: 780px;
+  flex: 1;
+  margin: 0 auto;
   flex-direction: column;
   box-sizing: border-box;
   padding: 12px 8px 24px;
