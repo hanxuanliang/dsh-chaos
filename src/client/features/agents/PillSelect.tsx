@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react'
-import { Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './PillSelect.module.css'
 
 interface PillSelectProps {
@@ -41,11 +41,13 @@ export function PillSelect(props: PillSelectProps): JSX.Element {
           disabled={disabled}
           data-filled={filled ? 'true' : undefined}
           onClick={() => { setOpen(state => !state) }}
+          data-open={open ? 'true' : undefined}
         >
           {!filled && <span className={css.pillLabel}>{label}</span>}
           <span className={filled ? css.pillValue : css.pillPlaceholder}>
             {filled ? value : placeholder}
           </span>
+          <IconChevronDownOutline14 size={12} className={css.pillChevron} aria-hidden="true" />
         </button>
       )}
     />

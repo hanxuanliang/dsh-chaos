@@ -16,6 +16,13 @@
   transition: border-color 120ms ease, background 120ms ease;
 }
 
+/* Filled = the pill carries a concrete choice: border steps up a level so
+   filled/unfilled read as one coherent state grammar across every pill. */
+.pill[data-filled='true'] {
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
 .pill:hover:not(:disabled) {
   border-color: var(--dsw-alias-border-l2);
   background: var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2));
@@ -53,4 +60,14 @@
 
 .pill[data-filled='true'] .pillValue {
   font-weight: 500;
+}
+
+.pillChevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 120ms ease;
+}
+
+.pill[data-open='true'] .pillChevron {
+  transform: rotate(180deg);
 }

@@ -137,11 +137,15 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
       <PanelHeader
         className={css.detailHeader}
         title={profile.actor.displayName}
-        description={`@${profile.actor.handle}`}
+        description={(
+          <span className={css.handleRow}>
+            {`@${profile.actor.handle}`}
+            <StatusChip tone={profile.binding === undefined ? 'warning' : 'success'} label={profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')} />
+          </span>
+        )}
         leading={<AgentAvatarEditor client={client} profile={profile} onUpdated={onUpdated} onError={setAvatarError} t={t} />}
         {...(onBack === undefined ? {} : { backLabel: t('agents.back'), onBack })}
         actions={<>
-          <StatusChip tone={profile.binding === undefined ? 'warning' : 'success'} label={profile.binding === undefined ? t('agents.unconfigured') : t('agents.configured')} />
           <IconButton label={t('agents.openWorkspace')} icon={<IconFolderOpenOutline16 size={16} />} onClick={onWorkspace} />
           <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
             onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}

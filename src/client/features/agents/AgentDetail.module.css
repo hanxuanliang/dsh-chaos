@@ -10,6 +10,8 @@
 .inlineAction { border: 0; padding: 0; color: var(--dsw-alias-state-business-primary); background: transparent; cursor: pointer; }
 .memberships { display: flex; flex-direction: column; gap: 6px; }
 .membership { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; padding: 8px 10px; background: var(--dsw-alias-bg-layer-2); }
+.handleRow { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: 8px; }
+.handleRow > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .membership[data-navigable='true'] { width: 100%; color: var(--dsw-alias-label-primary); cursor: pointer; font: inherit; text-align: left; transition: border-color 120ms ease, background 120ms ease; }
 .membership[data-navigable='true']:hover { border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-hover); }
 .membership[data-navigable='true']:active { transform: scale(.995); }
@@ -19,6 +21,7 @@
 .membershipMeta { display: inline-flex; flex: none; align-items: center; gap: 6px; color: var(--dsw-alias-label-tertiary); }
 @media (max-width: 700px) {
   .detailHeader [data-tone] { display: none; }
+  .handleRow { flex-wrap: wrap; }
   .sections { padding: 0 12px 4px; }
   .panel { padding: 8px 0 14px; }
   .footer { flex-wrap: wrap; }
