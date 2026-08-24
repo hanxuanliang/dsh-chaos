@@ -59,13 +59,14 @@ function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onA
           { id: 'delete', label: t('channel.delete'), icon: <IconTrashOutline16 size={16} />, danger: true },
         ]
     return (
-      <div key={channel.id} role="listitem" className={css.railItem} data-active={active || undefined}>
+      <div key={channel.id} role="listitem" className={css.railItem} data-active={active || undefined} data-unread={unread > 0 || undefined}>
         <button
           type="button"
           className={css.railRow}
           aria-current={active ? 'true' : undefined}
           onClick={() => { onSelect(channel.id) }}
         >
+          {unread > 0 && <span className={css.railUnreadDot} aria-hidden="true" />}
           <span className={css.railHash} aria-hidden="true">#</span>
           <span className={css.railName}>{channel.name}</span>
           {unread > 0 && <span className={css.railUnread}>{unread}</span>}
@@ -106,7 +107,7 @@ function ChannelRows({ channels, state, menuId, setMenuId, onSelect, onEdit, onA
 function GroupChevron({ open }: { open: boolean }): JSX.Element {
   return (
     <span className={css.railChevron} data-open={open ? 'true' : undefined} aria-hidden="true">
-      <IconChevronRightOutline14 size={10} />
+      <IconChevronRightOutline14 size={12} />
     </span>
   )
 }

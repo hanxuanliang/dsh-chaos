@@ -11,7 +11,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useRef, useState, type JSX } from 'react'
-import { IconCheckOutline14, IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline14, IconChevronLeftOutline14, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../../../native.ts'
 import css from './ActivityView.module.css'
 import type { ChaosTranslate } from '../../locales.ts'
@@ -28,6 +28,8 @@ interface ActivityViewProps {
   state: CollabStoreSnapshot
   activeLocale(): string
   onCreateAgent(channelId: string): void
+  /** 深度提升: dock 预览 → 完整 channel 工作面 (Slack Inbox 的跳频道主路径)。 */
+  onOpenInChannel(channelId: string, threadRootId?: string | undefined): void
 }
 /**
  * dock 状态: 右栏 **就是那套 channel/thread 内容区**——channel-first,
@@ -53,7 +55,7 @@ function relativeTime(atMs: number): string {
   if (days < 7) return `${days}d`
   return new Date(atMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
-export function ActivityView({ t, store, state, activeLocale, onCreateAgent }: ActivityViewProps): JSX.Element {
+export function ActivityView({ t, store, state, activeLocale, onCreateAgent, onOpenInChannel }: ActivityViewProps): JSX.Element {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const lastTriggerId = useRef<string | null>(null)
@@ -163,10 +165,13 @@ export function ActivityView({ t, store, state, activeLocale, onCreateAgent }: A
  )
   const listPane = (
     <section className={css.activityListCol} aria-label={t('activity.title')}>
-      <PanelHeader title={t('activity.title')} />
+      {/* 正文层不重复宣告模式(成文): 44px 悬浮 tab 组已宣告 Activity,
+          列表直接从 Toolbar 开始——与 channel 页“rail 已宣告频道”对称。 */}
       <Toolbar start={filters} end={markAll} />
       {error !== undefined && <ErrorBanner className={css.activityError}>{error}</ErrorBanner>}
-      {items.length === 0 ? <EmptyState title={t('activity.empty')} /> : rows}
+      {items.length === 0
+        ? <EmptyState className={css.activityEmpty} title={t('activity.empty')} description={t('activity.emptyHint')} />
+        : rows}
     </section>
   )
   const dockChannel = dock === undefined ? undefined : state.channels.find((c) => c.id === dock.channelId)
@@ -186,6 +191,7 @@ export function ActivityView({ t, store, state, activeLocale, onCreateAgent }: A
             activeLocale={activeLocale}
             onRootJump={() => { setDock({ channelId: dock.channelId }) }}
             onClose={() => { setDock({ channelId: dock.channelId }) }}
+            onOpenInChannel={() => { onOpenInChannel(dock.channelId, dock.threadRootId) }}
           />
         ) : dockChannel !== undefined ? (
           <ChannelView
@@ -195,10 +201,22 @@ export function ActivityView({ t, store, state, activeLocale, onCreateAgent }: A
             channel={dockChannel as NativeTarget}
             activeLocale={activeLocale}
             onCreateAgent={onCreateAgent}
-            headerActions={<span className={css.desktopClose}><IconButton label={t('activity.closeDock')} icon={<IconCloseOutline16 size={16} />} onClick={closeDock} /></span>}
+            headerLeading={(
+              <span className={css.dockBack}>
+                <IconButton label={t('activity.back')} icon={<IconChevronLeftOutline14 size={14} />} onClick={closeDock} />
+              </span>
+            )}
+            headerActions={(
+              <IconButton
+                className={css.dockOpenInChannel}
+                label={t('activity.openInChannel')}
+                icon={<IconRightUpOutline16 size={16} />}
+                onClick={() => { onOpenInChannel(dock.channelId) }}
+              />
+            )}
           />
         ) : (
-          <EmptyState title={t('activity.empty')} />
+          <EmptyState title={t('activity.empty')} description={t('activity.emptyHint')} />
         )}
       </div>
     </section>

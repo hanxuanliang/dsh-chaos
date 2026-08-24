@@ -18,13 +18,26 @@
   padding: 0 12px;
 }
 .threadPanel .threadTitle {
-  flex: 1;
+  flex: none;
   font-size: 13px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
 }
+.threadPanel .threadCount {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
 .threadPanel .threadClose {
   flex: none;
+}
+.threadPanel .threadOpen {
+  flex: none;
+  margin-left: auto;
 }
 
 .threadPanel .threadBody {
