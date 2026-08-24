@@ -438,10 +438,18 @@ try {
     const headerRect = header?.getBoundingClientRect();
     const groupRect = group.getBoundingClientRect();
     const activeCs = getComputedStyle(active);
+    const close = [...(header?.querySelectorAll('button') ?? [])]
+      .find(button => button.getAttribute('aria-label') === 'Back to session');
+    if (close === undefined) return false;
+    const closeRect = close.getBoundingClientRect();
+    const groupCenterY = (groupRect.top + groupRect.bottom) / 2;
+    const closeCenterY = (closeRect.top + closeRect.bottom) / 2;
     return groupCs.position === 'absolute'
       && groupCs.borderRadius === '999px'
       && activeCs.fontSize === '12px'
-      && Math.abs((groupRect.left + groupRect.right) / 2 - (headerRect?.left + (headerRect?.right ?? 0)) / 2) <= 2;
+      && Math.abs((groupRect.left + groupRect.right) / 2 - (headerRect?.left + (headerRect?.right ?? 0)) / 2) <= 2
+      && Math.abs(groupCenterY - closeCenterY) <= 2
+      && Math.abs(groupCenterY - ((headerRect?.top + (headerRect?.bottom ?? 0)) / 2)) <= 2;
   })()`)
   await page.waitForExpression('channel rail is a resizable pane', `(() => {
     const rail = document.querySelector('nav[aria-label="Channels"]');
