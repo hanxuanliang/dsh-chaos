@@ -121,7 +121,7 @@ Defaults work for a local DSH Web profile.
 | `path` | `$DSH_HOME/collab/state.db` | Local Turso database path. |
 | `deliveryPollMs` | `500` | Interval for scanning level-triggered pending Agent wakes. |
 | `remoteEnabled` | `true` | Enables loopback browser RPC and SSE surfaces. |
-| `webUserHandle` | `local-user` | Stable handle for the local browser principal. |
+| `webUserHandle` | operating-system user slug | Stable handle for the local browser principal; falls back to `user`. |
 | `webUserDisplayName` | operating-system user | Optional display-name override for the local browser principal. |
 | `sseHeartbeatMs` | `15000` | Heartbeat interval for the browser change stream. |
 

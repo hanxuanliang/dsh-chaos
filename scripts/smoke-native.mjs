@@ -15,11 +15,6 @@ try {
   const kept = await core.ensureUser('owner', 'Local Owner')
   assert.equal(kept.id, owner.id)
   assert.equal(kept.displayName, 'Owner')
-  // Only leftover default 'Local User' migrates on the stable handle.
-  const legacy = await core.createUser('local-user', 'Local User')
-  const renamed = await core.ensureUser('local-user', 'Local Owner')
-  assert.equal(renamed.id, legacy.id)
-  assert.equal(renamed.displayName, 'Local Owner')
   const alpha = await core.createAgent('alpha', 'Alpha', join(root, 'alpha'))
   const beta = await core.createAgent('beta', 'Beta', join(root, 'beta'))
   const alphaProfile = await core.agentProfile(alpha.id)
@@ -170,7 +165,7 @@ try {
     revived.message.seq,
   )
 
-  assert.equal((await core.listActors(owner.id)).length, 4)
+  assert.equal((await core.listActors(owner.id)).length, 3)
   const snapshot = await core.snapshot(owner.id)
   assert.equal(snapshot.actor.id, owner.id)
   assert(snapshot.targets.some(target => target.id === channel.id))

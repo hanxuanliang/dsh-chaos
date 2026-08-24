@@ -212,7 +212,6 @@ impl<'connection> ActorStore<'connection> {
             .await
     }
 
-
     pub(crate) async fn update_avatar_data_url(
         &self,
         id: &ActorId,
