@@ -646,22 +646,19 @@ try {
     return archived && !composer;
   })()`)
   await page.screenshot('channel-archived.png')
-  await page.clickExpression('Archived group', `[...document.querySelectorAll('button')]
-    .find(button => button.offsetParent !== null && button.textContent?.trim().startsWith('Archived'))`)
-  await page.waitForExpression('Archived group expands with rotating chevron and Channel spacing', `(() => {
-    const button = document.querySelector('button[data-channel-group-toggle="archived"]');
+  /* 归档切换: cumora 胶囊筛选排(替代折叠组头)。 */
+  await page.clickExpression('Archived filter pill', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Archived' && button.closest('nav') !== null)`)
+  await page.waitForExpression('Archived filter shows archived rows (pill grammar)', `(() => {
     const list = document.querySelector('[data-channel-group-list="archived"]');
-    const chevron = button?.querySelector('[data-open="true"]');
-    if (!(button instanceof HTMLElement) || !(list instanceof HTMLElement) || !(chevron instanceof HTMLElement)) return false;
-    const style = getComputedStyle(button);
-    return button.getAttribute('aria-expanded') === 'true'
-      && getComputedStyle(chevron).transform !== 'none'
-      && list.getBoundingClientRect().top - button.getBoundingClientRect().bottom >= 5
-      /* 组头语法升级(synapse sidebar-heading): 12px 正常大小写, 无 uppercase+宽字距; 归档组无分割线 */
-      && style.fontSize === '12px'
-      && style.textTransform === 'none'
-      && (style.letterSpacing === 'normal' || parseFloat(style.letterSpacing) < 1)
-      && getComputedStyle(list.closest('section') ?? list).borderTopStyle === 'none';
+    if (!(list instanceof HTMLElement) || list.offsetParent === null) return false;
+    const pill = [...document.querySelectorAll('button')]
+      .find(button => button.textContent?.trim() === 'Archived' && button.closest('nav') !== null);
+    if (!(pill instanceof HTMLElement)) return false;
+    const cs = getComputedStyle(pill);
+    return pill.getAttribute('aria-pressed') === 'true'
+      && cs.borderRadius === '999px'
+      && cs.fontSize === '11px';
   })()`)
   await page.screenshot('channel-archived-actions.png')
   await page.clickExpression('Restore archived channel (inline hover icon)', `[...document.querySelectorAll('button')]
@@ -683,12 +680,15 @@ try {
     const last = rows[rows.length - 1].getBoundingClientRect();
     return last.bottom > 0 && composer.getBoundingClientRect().top - last.bottom <= 90;
   })()`)
-  await page.waitForExpression('message/task tabs use the pill grammar (one tab language)', `(() => {
+  await page.waitForExpression('message/task tabs use the panel-tab grammar (plocal PanelTab)', `(() => {
     const channel = document.querySelector(${JSON.stringify(`section[aria-label="# ${channelName}"]`)});
     const group = channel?.querySelector('[role="tablist"]');
     if (!(group instanceof HTMLElement)) return false;
-    return getComputedStyle(group).borderRadius === '999px'
-      && [...group.querySelectorAll('[role="tab"]')].some(tab => getComputedStyle(tab).minHeight === '28px');
+    const tab = group.querySelector('[role="tab"]');
+    if (!(tab instanceof HTMLElement)) return false;
+    return getComputedStyle(group).borderStyle === 'none'
+      && getComputedStyle(tab).borderRadius !== '999px'
+      && getComputedStyle(tab).fontSize === '12px';
   })()`)
   await page.waitForExpression('mode layer closes with the same hairline as content heads', `(() => {
     const tabs = [...document.querySelectorAll('[role="tablist"]')]

@@ -6,7 +6,6 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  border-left: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-base);
 }
 .threadPanel .threadHead {
@@ -18,9 +17,8 @@
   border-bottom: 0;
   padding: 0 12px;
 }
-/* thread 是并列子面不是叠层表面: 面板自带左 hairline + SplitPane
-   separator 已划界, 头部再压一条线会形成三重线(模式层线+channelHead
-   线+threadHead 线)——同列去线, 靠 separator 与左 hairline 分界。 */
+/* thread 是并列子面不是叠层表面: 分割只由 SplitPane separator 一根承担
+   (不叠左 hairline, 两线并一); 头部不压底线。 */
 .threadPanel .threadTitle {
   flex: none;
   font-size: 13px;

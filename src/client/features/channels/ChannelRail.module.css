@@ -113,12 +113,13 @@
   overflow-y: auto;
 }
 
-/* 富行(cumora ConvoRow 结构 + 我们 token): 44px 两行——13px/500 名字 +
- * 11px 灰描述 truncate; 未读=右缘胶囊计数(双档: loud=主色填充)。 */
+/* plocal ChatSidebar 语法: 单行 32px、rounded-lg、无描述无 ring;
+ * 选中=极淡中性底+字重 600(不用蓝 tint——选中是位置不足状态);
+ * hover=4% 中性。 */
 .rail .railRow {
   display: flex;
   min-width: 0;
-  height: 44px;
+  height: 32px;
   flex: 1;
   align-items: center;
   gap: 7px;
@@ -127,27 +128,20 @@
   padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
+  font-size: 13px;
+  line-height: 17px;
   text-align: left;
   cursor: pointer;
 }
 
-.rail .railCopy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 1px;
-}
-
 .rail .railItem:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
 }
 
-/* 选中态(cumora ring 语法): 8% tint + 1px ring 描边。 */
 .rail .railItem[data-active] {
   color: var(--dsw-alias-label-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
+  font-weight: 600;
 }
 
 .rail .railRow:focus-visible {
@@ -182,17 +176,41 @@
   outline-offset: -2px;
 }
 
-.rail .archiveGroup {
+/* 胶囊筛选排(cumora ConversationsPane): 11px/600 小胶囊、1px 边、
+ * active=主色 tint 底+主色字。 */
+.rail .railFilterRow {
   display: flex;
-  flex-direction: column;
-  margin-top: 12px;
+  flex: none;
+  gap: 4px;
+  padding: 6px 8px 2px;
 }
-/* 归档=收纳而非分区: 无分割线, 组头颜色再退一档"沉底"。 */
-.rail .archiveGroup .railTitle {
-  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 72%, transparent);
+.rail .railFilter {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 999px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
 }
-.rail .archiveGroup .railTitle:hover {
-  color: var(--dsw-alias-label-tertiary);
+.rail .railFilter:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l2);
+}
+.rail .railFilter[data-active] {
+  color: var(--dsw-alias-state-business-primary);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+}
+.rail .railFilter:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
 }
 
 
@@ -204,6 +222,7 @@
 
 .rail .railName {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   font-size: 13px;
   font-weight: 500;
@@ -212,31 +231,14 @@
   white-space: nowrap;
 }
 
-.rail .railDescription {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-
-/* 未读胶囊(raft 双档/cumora 圆角计数): loud=主色填充白字; mono 数字。 */
+/* 未读: 右缘小数字(主色), 点开去色。 */
 .rail .railUnread {
   flex: none;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  color: var(--dsw-alias-label-primary-foreground, white);
-  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-primary);
   font-size: 10px;
-  font-weight: 700;
-  line-height: 18px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: center;
 }
 
 /* 未读语法(全局成文): 行左缘 6px 蓝点 + 名字 600 字重(富行基础 500), 点开去点去粗。 */

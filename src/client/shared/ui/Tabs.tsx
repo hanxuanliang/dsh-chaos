@@ -22,7 +22,7 @@ export function Tabs<T extends string>({ items, value, onValueChange, label, ali
    * 'floating' renders the synapse view-switch grammar — an absolutely
    * centered full-round pill group hovering over the header's contents.
    * Default keeps the existing segmented pill. */
-  variant?: 'underline' | 'floating' | 'pill' | undefined
+  variant?: 'underline' | 'floating' | 'pill' | 'panel' | undefined
   className?: string | undefined
 }): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null)

@@ -15,6 +15,7 @@ import { ChannelTasksBoard } from '../tasks/ChannelTasksBoard.tsx'
 import { ThreadPanel } from '../threads/ThreadPanel.tsx'
 import css from './ChannelView.module.css'
 import { Tabs } from '../../shared/ui/index.ts'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ResponsiveDrilldown, SplitPane } from '../../shared/layout/index.ts'
 
 export interface ChannelViewProps {
@@ -90,7 +91,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         {channel.name}
       </h3>
       <Tabs<'messages' | 'tasks'>
-        variant="pill"
+        variant="panel"
         value={tab}
         onValueChange={setTab}
         label={t('panel.title')}
@@ -100,15 +101,18 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         ]}
       />
       {members !== undefined && (
-        <button
-          type="button"
+        <Button
           className={css.memberChip}
+          variant="ghost"
+          size="sm"
+          icon={<IconUserOutline16 size={14} />}
+          title={t('channel.membersLabel')}
+          aria-label={t('channel.membersLabel')}
           aria-haspopup="dialog"
           onClick={() => { setMembersOpen(true) }}
-         title={t('channel.membersLabel')} aria-label={t('channel.membersLabel')}>
-          <IconUserOutline16 size={14} />
+        >
           <span className={css.memberCount}>{members.length}</span>
-        </button>
+        </Button>
       )}
       {headerActions}
     </header>
