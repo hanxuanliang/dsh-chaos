@@ -26,6 +26,7 @@ export function PillSelect(props: PillSelectProps): JSX.Element {
   return (
     <Menu
       open={open}
+      portal
       onClose={() => { setOpen(false) }}
       items={entries}
       selectedId={selectedId === '' ? undefined : selectedId}

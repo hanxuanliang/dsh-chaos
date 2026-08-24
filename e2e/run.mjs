@@ -742,29 +742,40 @@ try {
     const form = document.querySelector('[data-agent-create-inline]');
     return [...form?.querySelectorAll('button[aria-haspopup="listbox"]') ?? []][0];
   })()`)
-  await page.waitForExpression('Provider menu open', `(() => {
-    const items = [...document.querySelectorAll('[role="menuitem"]')]
-      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
-    return items.length > 0;
+  await page.waitForExpression('Provider menu open (portal, unclipped)', `(() => {
+    const menu = [...document.querySelectorAll('[role="menu"]')]
+      .find(candidate => candidate instanceof HTMLElement && getComputedStyle(candidate).position === 'fixed');
+    if (menu === undefined) return false;
+    const rect = menu.getBoundingClientRect();
+    const form = document.querySelector('[data-agent-create-inline]');
+    const block = form === null ? null : form.closest('[data-agent-create-inline], section');
+    const blockRect = block?.getBoundingClientRect();
+    return menu.textContent?.includes('DeepSeek') === true
+      && rect.height > 0
+      && (blockRect === undefined || (rect.right <= blockRect.right && rect.bottom <= window.innerHeight));
   })()`)
   await page.clickExpression('First provider option', `(() => {
-    const items = [...document.querySelectorAll('[role="menuitem"]')]
-      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
-    return items[0];
+    const menu = [...document.querySelectorAll('[role="menu"]')]
+      .find(candidate => candidate instanceof HTMLElement && getComputedStyle(candidate).position === 'fixed');
+    return [...menu?.querySelectorAll('[role="menuitem"]') ?? []][0];
   })()`)
   await page.clickExpression('Model pill', `(() => {
     const form = document.querySelector('[data-agent-create-inline]');
     return [...form?.querySelectorAll('button[aria-haspopup="listbox"]') ?? []][1];
   })()`)
-  await page.waitForExpression('Model menu open', `(() => {
-    const items = [...document.querySelectorAll('[role="menuitem"]')]
-      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
-    return items.length > 0;
+  await page.waitForExpression('Model menu open (portal, unclipped)', `(() => {
+    const menu = [...document.querySelectorAll('[role="menu"]')]
+      .find(candidate => candidate instanceof HTMLElement && getComputedStyle(candidate).position === 'fixed');
+    if (menu === undefined) return false;
+    const rect = menu.getBoundingClientRect();
+    return (menu.querySelectorAll('[role="menuitem"]').length ?? 0) > 0
+      && rect.height > 0
+      && rect.bottom <= window.innerHeight;
   })()`)
   await page.clickExpression('First model option', `(() => {
-    const items = [...document.querySelectorAll('[role="menuitem"]')]
-      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
-    return items[0];
+    const menu = [...document.querySelectorAll('[role="menu"]')]
+      .find(candidate => candidate instanceof HTMLElement && getComputedStyle(candidate).position === 'fixed');
+    return [...menu?.querySelectorAll('[role="menuitem"]') ?? []][0];
   })()`)
   await page.clickExpression('Create Agent submit', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Create Agent' && !button.disabled)`)
