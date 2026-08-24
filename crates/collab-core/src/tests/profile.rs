@@ -287,3 +287,35 @@ async fn delete_agent_rejects_users_and_missing_actors() -> Result<()> {
     ));
     Ok(())
 }
+
+#[tokio::test]
+async fn ensure_user_adopts_legacy_local_user_handle() -> Result<()> {
+    let core = CollabCore::open_memory().await?;
+    let owner = core.create_user("owner", "Owner").await?;
+    // Seed a legacy 'local-user' row the way old builds did.
+    let legacy = core.create_user("local-user", "Local User").await?;
+    // First ensure on the OS-username slug adopts (rehandles) the row.
+    let adopted = core.ensure_user("vduanyan", "vduanyan").await?;
+    assert_eq!(adopted.id, legacy.id, "adoption keeps the actor id");
+    assert_eq!(adopted.handle, "vduanyan");
+    assert_eq!(adopted.display_name, "vduanyan");
+    // Exactly two users: owner + adopted local user. No split identity.
+    let connection = core.connection.lock().await;
+    let mut rows = connection
+        .query("SELECT COUNT(*) FROM actors WHERE kind = 'user'", ())
+        .await?;
+    let row = rows.next().await?.unwrap();
+    assert_eq!(row.get::<i64>(0)?, 2);
+    // The legacy handle no longer resolves to a separate row.
+    let mut rows = connection
+        .query("SELECT COUNT(*) FROM actors WHERE handle = 'local-user'", ())
+        .await?;
+    let row = rows.next().await?.unwrap();
+    assert_eq!(row.get::<i64>(0)?, 0);
+    drop(connection);
+    // Repeat ensure is idempotent on the adopted handle.
+    let again = core.ensure_user("vduanyan", "vduanyan").await?;
+    assert_eq!(again.id, legacy.id);
+    assert_eq!(again.handle, "vduanyan");
+    Ok(())
+}
