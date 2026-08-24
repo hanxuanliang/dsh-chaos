@@ -2,11 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'rea
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import {
   Button,
-  IconEllipsisOutline16,
   IconChevronRightOutline14,
   IconFolderOpenOutline16,
-  IconTrashOutline16,
-  Menu,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { AgentMembership, AgentPresetSummary, AgentProfile } from '../../../agent-settings-types.ts'
 import { ChaosClient, type LlmModelGroup } from '../../data/api.ts'
@@ -34,7 +31,6 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
 }): JSX.Element {
   const client = useMemo(() => new ChaosClient(connection), [connection])
   const [tab, setTab] = useState<Tab>('identity')
-  const [menuOpen, setMenuOpen] = useState(false)
   const [name, setName] = useState(profile.actor.displayName)
   const [description, setDescription] = useState(profile.charter.summary)
   const [identitySaving, setIdentitySaving] = useState(false)
@@ -147,10 +143,6 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
         {...(onBack === undefined ? {} : { backLabel: t('agents.back'), onBack })}
         actions={<>
           <IconButton label={t('agents.openWorkspace')} icon={<IconFolderOpenOutline16 size={16} />} onClick={onWorkspace} />
-          <Menu open={menuOpen} portal compact dense align="end" onClose={() => { setMenuOpen(false) }}
-            onSelect={id => { setMenuOpen(false); if (id === 'delete') onDelete() }}
-            items={[{ id: 'delete', label: t('agents.delete'), icon: <IconTrashOutline16 size={16} />, danger: true }]}
-            anchor={<IconButton label={t('agents.more')} icon={<IconEllipsisOutline16 size={16} />} selected={menuOpen} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => { setMenuOpen(value => !value) }} />} />
         </>}
       />
       {avatarError !== null && <div className={css.headerError}><ErrorBanner>{avatarError}</ErrorBanner></div>}
@@ -174,8 +166,11 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
           <Field label={t('agents.name')} required><input value={name} maxLength={64} disabled={identitySaving} onChange={event => { setName(event.target.value); setIdentityError(null) }} /></Field>
           <Field label={t('agents.charter')} required help={t('create.charterHint')} meta={`${String(description.length)}/800`}><textarea value={description} maxLength={800} disabled={identitySaving} onChange={event => { setDescription(event.target.value); setIdentityError(null) }} /></Field>
           <footer className={css.footer}>
-            <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>
-            <Button variant="primary" size="sm" disabled={!identityDirty || identitySaving || name.trim() === '' || description.trim() === ''} onClick={saveIdentity}>{identitySaving ? t('agents.saving') : t('agents.saveIdentity')}</Button>
+            <Button variant="outline" size="sm" disabled={identitySaving} onClick={onDelete}>{t('agents.delete')}</Button>
+            <span className={css.footerActions}>
+              <Button variant="outline" size="sm" disabled={!identityDirty || identitySaving} onClick={() => { setName(profile.actor.displayName); setDescription(profile.charter.summary); setIdentityError(null) }}>{t('agents.discard')}</Button>
+              <Button variant="primary" size="sm" disabled={!identityDirty || identitySaving || name.trim() === '' || description.trim() === ''} onClick={saveIdentity}>{identitySaving ? t('agents.saving') : t('agents.saveIdentity')}</Button>
+            </span>
           </footer>
         </section>}
 
@@ -216,8 +211,11 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
           </div>}
           <p className={css.runtimeWarning}>{t('agents.runtimeWarning')}</p>
           <footer className={css.footer}>
-            <Button variant="outline" size="sm" disabled={!runtimeDirty || runtimeSaving} onClick={() => { setProvider(profile.binding?.provider ?? ''); setModel(profile.binding?.model ?? ''); setPresetId(profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? ''); setRuntimeError(null) }}>{t('agents.discard')}</Button>
-            <Button variant="primary" size="sm" disabled={!runtimeDirty || runtimeSaving || provider === '' || model === '' || presetId === ''} onClick={saveRuntime}>{runtimeSaving ? t('agents.applying') : profile.binding === undefined ? t('agents.configureRuntime') : t('agents.applyRuntime')}</Button>
+            <Button variant="outline" size="sm" disabled={runtimeSaving} onClick={onDelete}>{t('agents.delete')}</Button>
+            <span className={css.footerActions}>
+              <Button variant="outline" size="sm" disabled={!runtimeDirty || runtimeSaving} onClick={() => { setProvider(profile.binding?.provider ?? ''); setModel(profile.binding?.model ?? ''); setPresetId(profile.binding?.preset ?? presets.find(item => item.isDefault)?.id ?? ''); setRuntimeError(null) }}>{t('agents.discard')}</Button>
+              <Button variant="primary" size="sm" disabled={!runtimeDirty || runtimeSaving || provider === '' || model === '' || presetId === ''} onClick={saveRuntime}>{runtimeSaving ? t('agents.applying') : profile.binding === undefined ? t('agents.configureRuntime') : t('agents.applyRuntime')}</Button>
+            </span>
           </footer>
         </section>}
 
