@@ -6,7 +6,6 @@ import type { AgentPresetSummary, CreatedAgent } from '../../agent-settings-type
 import type { CollabStore } from '../data/store.ts'
 import { ChaosClient } from '../data/api.ts'
 import { ChannelRail } from '../features/channels/ChannelRail.tsx'
-import { IconPanelBell, IconPanelChat } from '../features/messages/MessageIcons.tsx'
 import { ActivityView } from '../features/activity/ActivityView.tsx'
 import { ChannelView } from '../features/channels/ChannelView.tsx'
 import { ChannelCreateDialog, emptyChannelCreateDraft, type ChannelCreateDraft } from '../features/channels/ChannelCreateDialog.tsx'
@@ -187,14 +186,13 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
     <>
       <header className={css.header}>
         <Tabs<'collab' | 'activity'>
-          variant="underline"
           align="lead"
           value={panelView}
           onValueChange={setPanelView}
           label={t('panel.title')}
           items={[
-            { id: 'collab', label: <span className={css.tabLabel}><IconPanelChat size={16} />{t('panel.title')}</span> },
-            { id: 'activity', label: <span className={css.tabLabel}><IconPanelBell size={16} />{t('activity.title')}{state.activityCount > 0 && <span className={css.tabCount}>{String(state.activityCount)}</span>}</span> },
+            { id: 'collab', label: t('panel.title') },
+            { id: 'activity', label: <span className={css.tabLabel}>{t('activity.title')}{state.activityCount > 0 && <span className={css.tabCount}>{String(state.activityCount)}</span>}</span> },
           ]}
         />
         <IconButton

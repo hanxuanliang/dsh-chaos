@@ -117,17 +117,15 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   display: flex;
   flex: none;
   height: 48px;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
-  padding: 0 16px 0 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
-/* Underline-tab header (A): the active tab's 2px underline rides this
- * edge; a second hairline would double up, so the header itself goes
- * borderless and the underline becomes the divider. */
-.header:has(> [data-variant='underline']) { border-bottom: 0; }
-.header > [data-variant='underline'] { align-self: stretch; }
-.header > [data-variant='underline'] [role='tab'] { display: inline-flex; align-items: center; }
+/* Pill tabs live at the header's left edge; the header keeps its own
+ * hairline divider. */
+.header > [role='tablist'] { margin-left: 0; }
 
 .title {
   margin: 0;
@@ -194,8 +192,7 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 
 /* Activity tab label: title + unread count as a quiet tabular badge. */
-.tabLabel { display: inline-flex; align-items: center; gap: 7px; }
-.tabLabel > svg { flex: none; opacity: .85; }
+.tabLabel { display: inline-flex; align-items: baseline; gap: 6px; }
 .tabCount {
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
