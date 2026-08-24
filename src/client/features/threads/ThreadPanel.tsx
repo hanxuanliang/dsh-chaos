@@ -20,7 +20,7 @@
  *   channel messages, and thread replies are not top-level.
  */
 import type { JSX } from 'react'
-import { IconChevronLeftOutline14, IconPanelLeftOutline16, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronLeftOutline14, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../../../native.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
@@ -68,12 +68,12 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
     : state.threadSummariesByRoot[thread.rootMessageId]?.replyCount
   return (
     <aside className={css.threadPanel} aria-label={t('thread.title')}>
-      {/* 关闭层级化(成文): × 独占模式层; 层级内返回/收拢=左缘方向箭头,
-          与右上 × 分离不再垂直同列。右缘留给 view in channel ↗。 */}
+      {/* Thread marker (cumora ThreadDrawer eyebrow+count grammar): the
+          panel declares what it IS, no desktop close affordance — closing is
+          re-clicking the message's reply marker (toggle) or the root jump.
+          Mobile keeps its full-screen back arrow; the dock gets ↗. */}
       <header className={css.threadHead}>
-        <IconButton className={css.threadClose} label={t('thread.close')}
-          icon={back ? <IconChevronLeftOutline14 size={14} /> : <IconPanelLeftOutline16 size={16} />}
-          onClick={onClose} />
+        {back && <IconButton className={css.threadClose} label={t('thread.close')} icon={<IconChevronLeftOutline14 size={14} />} onClick={onClose} />}
         <span className={css.threadTitle}>{t('thread.title')}</span>
         {replyCount !== undefined && replyCount > 0 && (
           <span className={css.threadCount}>{t('thread.replies', { count: replyCount })}</span>

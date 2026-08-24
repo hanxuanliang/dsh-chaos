@@ -146,16 +146,31 @@
   outline-offset: -2px;
 }
 
-.rail .railMore {
-  width: 28px;
-  height: 28px;
-  margin-right: 4px;
+/* 行内悬停动作(替代三点菜单): 24px 图标钮, 默认透明, 行 hover/焦点时浮现。
+ * 活动行=编辑+删除; 归档行=恢复+删除。删除仍走 RiskConfirmation。 */
+.rail .railActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0;
   opacity: 0;
 }
-
-.rail .railItem:hover .railMore,
-.rail .railItem:focus-within .railMore {
+.rail .railItem:hover .railActions,
+.rail .railItem:focus-within .railActions {
   opacity: 1;
+}
+.rail .railAction {
+  width: 24px;
+  height: 24px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.rail .railAction:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.rail .railAction:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
 }
 
 .rail .archiveGroup {

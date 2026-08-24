@@ -88,6 +88,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
         {channel.name}
       </h3>
       <Tabs<'messages' | 'tasks'>
+        variant="pill"
         value={tab}
         onValueChange={setTab}
         label={t('panel.title')}
@@ -127,7 +128,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             onJumpHandled={() => { setJumpMessageId(undefined) }}
             activeLocale={activeLocale}
             onOpenTasks={(messageId) => { setFocusedTaskMessageId(messageId); setTab('tasks') }}
-            onOpenThread={(messageId) => { setThreadRootId(messageId) }}
+            onOpenThread={(messageId) => { setThreadRootId(cur => cur === messageId ? undefined : messageId) }}
             onCloseThread={() => { setThreadRootId(undefined) }}
             onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
             composerDisabled={composerDisabled}

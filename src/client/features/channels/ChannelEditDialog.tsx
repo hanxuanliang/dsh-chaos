@@ -1,5 +1,5 @@
 import { useState, type JSX } from 'react'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconArchiveOutline20, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTarget } from '../../../native.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
 import type { ChaosTranslate } from '../../locales.ts'
@@ -10,11 +10,13 @@ function errorText(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
 }
 
-export function ChannelEditDialog({ t, store, state, channel, onClose }: {
+export function ChannelEditDialog({ t, store, state, channel, onArchive, onClose }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
   channel: NativeTarget
+  /** 归档动作从行内菜单移入 dialog 危险区(rail 只留悬停图标)。 */
+  onArchive(): void
   onClose(): void
 }): JSX.Element {
   const [name, setName] = useState(channel.name)
@@ -92,6 +94,12 @@ export function ChannelEditDialog({ t, store, state, channel, onClose }: {
         </Field>
       </div>
       {failure !== null && <p className={css.error} role="alert">{t('channelEdit.failed', { error: failure })}</p>}
+      <div className={css.dangerZone}>
+        <button type="button" className={css.archiveLink} disabled={submitting} onClick={onArchive}>
+          <IconArchiveOutline20 size={16} />
+          {t('channel.archive')}
+        </button>
+      </div>
     </Modal>
   )
 }

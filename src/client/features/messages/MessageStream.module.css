@@ -14,9 +14,15 @@
 }
 
 
+/* flex column: content stretches to the scroll viewport so `listPush`
+ * (flex: 1 above the day groups) absorbs the free space — messages anchor
+ * to the BOTTOM, Slack-style bottom-fill. A block scroller collapses
+ * chatCol to content height and the push dies (real bug found in audit). */
 .stream {
+  display: flex;
   min-height: 0;
   flex: 1;
+  flex-direction: column;
   overflow-y: auto;
 }
 

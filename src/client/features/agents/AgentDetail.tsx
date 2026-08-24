@@ -147,7 +147,7 @@ export function AgentDetail({ connection, profile, presets, onBack, onUpdated, o
       />
       {avatarError !== null && <div className={css.headerError}><ErrorBanner>{avatarError}</ErrorBanner></div>}
       <Toolbar start={(
-        <Tabs<Tab> label={t('agents.detailTabs')} value={tab} onValueChange={setTab} align="lead" items={([
+        <Tabs<Tab> label={t('agents.detailTabs')} variant="pill" value={tab} onValueChange={setTab} align="lead" items={([
           ['identity', t('agents.identity')],
           ['runtime', t('agents.runtime')],
           ['collaboration', t('agents.collaboration')],
