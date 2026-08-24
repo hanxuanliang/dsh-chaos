@@ -6,6 +6,7 @@
 .footer { display: flex; min-height: 42px; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--dsw-alias-border-l1); padding-top: 10px; }
 .footer > button { white-space: nowrap; }
 .runtimeGrid { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
+.runtimeGrid .pillRow { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--chaos-radius-surface); background: var(--dsw-alias-bg-layer-2); }
 .runtimeWarning, .state { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 17px; }
 .inlineAction { border: 0; padding: 0; color: var(--dsw-alias-state-business-primary); background: transparent; cursor: pointer; }
 .memberships { display: flex; flex-direction: column; gap: 6px; }
