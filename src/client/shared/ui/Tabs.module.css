@@ -23,9 +23,9 @@
   border-radius: 0;
   padding: 3px 2px 7px;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 21px;
 }
 .tabs[data-variant='underline'] .tab:hover:not(:disabled):not([data-active]) {
   color: var(--dsw-alias-label-secondary);

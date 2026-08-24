@@ -194,7 +194,8 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 }
 
 /* Activity tab label: title + unread count as a quiet tabular badge. */
-.tabLabel { display: inline-flex; align-items: baseline; gap: 6px; }
+.tabLabel { display: inline-flex; align-items: center; gap: 7px; }
+.tabLabel > svg { flex: none; opacity: .85; }
 .tabCount {
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
