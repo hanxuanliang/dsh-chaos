@@ -497,37 +497,24 @@ try {
   await page.fill('textarea[placeholder="Describe this channel’s purpose, scope, and collaboration rules."]', 'E2E channel lifecycle validation')
   await page.clickExpression('New Agent from empty member state', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'New Agent')`)
-  await page.waitForExpression('single Agent creation dialog', `(() => {
+  await page.waitForExpression('single-screen Agent creation dialog', `(() => {
     const input = document.querySelector('#chaos-agent-create-name');
     const dialogs = [...document.querySelectorAll('[role="dialog"]')]
       .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
-    const tabs = [...document.querySelectorAll('[role="tab"]')]
-      .filter(tab => tab instanceof HTMLElement && tab.offsetParent !== null);
+    const dialog = dialogs[0];
+    const tabs = [...(dialog?.querySelectorAll('[role="tab"]') ?? [])];
+    const pills = [...(dialog?.querySelectorAll('button[aria-haspopup="listbox"]') ?? [])]
+      .filter(button => button instanceof HTMLElement && button.offsetParent !== null);
+    const actions = [...(dialog?.querySelectorAll('footer button') ?? [])]
+      .filter(button => button instanceof HTMLElement && button.offsetParent !== null);
     return input?.offsetParent !== null
       && dialogs.length === 1
-      && tabs.some(tab => tab.textContent?.trim() === 'Identity')
-      && tabs.some(tab => tab.textContent?.trim() === 'Runtime')
+      && tabs.length === 0
+      && pills.length === 3
+      && actions.length === 2
       && document.body.innerText.includes('Handle') === false;
   })()`)
-  await page.screenshot('agent-create-compact.png')
-  await page.clickExpression('Agent Runtime tab', `[...document.querySelectorAll('[role="tab"]')]
-    .find(tab => tab.offsetParent !== null && tab.textContent?.trim() === 'Runtime')`)
-  await page.waitForExpression('Agent runtime fields use Circle geometry and muted placeholders', `(() => {
-    const selects = [...document.querySelectorAll('#chaos-create-panel-runtime select')];
-    if (selects.length !== 3 || selects.some(select => !(select instanceof HTMLSelectElement))) return false;
-    const rects = selects.map(select => select.getBoundingClientRect());
-    const placeholder = getComputedStyle(selects[0]);
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--dsw-alias-label-tertiary)';
-    document.body.append(probe);
-    const muted = getComputedStyle(probe).color;
-    probe.remove();
-    return rects.every(rect => Math.abs(rect.left - rects[0].left) < 1 && Math.abs(rect.width - rects[0].width) < 1)
-      && placeholder.textAlign === 'left'
-      && placeholder.color === muted
-      && selects.slice(0, 2).every(select => select.dataset.placeholder === 'true');
-  })()`)
-  await page.screenshot('agent-create-runtime.png')
+  await page.screenshot('agent-create-single-screen.png')
   await page.clickExpression('Cancel Agent creation', `[...document.querySelectorAll('button')]
     .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Cancel')`)
   await page.waitForExpression('Channel draft restored after Agent creation cancel', `(() => {
@@ -708,7 +695,7 @@ try {
       && ![...page.querySelectorAll('button')].some(button => button.textContent?.trim() === 'New Agent');
   })()`)
   await page.clickExpression('inline New Agent', `document.querySelector('section[aria-label="Collab Agents"] button[aria-label="New Agent"]')`)
-  await page.waitForExpression('Settings uses inline tabbed Agent creation', `(() => {
+  await page.waitForExpression('Settings uses inline single-screen Agent creation', `(() => {
     const page = document.querySelector('section[aria-label="Collab Agents"]');
     const block = page?.querySelector('[data-agent-create-inline]');
     const form = block?.querySelector('[data-variant="inline"]');
@@ -716,49 +703,27 @@ try {
       .filter(dialog => dialog instanceof HTMLElement && dialog.offsetParent !== null);
     const tabs = [...form?.querySelectorAll('[role="tab"]') ?? []];
     const header = form?.querySelector('header');
-    const toolbar = form?.querySelector('[role="toolbar"]');
-    const panel = form?.querySelector('[role="tabpanel"]');
-    const tablist = form?.querySelector('[role="tablist"]');
     const firstInput = form?.querySelector('#chaos-agent-create-name');
+    const pills = [...form?.querySelectorAll('button[aria-haspopup="listbox"]') ?? []];
+    const textarea = form?.querySelector('#chaos-agent-create-charter');
+    const actions = [...form?.querySelectorAll('footer button') ?? []];
     if (!(block instanceof HTMLElement) || !(form instanceof HTMLElement)
-      || !(header instanceof HTMLElement) || !(toolbar instanceof HTMLElement)
-      || !(panel instanceof HTMLElement) || !(tablist instanceof HTMLElement)
+      || !(header instanceof HTMLElement)
       || !(firstInput instanceof HTMLInputElement)) return false;
     const blockRect = block.getBoundingClientRect();
     const headerRect = header.getBoundingClientRect();
-    const toolbarRect = toolbar.getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
     return form.offsetParent !== null
       && dialogs.length === 1
-      && tabs.length === 2
-      && tabs.some(tab => tab.textContent?.trim() === 'Identity')
-      && tabs.some(tab => tab.textContent?.trim() === 'Runtime')
-      && form.textContent?.includes('Handle') === false
+      && tabs.length === 0
+      && pills.length === 3
       && header.querySelector('h2')?.textContent?.trim() === 'New Agent'
       && Math.abs(headerRect.left - blockRect.left) <= 2
       && Math.abs(headerRect.right - blockRect.right) <= 2
-      && Math.abs(toolbarRect.top - headerRect.bottom) <= 2
-      && firstInput.getBoundingClientRect().top - toolbarRect.bottom >= 24
-      && panelRect.left - blockRect.left >= 12
-      && tablist.getBoundingClientRect().width < blockRect.width * 0.75;
+      && textarea instanceof HTMLTextAreaElement
+      && actions.length === 2
+      && form.textContent?.includes('Handle') === false;
   })()`)
   await page.screenshot('agent-settings-inline.png')
-  await page.clickExpression('inline Agent Runtime tab', `(() => {
-    const form = document.querySelector('[data-agent-create-inline]');
-    return [...form?.querySelectorAll('[role="tab"]') ?? []]
-      .find(tab => tab.textContent?.trim() === 'Runtime');
-  })()`)
-  await page.waitForExpression('inline Runtime fields stay in one left-aligned column', `(() => {
-    const block = document.querySelector('[data-agent-create-inline]');
-    const selects = [...block?.querySelectorAll('#chaos-create-panel-runtime select') ?? []];
-    if (!(block instanceof HTMLElement) || selects.length !== 3) return false;
-    const blockRect = block.getBoundingClientRect();
-    const rects = selects.map(select => select.getBoundingClientRect());
-    return rects.every(rect => Math.abs(rect.left - rects[0].left) < 1
-        && Math.abs(rect.width - rects[0].width) < 1
-        && rect.left >= blockRect.left && rect.right <= blockRect.right)
-      && getComputedStyle(selects[0]).textAlign === 'left';
-  })()`)
   await page.setViewport(650, 800)
   await page.waitForExpression('inline Agent creation fits narrow Settings viewport', `(() => {
     const block = document.querySelector('[data-agent-create-inline]');
@@ -785,7 +750,7 @@ try {
       'Message send completed through the real UI and RPC path',
       'Channel and Message persisted across a full page reload',
       'Channel remained usable at a 650x800 viewport',
-      'Settings kept Agent creation inline with compact controls and tabbed Identity/Runtime fields',
+      'Settings kept Agent creation inline on one screen with pill selectors',
       'Settings Agent creation remained usable at a 650x800 viewport',
       'no console, page, or request failures were observed',
     ],
