@@ -20,7 +20,7 @@
  *   channel messages, and thread replies are not top-level.
  */
 import type { JSX } from 'react'
-import { IconChevronLeftOutline14, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronLeftOutline14, IconRightUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActor, NativeMessage, NativeTarget } from '../../../native.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import type { CollabStore, CollabStoreSnapshot } from '../../data/store.ts'
@@ -80,7 +80,7 @@ export function ThreadPanel({ t, store, state, thread, parentChannelId, activeLo
         )}
         {onOpenInChannel !== undefined && (
           <IconButton className={css.threadOpen} label={t('thread.viewInChannel')} tooltip
-            icon={<IconRightUpOutline16 size={16} />} onClick={onOpenInChannel} />
+            icon={<IconRightUpOutline14 size={14} />} onClick={onOpenInChannel} />
         )}
       </header>
       {thread.rootMessageId !== undefined && (

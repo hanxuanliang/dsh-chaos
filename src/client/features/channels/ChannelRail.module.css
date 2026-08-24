@@ -138,9 +138,10 @@
   background: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
 }
 
+/* 选中态无底(owner 定论): 只用字重 600 + 主文字色, 不压任何背景
+   (plocal 是 black/7 底, owner 明确不要——点选后的灰块即来自它)。 */
 .rail .railItem[data-active] {
   color: var(--dsw-alias-label-primary);
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
   font-weight: 600;
 }
 
@@ -207,6 +208,10 @@
   color: var(--dsw-alias-state-business-primary);
   border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 35%, transparent);
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+}
+.rail .railFilter:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 .rail .railFilter:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);

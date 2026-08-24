@@ -87,9 +87,9 @@ export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onRestore, o
   const activeListId = useId()
   const activeChannels = state.channels.filter(channel => channel.lifecycle === 'active')
   const archivedChannels = state.channels.filter(channel => channel.lifecycle === 'archived')
+  /* 恢复频道后归档变空: 筛选自动回 all, 避免停在空归档列表(实测 bug)。 */
+  const showingArchived = railFilter === 'archived' && archivedChannels.length > 0
   const rows = { state, onSelect, onEdit, onRestore, onDelete, t }
-  /* cumora 胶囊筛选排: All/Archived 替代归档折叠组头。 */
-  const showingArchived = railFilter === 'archived'
 
   return (
     <nav className={css.rail} aria-label={t('panel.channels')}>
@@ -104,24 +104,24 @@ export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onRestore, o
           <IconPlusOutline16 size={14} />
         </button>
       </div>
-      {archivedChannels.length > 0 && (
-        <div className={css.railFilterRow} role="group" aria-label={t('panel.railFilterAria')}>
-          <button type="button" className={css.railFilter} data-active={!showingArchived || undefined}
-            aria-pressed={!showingArchived} onClick={() => { setRailFilter('all') }}>{t('activity.filterAll')}</button>
-          <button type="button" className={css.railFilter} data-active={showingArchived || undefined}
-            aria-pressed={showingArchived} onClick={() => { setRailFilter('archived') }}>{t('channel.archivedGroup')}</button>
-        </div>
-      )}
+      <div className={css.railFilterRow} role="group" aria-label={t('panel.railFilterAria')}>
+        <button type="button" className={css.railFilter} data-active={!showingArchived || undefined}
+          aria-pressed={!showingArchived} onClick={() => { setRailFilter('all') }}>{t('activity.filterAll')}</button>
+        <button type="button" className={css.railFilter} data-active={showingArchived || undefined}
+          aria-pressed={showingArchived} disabled={archivedChannels.length === 0}
+          onClick={() => { setRailFilter('archived') }}>{t('channel.archivedGroup')}</button>
+      </div>
       <div className={css.railScroll}>
-        {activeOpen && !showingArchived && (
+        {showingArchived ? (
+          archivedChannels.length > 0 && (
+            <div data-channel-group-list="archived" role="list">
+              <ChannelRows channels={archivedChannels} {...rows} />
+            </div>
+          )
+        ) : activeOpen && (
           <div id={activeListId} data-channel-group-list="active" role="list">
             {activeChannels.length === 0 && <p className={css.railEmpty}>{t('panel.railEmpty')}</p>}
             <ChannelRows channels={activeChannels} {...rows} />
-          </div>
-        )}
-        {showingArchived && archivedChannels.length > 0 && (
-          <div data-channel-group-list="archived" role="list">
-            <ChannelRows channels={archivedChannels} {...rows} />
           </div>
         )}
       </div>
