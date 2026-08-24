@@ -163,9 +163,11 @@
 .rail .railItem:focus-within .railActions {
   opacity: 1;
 }
+/* 行内悬停动作: 20px 钮 + 14px 图标(plocal size-6 钮配 14px 图标比例),
+ * 默认透明, 行 hover/焦点时浮现。 */
 .rail .railAction {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: var(--dsw-alias-label-tertiary);
 }
 .rail .railAction:hover {

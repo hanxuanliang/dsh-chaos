@@ -3,7 +3,7 @@ import {
   IconChevronRightOutline14,
   IconEditOutline16,
   IconPlusOutline16,
-  IconRefreshOutline16,
+  IconRefreshOutline14,
   IconTrashOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeTarget } from '../../../native.ts'
@@ -58,14 +58,14 @@ function ChannelRows({ channels, state, onSelect, onEdit, onRestore, onDelete, t
           <span className={css.railActions}>
             {channel.lifecycle === 'archived'
               ? (
-                <IconButton className={css.railAction} label={t('channel.restore')} icon={<IconRefreshOutline16 size={16} />}
+                <IconButton className={css.railAction} label={t('channel.restore')} icon={<IconRefreshOutline14 size={14} />}
                   onClick={() => { onRestore(channel) }} />
               )
               : (
-                <IconButton className={css.railAction} label={t('channel.edit')} icon={<IconEditOutline16 size={16} />}
+                <IconButton className={css.railAction} label={t('channel.edit')} icon={<IconEditOutline16 size={14} />}
                   onClick={() => { onEdit(channel) }} />
               )}
-            <IconButton className={css.railAction} label={t('channel.delete')} icon={<IconTrashOutline16 size={16} />} onClick={() => { onDelete(channel) }} />
+            <IconButton className={css.railAction} label={t('channel.delete')} icon={<IconTrashOutline16 size={14} />} onClick={() => { onDelete(channel) }} />
           </span>
         )}
       </div>
