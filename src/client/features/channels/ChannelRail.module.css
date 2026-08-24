@@ -54,11 +54,10 @@
   letter-spacing: 0;
   cursor: pointer;
 }
-/* 组头语法升级(synapse sidebar-heading 同构): 正常大小写+12px/500,
- * hover 给一层浅底暗示整条可点(收拢 chevron 只有 12px, 需要可点暗示)。 */
+/* 组头语法(plocal section toggle 同款): 正常大小写+12px/500,
+ * hover 只提字色不压底(与行选中语法一致——整个 rail 无任何底色块)。 */
 .rail .railTitle:hover {
   color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-interactive-bg-hover);
 }
 .railChevron {
   display: inline-flex;
@@ -100,7 +99,6 @@
 }
 .rail .railAdd:hover {
   color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 
