@@ -113,32 +113,41 @@
   overflow-y: auto;
 }
 
+/* 富行(cumora ConvoRow 结构 + 我们 token): 44px 两行——13px/500 名字 +
+ * 11px 灰描述 truncate; 未读=右缘胶囊计数(双档: loud=主色填充)。 */
 .rail .railRow {
   display: flex;
   min-width: 0;
-  height: 36px;
+  height: 44px;
   flex: 1;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0 8px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  /* font shorthand token 化 (oil-creator 方式) */
-  font: var(--dsw-font-s-14);
   text-align: left;
   cursor: pointer;
+}
+
+.rail .railCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .rail .railItem:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* 选中态(cumora ring 语法): 8% tint + 1px ring 描边。 */
 .rail .railItem[data-active] {
   color: var(--dsw-alias-label-primary);
   background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
-  font-weight: 500;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 32%, transparent);
 }
 
 .rail .railRow:focus-visible {
@@ -194,23 +203,43 @@
 
 
 .rail .railName {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail .railDescription {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 
+/* 未读胶囊(raft 双档/cumora 圆角计数): loud=主色填充白字; mono 数字。 */
 .rail .railUnread {
   flex: none;
-  color: var(--dsw-alias-state-business-primary);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--dsw-alias-label-primary-foreground, white);
+  background: var(--dsw-alias-state-business-primary);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 18px;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
-/* 未读语法(全局成文): 行左缘 6px 蓝点 + 名字 500 字重, 点开去点去粗。 */
+/* 未读语法(全局成文): 行左缘 6px 蓝点 + 名字 600 字重(富行基础 500), 点开去点去粗。 */
 .rail .railUnreadDot {
   flex: none;
   width: 6px;
@@ -219,7 +248,7 @@
   background: var(--dsw-alias-state-business-primary);
 }
 .rail .railItem[data-unread] .railName {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--dsw-alias-label-primary);
 }
 

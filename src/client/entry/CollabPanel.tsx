@@ -174,6 +174,11 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
         headerActions={active.lifecycle === 'archived'
           ? <StatusChip tone="neutral" label={t('channel.archived')} />
           : undefined}
+        onThreadOpenInChannel={() => {
+          /* 宿主确认链: channel 区 thread 的 ↗ 落地 = 收起面板 + 锚定
+              主流 root 行 (ChannelView 内部已处理 jump)。 */
+          setPendingThreadRoot(undefined)
+        }}
       />
     )}
   </main>

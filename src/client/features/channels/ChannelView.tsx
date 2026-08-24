@@ -36,9 +36,11 @@ export interface ChannelViewProps {
   headerLeading?: ReactNode
   /** Start the shared Agent creation flow from the member picker. */
   onCreateAgent(channelId: string): void
+  /** 深度提升: channel 区 thread 面板头的 ↗ (宿主注入, 无则不渲)。 */
+  onThreadOpenInChannel?(): void
 }
 
-export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading, onCreateAgent }: ChannelViewProps): JSX.Element {
+export function ChannelView({ t, store, state, channel, activeLocale, pendingThreadRoot, onPendingThreadConsumed, headerActions, headerLeading, onCreateAgent, onThreadOpenInChannel }: ChannelViewProps): JSX.Element {
   const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
   const [membersOpen, setMembersOpen] = useState(false)
   /** One-shot jump request: task anchor click → land on the stream row. */
@@ -131,6 +133,15 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
             onOpenThread={(messageId) => { setThreadRootId(cur => cur === messageId ? undefined : messageId) }}
             onCloseThread={() => { setThreadRootId(undefined) }}
             onRootJump={(messageId) => { setThreadRootId(undefined); setJumpMessageId(messageId) }}
+            onThreadOpenInChannel={onThreadOpenInChannel === undefined
+          ? undefined
+          : () => {
+              /* 已在频道工作面: ↗ = 收起面板 + 锚定主流 root 行 (jump-flash)。 */
+              const root = threadRootId
+              setThreadRootId(undefined)
+              if (root !== undefined) setJumpMessageId(root)
+              onThreadOpenInChannel?.()
+            }}
             composerDisabled={composerDisabled}
           />
         )
@@ -168,7 +179,7 @@ export function ChannelView({ t, store, state, channel, activeLocale, pendingThr
  * 「先展示 channel, 有 thread 才在右侧展开」。ChannelView messages tab 自己用
  * 它; Activity 右栏 dock 也用同一组件, 不再手拼第二套。
  */
-export function ChannelChatPane({ t, store, state, channel, channelHead, thread, jumpMessageId, onJumpHandled, activeLocale, onOpenTasks, onOpenThread, onCloseThread, onRootJump, composerDisabled }: {
+export function ChannelChatPane({ t, store, state, channel, channelHead, thread, jumpMessageId, onJumpHandled, activeLocale, onOpenTasks, onOpenThread, onCloseThread, onRootJump, onThreadOpenInChannel, composerDisabled }: {
   t: ChaosTranslate
   store: CollabStore
   state: CollabStoreSnapshot
@@ -183,6 +194,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
   onOpenThread(messageId: string): void
   onCloseThread(): void
   onRootJump(messageId: string): void
+  onThreadOpenInChannel?: (() => void) | undefined
   composerDisabled: boolean
 }): JSX.Element {
   const readOnly = channel.lifecycle === 'archived'
@@ -223,6 +235,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
       activeLocale={activeLocale}
       onRootJump={onRootJump}
       onClose={onCloseThread}
+      onOpenInChannel={onThreadOpenInChannel}
       readOnly={readOnly}
     />
   )
@@ -236,6 +249,7 @@ export function ChannelChatPane({ t, store, state, channel, channelHead, thread,
       activeLocale={activeLocale}
       onRootJump={onRootJump}
       onClose={onCloseThread}
+      onOpenInChannel={onThreadOpenInChannel}
       back
       readOnly={readOnly}
     />
