@@ -19,7 +19,7 @@
 /* Filled = the pill carries a concrete choice: border steps up a level so
    filled/unfilled read as one coherent state grammar across every pill. */
 .pill[data-filled='true'] {
-  border-color: var(--dsw-alias-border-l2);
+  border-color: var(--dsw-alias-label-tertiary);
   background: var(--dsw-alias-bg-layer-1);
 }
 
@@ -36,6 +36,14 @@
 .pill:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/* Empty = disabled with nothing to offer (e.g. "No models" until a provider
+   is chosen): reads as inert data, not a waiting input — dashed border keeps
+   it distinct from the plain unfilled state. */
+.pill[data-empty='true'] {
+  border-style: dashed;
+  opacity: 0.7;
 }
 
 .pillLabel {
