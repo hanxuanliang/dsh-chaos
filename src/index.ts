@@ -92,6 +92,17 @@ function dshHome(): string {
 
 const DEFAULT_DATABASE_PATH = join(dshHome(), 'collab', 'state.db')
 
+function defaultWebUserHandle(): string {
+  try {
+    const username = userInfo().username.trim()
+    // handle 取 OS 用户名 slug: 本地用户唯一且固定(owner 定论),
+    // `@vduanyan` 直接可读。空/异常时退 legacy 键。
+    return username === '' ? 'local-user' : username.toLowerCase().replace(/[^a-z0-9-_]/g, '-')
+  } catch {
+    return 'local-user'
+  }
+}
+
 function defaultWebUserDisplayName(): string {
   try {
     const username = userInfo().username.trim()
@@ -105,7 +116,7 @@ export const Config: z<Config> = z.object({
   path: z.string().default(DEFAULT_DATABASE_PATH),
   deliveryPollMs: z.number().step(1).min(50).default(500),
   remoteEnabled: z.boolean().default(true),
-  webUserHandle: z.string().default('local-user'),
+  webUserHandle: z.string().default(''),
   webUserDisplayName: z.string().default(''),
   sseHeartbeatMs: z.number().step(1).min(1_000).default(15_000),
 })
@@ -194,10 +205,11 @@ export class CollabService extends Service {
     this.runtimes = runtimes
 
     if (this.config.remoteEnabled ?? true) {
-      // Default to the OS username; the stable handle keeps identity while
-      // ensure_user migrates the display name of legacy 'Local User' rows.
+      // 本地用户 handle 默认取 OS 用户名 slug(owner 定论: 本地用户固定,
+      // `@vduanyan` 而非 legacy 键); 旧库的 legacy handle 行不迁移——
+      // ensureUser 会按新 handle 建新 User, 旧 local-user 行留作历史数据。
       const webActor = await handle.ensureUser(
-        this.config.webUserHandle ?? 'local-user',
+        this.config.webUserHandle || defaultWebUserHandle(),
         this.config.webUserDisplayName || defaultWebUserDisplayName(),
       )
       this.ctx.inject(['connection', 'webServer'], (remoteCtx) => {
