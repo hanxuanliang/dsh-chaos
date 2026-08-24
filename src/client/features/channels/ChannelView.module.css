@@ -65,32 +65,15 @@
 /* plocal participants-button anatomy (ChannelHeader member count, top-right):
  * bordered paper chip, tertiary icon + bold count — real button opening the
  * members dialog. */
+/* member chip = DSH Button ghost sm(宿主物种, settings 同款):
+ * 只微调座位 margin; 样式全部交给宿主。 */
 .channel .memberChip {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
   margin-left: 8px;
-  padding: 0 8px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-.channel .memberChip:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-.channel .memberChip:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
 }
 .channel .memberCount {
-  color: var(--dsw-alias-label-primary);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 

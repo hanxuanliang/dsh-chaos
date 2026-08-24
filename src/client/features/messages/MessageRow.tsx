@@ -94,7 +94,7 @@ export function MessageRow({ t, message, compact = false, author, bindingModel, 
   const displayName = author?.displayName ?? message.authorId
   return (
     <div className={css.row} data-message-id={message.id}>
-      <AvatarChip kind={author?.kind} handle={handle} displayName={displayName} avatarUrl={author?.avatarDataUrl} size="lg" />
+      <AvatarChip kind={author?.kind} handle={handle} displayName={displayName} avatarUrl={author?.avatarDataUrl} size="md" />
       <div className={css.main}>
         <div className={css.head}>
           <span className={css.name}>{displayName}</span>

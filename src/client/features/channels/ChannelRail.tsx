@@ -51,12 +51,7 @@ function ChannelRows({ channels, state, onSelect, onEdit, onRestore, onDelete, t
         >
           {unread > 0 && <span className={css.railUnreadDot} aria-hidden="true" />}
           <span className={css.railHash} aria-hidden="true">#</span>
-          <span className={css.railCopy}>
-            <span className={css.railName}>{channel.name}</span>
-            {channel.description.trim() !== '' && (
-              <span className={css.railDescription}>{channel.description}</span>
-            )}
-          </span>
+          <span className={css.railName}>{channel.name}</span>
           {unread > 0 && <span className={css.railUnread}>{unread}</span>}
         </button>
         {owner && (
@@ -88,12 +83,13 @@ function GroupChevron({ open }: { open: boolean }): JSX.Element {
 
 export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onRestore, onDelete }: ChannelRailProps): JSX.Element {
   const [activeOpen, setActiveOpen] = useState(true)
-  const [archivedOpen, setArchivedOpen] = useState(false)
+  const [railFilter, setRailFilter] = useState<'all' | 'archived'>('all')
   const activeListId = useId()
-  const archivedListId = useId()
   const activeChannels = state.channels.filter(channel => channel.lifecycle === 'active')
   const archivedChannels = state.channels.filter(channel => channel.lifecycle === 'archived')
   const rows = { state, onSelect, onEdit, onRestore, onDelete, t }
+  /* cumora 胶囊筛选排: All/Archived 替代归档折叠组头。 */
+  const showingArchived = railFilter === 'archived'
 
   return (
     <nav className={css.rail} aria-label={t('panel.channels')}>
@@ -108,25 +104,25 @@ export function ChannelRail({ t, state, onSelect, onCreate, onEdit, onRestore, o
           <IconPlusOutline16 size={14} />
         </button>
       </div>
+      {archivedChannels.length > 0 && (
+        <div className={css.railFilterRow} role="group" aria-label={t('panel.railFilterAria')}>
+          <button type="button" className={css.railFilter} data-active={!showingArchived || undefined}
+            aria-pressed={!showingArchived} onClick={() => { setRailFilter('all') }}>{t('activity.filterAll')}</button>
+          <button type="button" className={css.railFilter} data-active={showingArchived || undefined}
+            aria-pressed={showingArchived} onClick={() => { setRailFilter('archived') }}>{t('channel.archivedGroup')}</button>
+        </div>
+      )}
       <div className={css.railScroll}>
-        {activeOpen && (
+        {activeOpen && !showingArchived && (
           <div id={activeListId} data-channel-group-list="active" role="list">
             {activeChannels.length === 0 && <p className={css.railEmpty}>{t('panel.railEmpty')}</p>}
             <ChannelRows channels={activeChannels} {...rows} />
           </div>
         )}
-        {archivedChannels.length > 0 && (
-          <section className={css.archiveGroup}>
-            <div className={css.railHead}>
-              <button type="button" className={css.railTitle} aria-expanded={archivedOpen} aria-controls={archivedListId}
-                data-channel-group-toggle="archived" onClick={() => { setArchivedOpen(open => !open) }}>
-                <GroupChevron open={archivedOpen} />
-                <span className={css.railLabel}>{t('channel.archivedGroup')}</span>
-                <span className={css.railCount}>{archivedChannels.length}</span>
-              </button>
-            </div>
-            {archivedOpen && <div id={archivedListId} data-channel-group-list="archived" role="list"><ChannelRows channels={archivedChannels} {...rows} /></div>}
-          </section>
+        {showingArchived && archivedChannels.length > 0 && (
+          <div data-channel-group-list="archived" role="list">
+            <ChannelRows channels={archivedChannels} {...rows} />
+          </div>
         )}
       </div>
     </nav>
