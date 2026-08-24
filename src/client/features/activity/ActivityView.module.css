@@ -60,7 +60,33 @@
 .activityDetailPane > [class*='threadPanel'] { width: 100% !important; border-left: 0 !important; }
 
 .dockBack { display: inline-flex; flex: none; }
-.dockOpenInChannel { display: inline-flex; flex: none; }
+/* view in channel = 轻量胶囊(memberChip 同物种): 24px 高、无边框、hover 底。
+ * DSH Button sm(28px 描边)在 dock 头偏重。 */
+.dockOpenInChannel {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dockOpenInChannel:hover {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dockOpenInChannel:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
 .mobileDetailHeader { display: none; }
 
 @media (max-width: 700px) {

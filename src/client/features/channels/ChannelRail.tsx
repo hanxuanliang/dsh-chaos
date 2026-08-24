@@ -51,7 +51,12 @@ function ChannelRows({ channels, state, onSelect, onEdit, onRestore, onDelete, t
         >
           {unread > 0 && <span className={css.railUnreadDot} aria-hidden="true" />}
           <span className={css.railHash} aria-hidden="true">#</span>
-          <span className={css.railName}>{channel.name}</span>
+          <span className={css.railCopy}>
+            <span className={css.railName}>{channel.name}</span>
+            {channel.description.trim() !== '' && (
+              <span className={css.railDescription}>{channel.description}</span>
+            )}
+          </span>
           {unread > 0 && <span className={css.railUnread}>{unread}</span>}
         </button>
         {owner && (

@@ -11,7 +11,7 @@
  * - direct 行暂不做(DM 主界面没建,点击没有诚实目标 — 隐藏)。
  */
 import { useMemo, useRef, useState, type JSX } from 'react'
-import { Button, IconCheckOutline14, IconChevronLeftOutline14, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCheckOutline14, IconChevronLeftOutline14, IconRightUpOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NativeActivityInboxItem, NativeTarget } from '../../../native.ts'
 import css from './ActivityView.module.css'
 import type { ChaosTranslate } from '../../locales.ts'
@@ -207,15 +207,10 @@ export function ActivityView({ t, store, state, activeLocale, onCreateAgent, onO
               </span>
             )}
             headerActions={(
-              <Button
-                className={css.dockOpenInChannel}
-                variant="outline"
-                size="sm"
-                icon={<IconRightUpOutline16 size={14} />}
-                onClick={() => { onOpenInChannel(dock.channelId) }}
-              >
-                {t('activity.openInChannel')}
-              </Button>
+              <button type="button" className={css.dockOpenInChannel} onClick={() => { onOpenInChannel(dock.channelId) }}>
+                <IconRightUpOutline16 size={14} />
+                <span>{t('activity.openInChannel')}</span>
+              </button>
             )}
           />
         ) : (
