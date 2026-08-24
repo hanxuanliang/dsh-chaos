@@ -30,7 +30,7 @@
   flex: none;
   align-items: center;
   gap: 4px;
-  padding: 0 4px 6px;
+  padding: 0 4px 4px;
 }
 
 
@@ -179,11 +179,13 @@
 
 /* 胶囊筛选排(cumora ConversationsPane): 11px/600 小胶囊、1px 边、
  * active=主色 tint 底+主色字。 */
+/* 布局节奏对齐 plocal ChatSidebar: 头(py 顶部)→筛选行→列表(mb-1 节奏)
+   ——组头到筛选行 4px, 筛选行到列表 4px, 统一同距, 上下不再不对称。 */
 .rail .railFilterRow {
   display: flex;
   flex: none;
   gap: 4px;
-  padding: 6px 8px 2px;
+  padding: 0 8px 4px;
 }
 .rail .railFilter {
   display: inline-flex;
