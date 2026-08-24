@@ -732,6 +732,78 @@ try {
     return rect.left >= 0 && rect.right <= 650 && document.documentElement.scrollWidth <= 650;
   })()`)
   await page.screenshot('agent-settings-inline-narrow.png')
+  await page.setViewport(1200, 800)
+
+  // Complete a real Agent through the single-screen inline form, then open
+  // the detail header's More menu to lock its open state and capture it.
+  await page.fill('#chaos-agent-create-name', 'Frontend review')
+  await page.fill('#chaos-agent-create-charter', 'Reviews frontend changes.')
+  await page.clickExpression('Provider pill', `(() => {
+    const form = document.querySelector('[data-agent-create-inline]');
+    return [...form?.querySelectorAll('button[aria-haspopup="listbox"]') ?? []][0];
+  })()`)
+  await page.waitForExpression('Provider menu open', `(() => {
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
+    return items.length > 0;
+  })()`)
+  await page.clickExpression('First provider option', `(() => {
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
+    return items[0];
+  })()`)
+  await page.clickExpression('Model pill', `(() => {
+    const form = document.querySelector('[data-agent-create-inline]');
+    return [...form?.querySelectorAll('button[aria-haspopup="listbox"]') ?? []][1];
+  })()`)
+  await page.waitForExpression('Model menu open', `(() => {
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
+    return items.length > 0;
+  })()`)
+  await page.clickExpression('First model option', `(() => {
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+      .filter(item => item instanceof HTMLElement && item.offsetParent !== null);
+    return items[0];
+  })()`)
+  await page.clickExpression('Create Agent submit', `[...document.querySelectorAll('button')]
+    .find(button => button.offsetParent !== null && button.textContent?.trim() === 'Create Agent' && !button.disabled)`)
+  await page.waitForExpression('created Agent row in list', `(() => {
+    const block = document.querySelector('[data-agent-create-inline]');
+    return block === null && document.body.innerText.includes('Frontend review');
+  })()`)
+  await page.screenshot('agent-created-list.png')
+  await page.clickExpression('open Agent detail from row', `(() => {
+    const page = document.querySelector('section[aria-label="Collab Agents"]');
+    return [...page?.querySelectorAll('button, [role="button"]') ?? []]
+      .find(row => row.textContent?.includes('Frontend review'));
+  })()`)
+  await page.waitForExpression('Agent detail header', `(() => {
+    const detail = document.querySelector('section[id^="chaos-agent-"][id$="-detail"]');
+    return detail instanceof HTMLElement && detail.offsetParent !== null
+      && detail.textContent?.includes('Frontend review');
+  })()`)
+  await page.screenshot('agent-detail-before-menu.png')
+  await page.clickExpression('Agent detail More menu', `document.querySelector('button[aria-label="More actions"]')`)
+  await new Promise(resolveWait => setTimeout(resolveWait, 400))
+  await page.screenshot('agent-detail-more-menu.png')
+  await page.waitForExpression('Agent detail More menu opens as a fixed portal', `(() => {
+    const menu = [...document.querySelectorAll('[role="menu"]')]
+      .find(candidate => candidate instanceof HTMLElement);
+    if (menu === undefined) return false;
+    const style = getComputedStyle(menu);
+    const rect = menu.getBoundingClientRect();
+    const trigger = document.querySelector('button[aria-label="More actions"]');
+    if (trigger === null) return false;
+    const triggerRect = trigger.getBoundingClientRect();
+    return style.position === 'fixed'
+      && style.zIndex !== 'auto'
+      && menu.textContent?.includes('Delete')
+      && Math.abs(rect.right - triggerRect.right) <= 2
+      && rect.top >= triggerRect.bottom - 2
+      && rect.right <= window.innerWidth
+      && rect.bottom <= window.innerHeight;
+  })()`)
 
   assert(page.consoleErrors.length === 0, `console errors:\n${page.consoleErrors.join('\n')}`)
   assert(page.pageErrors.length === 0, `page errors:\n${page.pageErrors.join('\n')}`)
