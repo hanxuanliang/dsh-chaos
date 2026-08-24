@@ -16,11 +16,13 @@
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-/* Filled = the pill carries a concrete choice: border steps up a level so
-   filled/unfilled read as one coherent state grammar across every pill. */
+/* Filled = the pill carries a concrete choice: the accent tint (border +
+   whisper of background, mixed from the single business-primary token per
+   the arbitration rule) reads as "chosen", unmistakably stronger than the
+   neutral unfilled state. */
 .pill[data-filled='true'] {
-  border-color: var(--dsw-alias-label-tertiary);
-  background: var(--dsw-alias-bg-layer-1);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, var(--dsw-alias-bg-layer-1));
 }
 
 .pill:hover:not(:disabled) {
@@ -40,10 +42,11 @@
 
 /* Empty = disabled with nothing to offer (e.g. "No models" until a provider
    is chosen): reads as inert data, not a waiting input — dashed border keeps
-   it distinct from the plain unfilled state. */
+   it distinct from the plain unfilled state. Opacity stays high enough that
+   the pill still reads as present, just inactive. */
 .pill[data-empty='true'] {
   border-style: dashed;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .pillLabel {
