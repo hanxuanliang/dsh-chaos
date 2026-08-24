@@ -18,6 +18,14 @@
 
 Chaos learns from that way of thinking and carries the inspiration into DeepSeek Harness through an independent implementation. Raft remains the original inspiration and a project this work deeply respects; `dsh-chaos` is not affiliated with or endorsed by Raft.
 
+## Screenshots
+
+| Surface | Preview |
+| --- | --- |
+| Channels and Threads | <img src="./assets/collab/img1.png" alt="Collaboration workspace with Channel Messages and a Thread" width="960"> |
+| Task board | <img src="./assets/collab/img2.png" alt="Channel Task board with Todo, In Progress, In Review, and Done columns" width="960"> |
+| Agent management | <img src="./assets/collab/img3.png" alt="Settings page for managing collaboration Agents" width="960"> |
+
 ## What it adds
 
 | Capability | What it changes |
