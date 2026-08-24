@@ -816,26 +816,26 @@ try {
       && pills[2].left - pills[1].right >= 8;
   })()`)
   await page.screenshot('agent-detail-before-menu.png')
-  await page.clickExpression('Agent detail More menu', `document.querySelector('button[aria-label="More actions"]')`)
-  await new Promise(resolveWait => setTimeout(resolveWait, 400))
-  await page.screenshot('agent-detail-more-menu.png')
-  await page.waitForExpression('Agent detail More menu opens as a fixed portal', `(() => {
-    const menu = [...document.querySelectorAll('[role="menu"]')]
-      .find(candidate => candidate instanceof HTMLElement);
-    if (menu === undefined) return false;
-    const style = getComputedStyle(menu);
-    const rect = menu.getBoundingClientRect();
-    const trigger = document.querySelector('button[aria-label="More actions"]');
-    if (trigger === null) return false;
-    const triggerRect = trigger.getBoundingClientRect();
-    return style.position === 'fixed'
-      && style.zIndex !== 'auto'
-      && menu.textContent?.includes('Delete')
-      && Math.abs(rect.right - triggerRect.right) <= 2
-      && rect.top >= triggerRect.bottom - 2
-      && rect.right <= window.innerWidth
-      && rect.bottom <= window.innerHeight;
+  await page.waitForExpression('Agent detail header carries no More menu and Delete lives in the footer', `(() => {
+    const detail = document.querySelector('section[id^="chaos-agent-"][id$="-detail"]');
+    if (!(detail instanceof HTMLElement)) return false;
+    const header = detail.querySelector('header');
+    const menus = header?.querySelectorAll('[role="menu"], button[aria-haspopup="menu"]').length ?? 0;
+    const footerButtons = [...detail.querySelectorAll('footer button')]
+      .map(button => button.textContent?.trim());
+    return menus === 0 && footerButtons.includes('Delete Agent');
   })()`)
+  await page.clickExpression('Identity tab', `(() => {
+    const detail = document.querySelector('section[id^="chaos-agent-"][id$="-detail"]');
+    return [...detail?.querySelectorAll('[role="tab"]') ?? []].find(tab => tab.textContent?.trim() === 'Identity');
+  })()`)
+  await page.waitForExpression('identity footer also owns Delete', `(() => {
+    const panel = document.querySelector('[role="tabpanel"]');
+    const buttons = [...panel?.querySelectorAll('footer button') ?? []]
+      .map(button => button.textContent?.trim());
+    return buttons.includes('Delete Agent') && buttons.some(label => (label ?? '').startsWith('Save'));
+  })()`)
+  await page.screenshot('agent-detail-footer.png')
 
   assert(page.consoleErrors.length === 0, `console errors:\n${page.consoleErrors.join('\n')}`)
   assert(page.pageErrors.length === 0, `page errors:\n${page.pageErrors.join('\n')}`)
