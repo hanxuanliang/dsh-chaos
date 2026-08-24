@@ -48,3 +48,41 @@
   border-radius: 1px;
   background: var(--dsw-alias-state-business-primary);
 }
+
+/* Floating variant (dsh-synapse view-switch grammar): a centered pill
+ * group hovering over the header's contents — full-round 999px track,
+ * 1px border, near-opaque background, 3px inset; 28px buttons at 12px/650
+ * with 11px horizontal padding, active = primary-fill + on-fill text. */
+.tabs[data-variant='floating'] {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin-left: 0;
+  gap: 2px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv1-blur, 0 1px 3px rgb(0 0 0 / 0.08));
+}
+.tabs[data-variant='floating'] .tab {
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 11px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.tabs[data-variant='floating'] .tab:hover:not(:disabled):not([data-active]) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.tabs[data-variant='floating'] .tab[data-active] {
+  color: var(--dsw-alias-label-primary-foreground, white);
+  background: var(--dsw-alias-button-primary-fill);
+  font-weight: 600;
+}

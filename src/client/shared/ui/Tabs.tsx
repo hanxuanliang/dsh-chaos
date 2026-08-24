@@ -17,11 +17,12 @@ export function Tabs<T extends string>({ items, value, onValueChange, label, ali
   onValueChange(value: T): void
   label: string
   align?: 'inline' | 'lead' | 'stretch' | undefined
-  /** 'underline' swaps the segmented-pill grammar for the page-title tab
-   * grammar (Linear/circle workspace headers): 14px/600 label, active =
-   * full-strength text + 2px primary underline riding the container's
-   * bottom edge. Default keeps the existing segmented pill. */
-  variant?: 'underline' | undefined
+  /** 'underline' swaps the segmented-pill grammar for the synapse canvas-tabs
+   * grammar (bare labels + primary underline on the container's bottom edge).
+   * 'floating' renders the synapse view-switch grammar — an absolutely
+   * centered full-round pill group hovering over the header's contents.
+   * Default keeps the existing segmented pill. */
+  variant?: 'underline' | 'floating' | undefined
   className?: string | undefined
 }): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null)

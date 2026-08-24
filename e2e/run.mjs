@@ -424,22 +424,24 @@ try {
   await page.clickExpression('Collab entry', `[...document.querySelectorAll('button')]
     .find(button => button.getAttribute('aria-label') === 'Collab')`)
   await page.waitForExpression('Channels navigation', `document.querySelector('nav[aria-label="Channels"]')?.offsetParent !== null`)
-  await page.waitForExpression('panel header tabs use the synapse underline grammar', `(() => {
+  await page.waitForExpression('panel tabs are the floating view-switch (synapse grammar)', `(() => {
     const tabs = [...document.querySelectorAll('[role="tab"]')]
       .filter(tab => tab instanceof HTMLElement && tab.offsetParent !== null
         && tab.closest('header') !== null);
     if (tabs.length < 2) return false;
+    const group = tabs[0].closest('[role="tablist"]');
+    if (!(group instanceof HTMLElement)) return false;
+    const groupCs = getComputedStyle(group);
     const active = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
     if (active === undefined) return false;
-    const cs = getComputedStyle(active);
-    const underline = getComputedStyle(active, '::after');
-    const header = active.closest('header');
+    const header = group.closest('header');
     const headerRect = header?.getBoundingClientRect();
-    const activeRect = active.getBoundingClientRect();
-    return activeRect.left - (headerRect?.left ?? 0) < 24
-      && cs.fontSize === '13px'
-      && parseFloat(cs.borderRadius) === 0
-      && underline.height !== '' && parseFloat(underline.height) >= 1.5;
+    const groupRect = group.getBoundingClientRect();
+    const activeCs = getComputedStyle(active);
+    return groupCs.position === 'absolute'
+      && groupCs.borderRadius === '999px'
+      && activeCs.fontSize === '12px'
+      && Math.abs((groupRect.left + groupRect.right) / 2 - (headerRect?.left + (headerRect?.right ?? 0)) / 2) <= 2;
   })()`)
   await page.waitForExpression('channel rail is a resizable pane', `(() => {
     const rail = document.querySelector('nav[aria-label="Channels"]');

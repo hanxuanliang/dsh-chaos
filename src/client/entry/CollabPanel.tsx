@@ -186,8 +186,7 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
     <>
       <header className={css.header}>
         <Tabs<'collab' | 'activity'>
-          variant="underline"
-          align="lead"
+          variant="floating"
           value={panelView}
           onValueChange={setPanelView}
           label={t('panel.title')}

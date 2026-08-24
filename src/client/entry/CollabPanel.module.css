@@ -123,11 +123,9 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
-/* Synapse-style underline tabs (variant): tablist stretches to the
- * header's bottom edge so the 2px active underline meets the header
- * hairline. */
-.header > [data-variant='underline'] { align-self: stretch; }
-.header > [data-variant='underline'] [role='tab'] { display: inline-flex; align-items: center; }
+/* Floating view-switch tabs (synapse grammar): the group is absolutely
+ * centered over the header; the header itself anchors it. */
+.header { position: relative; }
 
 .title {
   margin: 0;
