@@ -186,12 +186,14 @@ export function CollabPanel({ t, onClose, store, connection, activeLocale }: Col
     <>
       <header className={css.header}>
         <Tabs<'collab' | 'activity'>
+          variant="underline"
+          align="lead"
           value={panelView}
           onValueChange={setPanelView}
           label={t('panel.title')}
           items={[
             { id: 'collab', label: t('panel.title') },
-            { id: 'activity', label: t('activity.title') + ` (${String(state.activityCount)})` },
+            { id: 'activity', label: <span className={css.tabLabel}>{t('activity.title')}{state.activityCount > 0 && <span className={css.tabCount}>{String(state.activityCount)}</span>}</span> },
           ]}
         />
         <IconButton

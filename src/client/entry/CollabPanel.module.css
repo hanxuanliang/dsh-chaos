@@ -117,11 +117,17 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   display: flex;
   flex: none;
   height: 48px;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  padding: 0 16px 0 12px;
 }
+
+/* Underline-tab header (A): the active tab's 2px underline rides this
+ * edge; a second hairline would double up, so the header itself goes
+ * borderless and the underline becomes the divider. */
+.header:has(> [data-variant='underline']) { border-bottom: 0; }
+.header > [data-variant='underline'] { align-self: stretch; }
+.header > [data-variant='underline'] [role='tab'] { display: inline-flex; align-items: center; }
 
 .title {
   margin: 0;
@@ -185,4 +191,13 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
 /* Card = whole-button; must beat .panel button { font: inherit } (S5). */
 @media (max-width: 700px) {
   .mobileChannelsButton { display: inline-flex; }
+}
+
+/* Activity tab label: title + unread count as a quiet tabular badge. */
+.tabLabel { display: inline-flex; align-items: baseline; gap: 6px; }
+.tabCount {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }

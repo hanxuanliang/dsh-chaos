@@ -7,3 +7,42 @@
 .tab:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
 .tab[data-active] { color: var(--dsw-alias-label-primary-foreground, white); background: var(--dsw-alias-button-primary-fill); font-weight: 500; }
 .tab:disabled { cursor: not-allowed; opacity: .45; }
+
+/* Underline variant (Linear/circle page-title tabs): transparent track,
+ * 14px/600 labels, active = full-strength text + 2px primary underline
+ * riding the track's bottom edge. Pairs with a header that has no bottom
+ * border so the underline reads as the divider itself. */
+.tabs[data-variant='underline'] {
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.tabs[data-variant='underline'] .tab {
+  position: relative;
+  border-radius: 0;
+  padding: 3px 2px 7px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.tabs[data-variant='underline'] .tab:hover:not(:disabled):not([data-active]) {
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+}
+.tabs[data-variant='underline'] .tab[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font-weight: 600;
+}
+.tabs[data-variant='underline'] .tab[data-active]::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  left: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--dsw-alias-state-business-primary);
+}
