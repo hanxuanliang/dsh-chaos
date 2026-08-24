@@ -22,6 +22,7 @@ export function PillSelect(props: PillSelectProps): JSX.Element {
   const { label, placeholder, value, entries, selectedId, disabled, onSelect } = props
   const [open, setOpen] = useState(false)
   const filled = value !== ''
+  const empty = disabled && entries.length === 0
   return (
     <Menu
       open={open}
@@ -40,6 +41,7 @@ export function PillSelect(props: PillSelectProps): JSX.Element {
           title={filled ? value : placeholder}
           disabled={disabled}
           data-filled={filled ? 'true' : undefined}
+          data-empty={empty ? 'true' : undefined}
           onClick={() => { setOpen(state => !state) }}
           data-open={open ? 'true' : undefined}
         >
