@@ -212,6 +212,20 @@ impl<'connection> ActorStore<'connection> {
             .await
     }
 
+    /// Move one actor onto a new handle (identity adoption: the actor id and
+    /// every foreign key referencing it stay untouched — only the handle
+    /// key changes, so memberships/tasks/messages follow the same row).
+    pub(crate) async fn rehandle(&self, id: &ActorId, handle: &str) -> Result<()> {
+        let handle = NonBlank::parse("handle", handle)?;
+        self.connection
+            .execute_one(
+                "UPDATE actors SET handle = ?2 WHERE id = ?1",
+                (id.as_str(), handle.as_str()),
+                "actor rehandle",
+            )
+            .await
+    }
+
     pub(crate) async fn update_avatar_data_url(
         &self,
         id: &ActorId,

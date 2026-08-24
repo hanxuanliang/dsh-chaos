@@ -18,6 +18,10 @@ use base64::engine::general_purpose::STANDARD;
 use store::ProfileStore;
 
 const AGENT_AVATAR_MAX_BYTES: usize = 256 * 1024;
+/// Legacy default handle from pre-OS-username builds. ensure_user adopts
+/// (rehandles) this row onto the OS-username slug instead of splitting the
+/// local user into two actors.
+const LEGACY_LOCAL_USER_HANDLE: &str = "local-user";
 
 fn normalize_avatar_data_url(value: Option<&str>) -> Result<Option<String>> {
     let Some(value) = value else { return Ok(None) };
@@ -244,6 +248,13 @@ impl CollabCore {
     }
 
     /// Return the stable User for one handle, creating it when absent.
+    ///
+    /// Legacy-handle adoption (owner ruling: the local user is fixed on this
+    /// machine, so the handle reads as the OS username): when the requested
+    /// handle does not exist but the legacy 'local-user' User does (and no
+    /// Agent squatted the new handle), that row is ADOPTED — one UPDATE moves
+    /// memberships, tasks, follows, and history to the new handle; no second
+    /// User row is created.
     pub async fn ensure_user(&self, handle: &str, display_name: &str) -> Result<Actor> {
         NonBlank::parse("handle", handle)?;
         NonBlank::parse("display_name", display_name)?;
@@ -276,6 +287,47 @@ impl CollabCore {
                     });
                 }
                 return Ok(actor);
+            }
+
+            // Legacy 'local-user' adoption: rename the row in place instead of
+            // leaving a split identity behind (id, memberships, tasks, and
+            // message authorship all keep pointing at this actor id).
+            if handle != LEGACY_LOCAL_USER_HANDLE {
+                if let Some(legacy) = Actor::find_by_handle(
+                    connection,
+                    LEGACY_LOCAL_USER_HANDLE,
+                )
+                .await?
+                {
+                    if legacy.kind == ActorKind::User {
+                        let id = ActorId::parse(&legacy.id)?;
+                        crate::actor::ActorStore::new(connection)
+                            .rehandle(&id, handle)
+                            .await?;
+                        if legacy.display_name != display_name
+                            && legacy.display_name == "Local User"
+                        {
+                            crate::actor::ActorStore::new(connection)
+                                .rename(&id, display_name)
+                                .await?;
+                        }
+                        let actor_ids = ChangeStore::new(connection).all_actor_ids().await?;
+                        ChangeStore::new(connection)
+                            .insert_change(
+                                ChangeKind::ActorCreated,
+                                None,
+                                &legacy.id,
+                                &actor_ids,
+                                now,
+                            )
+                            .await?;
+                        return Ok(Actor {
+                            handle: handle.to_owned(),
+                            display_name: display_name.to_owned(),
+                            ..legacy
+                        });
+                    }
+                }
             }
 
             Actor::insert(connection, ActorKind::User, handle, display_name, now).await
