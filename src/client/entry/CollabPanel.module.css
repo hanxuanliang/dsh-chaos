@@ -123,9 +123,11 @@ html[data-dsh-chaos-active]:not([data-dsh-taskboard-active]):not([data-dsh-ssh-a
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
-/* Pill tabs live at the header's left edge; the header keeps its own
- * hairline divider. */
-.header > [role='tablist'] { margin-left: 0; }
+/* Synapse-style underline tabs (variant): tablist stretches to the
+ * header's bottom edge so the 2px active underline meets the header
+ * hairline. */
+.header > [data-variant='underline'] { align-self: stretch; }
+.header > [data-variant='underline'] [role='tab'] { display: inline-flex; align-items: center; }
 
 .title {
   margin: 0;
