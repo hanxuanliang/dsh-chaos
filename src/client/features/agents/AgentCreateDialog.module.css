@@ -73,16 +73,6 @@
   gap: 10px;
 }
 
-.identityHint {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 17px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .handleError {
   color: var(--dsw-alias-state-error-primary, inherit);
   font-size: 11px;

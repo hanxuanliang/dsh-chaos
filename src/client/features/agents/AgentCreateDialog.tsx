@@ -5,7 +5,7 @@ import type { AgentPresetSummary, CreatedAgent } from '../../../agent-settings-t
 import { ChaosClient, type CreateAgentRequest, type LlmModelGroup } from '../../data/api.ts'
 import type { ChaosTranslate } from '../../locales.ts'
 import { PanelHeader } from '../../shared/layout/index.ts'
-import { ErrorBanner } from '../../shared/ui/index.ts'
+import { ErrorBanner, HelpHint } from '../../shared/ui/index.ts'
 import { AvatarChip } from '../../shared/ui/AvatarChip.tsx'
 import { hasAgentHandle, initialAgentHandle } from './agent-handle.ts'
 import { PillSelect } from './PillSelect.tsx'
@@ -148,7 +148,7 @@ export function AgentCreateForm(props: AgentCreateFormProps): JSX.Element {
         {handleExists
           ? <span className={css.handleError} role="alert">{t('create.nameExists')}</span>
           : <>
-              <span className={css.identityHint}>{t('create.charterHint')}</span>
+              <HelpHint label={t('create.charterHint')} />
               <span className={css.count}>{String(description.length)}/800</span>
             </>}
       </div>
