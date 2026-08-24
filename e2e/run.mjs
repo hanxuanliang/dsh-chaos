@@ -794,6 +794,27 @@ try {
     return detail instanceof HTMLElement && detail.offsetParent !== null
       && detail.textContent?.includes('Frontend review');
   })()`)
+  await page.clickExpression('Runtime tab', `(() => {
+    const detail = document.querySelector('section[id^="chaos-agent-"][id$="-detail"]');
+    return [...detail?.querySelectorAll('[role="tab"]') ?? []].find(tab => tab.textContent?.trim() === 'Runtime');
+  })()`)
+  await page.waitForExpression('runtime tab panel', `(() => {
+    const panel = document.querySelector('[role="tabpanel"]');
+    const group = document.querySelector('[role="group"][aria-label="Runtime"]');
+    return panel instanceof HTMLElement && group instanceof HTMLElement;
+  })()`)
+  await page.screenshot('agent-detail-runtime-tab.png')
+  await page.waitForExpression('runtime pills separated with visible edge', `(() => {
+    const group = document.querySelector('[role="group"][aria-label="Runtime"]');
+    if (!(group instanceof HTMLElement)) return false;
+    const cs = getComputedStyle(group);
+    const pills = [...group.querySelectorAll('button')].map(btn => btn.getBoundingClientRect());
+    return parseFloat(cs.paddingTop) >= 8
+      && parseFloat(cs.borderWidth) >= 1
+      && pills.length === 3
+      && pills[1].left - pills[0].right >= 8
+      && pills[2].left - pills[1].right >= 8;
+  })()`)
   await page.screenshot('agent-detail-before-menu.png')
   await page.clickExpression('Agent detail More menu', `document.querySelector('button[aria-label="More actions"]')`)
   await new Promise(resolveWait => setTimeout(resolveWait, 400))
