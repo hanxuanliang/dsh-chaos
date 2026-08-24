@@ -11,12 +11,17 @@ export interface TabItem<T extends string> {
   panelId?: string | undefined
 }
 
-export function Tabs<T extends string>({ items, value, onValueChange, label, align = 'inline', className }: {
+export function Tabs<T extends string>({ items, value, onValueChange, label, align = 'inline', variant, className }: {
   items: Array<TabItem<T>>
   value: T
   onValueChange(value: T): void
   label: string
   align?: 'inline' | 'lead' | 'stretch' | undefined
+  /** 'underline' swaps the segmented-pill grammar for the page-title tab
+   * grammar (Linear/circle workspace headers): 14px/600 label, active =
+   * full-strength text + 2px primary underline riding the container's
+   * bottom edge. Default keeps the existing segmented pill. */
+  variant?: 'underline' | undefined
   className?: string | undefined
 }): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -36,7 +41,7 @@ export function Tabs<T extends string>({ items, value, onValueChange, label, ali
   }
 
   return (
-    <div ref={rootRef} className={classNames(css.tabs, className)} data-align={align} role="tablist" aria-label={label}>
+    <div ref={rootRef} className={classNames(css.tabs, className)} data-align={align} data-variant={variant} role="tablist" aria-label={label}>
       {items.map((item) => {
         const active = item.id === value
         return (

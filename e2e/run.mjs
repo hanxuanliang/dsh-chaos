@@ -424,6 +424,17 @@ try {
   await page.clickExpression('Collab entry', `[...document.querySelectorAll('button')]
     .find(button => button.getAttribute('aria-label') === 'Collab')`)
   await page.waitForExpression('Channels navigation', `document.querySelector('nav[aria-label="Channels"]')?.offsetParent !== null`)
+  await page.waitForExpression('panel header uses underline tabs (plan A)', `(() => {
+    const tabs = [...document.querySelectorAll('[role="tab"]')]
+      .filter(tab => tab instanceof HTMLElement && tab.offsetParent !== null
+        && tab.closest('header') !== null);
+    if (tabs.length < 2) return false;
+    const active = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
+    if (active === undefined) return false;
+    const underline = getComputedStyle(active, '::after');
+    return getComputedStyle(active).fontWeight === '600'
+      && underline.height !== '' && parseFloat(underline.height) >= 1.5;
+  })()`)
   await page.waitForExpression('channel rail is a resizable pane', `(() => {
     const rail = document.querySelector('nav[aria-label="Channels"]');
     if (!(rail instanceof HTMLElement) || rail.offsetParent === null) return false;
