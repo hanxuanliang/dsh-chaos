@@ -200,3 +200,22 @@
 @media (max-width: 700px) {
   .rail { width: 100%; }
 }
+
+/* Channel item actions menu (circle flavor): the DSH Menu primitive is
+ * compact by default — owner finds the result rigid next to circle's
+ * dropdown-menu. While the chaos panel owns the pane, restyle its
+ * portal menus: 200px floor, roomier rows, softer hover, 10px radius.
+ * Attribute selector survives CSS-module hashing (mnemon precedent). */
+html[data-dsh-chaos-active] [role='menu'][style*='position: fixed'] {
+  min-width: 200px;
+  border-radius: 10px;
+}
+html[data-dsh-chaos-active] [role='menu'] [role='menuitem'] {
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+html[data-dsh-chaos-active] [role='menu'] [role='menuitem']:hover,
+html[data-dsh-chaos-active] [role='menu'] [role='menuitem']:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
